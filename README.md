@@ -3,6 +3,15 @@
 Computational Modeling. Volume 1 of the Geometric Series. Served at
 https://erisml.org/geometric-methods/ via the erisml-lib `site` submodule.
 
+> **Epistemic status (2026-07-14): the series' metrology discipline.** This volume defines the
+> method — posited/measured separation, admission filters, frozen-null gates, pre-registration —
+> that the domain volumes are held to. The method itself is normative (a discipline, not a
+> finding); results it has produced are reported in the instrument repos
+> ([xbse](https://github.com/ahb-sjsu/xbse),
+> [moral-spectrum-analyzer](https://github.com/ahb-sjsu/moral-spectrum-analyzer),
+> [lebse](https://github.com/ahb-sjsu/lebse)). Domain volumes are *posited* until they pass
+> these gates; as of this date roughly two domains (legal text, moral dimensions 8/9) have.
+
 ## Structure
 
 - `chapters/*.md` — the book content (source of truth). The site is a
