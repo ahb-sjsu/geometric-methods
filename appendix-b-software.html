@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appendix B: Software Dependencies and Installation &mdash; Geometric Methods</title>
+  <meta name="description" content="Appendix B: Software Dependencies and Installation from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="appendix-b-software">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Appendix B: Software Dependencies and Installation</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="appendix-a-notation.html" class="nav-prev">&larr; Appendix A: Mathematical Notation and Conventions</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="appendix-c-proofs.html" class="nav-next">Appendix C: Selected Proofs and Derivations &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="appendix-b-software-dependencies-and-installation">Appendix B: Software Dependencies and Installation</h1>
+<p>This appendix provides a guide to setting up the software environment
+required to reproduce the examples in <em>Structural Fuzzing: Geometric Methods
+for Adversarial Model Validation</em>. The primary framework, <code>structural-fuzzing</code>, is available on
+PyPI and serves as the backbone for the structural validation techniques
+developed throughout the text.</p>
+<h2 id="b1-python-version-requirements">B.1 Python Version Requirements</h2>
+<p>All code in this book requires <strong>Python 3.10 or later</strong>. The
+<code>structural-fuzzing</code> package is tested against Python 3.10, 3.11, 3.12,
+and 3.13. We recommend the latest stable release in the 3.12 or 3.13
+series for best performance and compatibility.</p>
+<p>Python 3.10 is the minimum because the codebase uses modern type
+annotation syntax (e.g., <code>X | Y</code> union types) introduced in that release.
+Earlier versions will fail at import time.</p>
+<pre><code class="language-bash">python --version
+</code></pre>
+<p>If you need to manage multiple Python versions, we recommend
+<a href="https://github.com/pyenv/pyenv">pyenv</a> on Linux/macOS or the official
+installers from <a href="https://www.python.org/downloads/">python.org</a> on Windows.</p>
+<h2 id="b2-virtual-environment-setup">B.2 Virtual Environment Setup</h2>
+<p>We strongly recommend creating an isolated virtual environment before
+installing any packages.</p>
+<pre><code class="language-bash"># Create
+python -m venv .venv
+
+# Activate (Linux/macOS)
+source .venv/bin/activate
+
+# Activate (Windows PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Activate (Windows cmd)
+.venv\Scripts\activate.bat
+</code></pre>
+<p>Alternatively, with conda:</p>
+<pre><code class="language-bash">conda create -n structural-fuzzing python=3.12
+conda activate structural-fuzzing
+</code></pre>
+<p><strong>Best practices:</strong>
+- Create one virtual environment per project or per book chapter group.
+- Pin dependencies with <code>pip freeze &gt; requirements.txt</code> after installation.
+- Never install packages into your system Python.
+- On shared computing environments, use <code>--user</code> installs or virtual
+  environments to avoid permission issues.</p>
+<h2 id="b3-the-structural-fuzzing-package">B.3 The structural-fuzzing Package</h2>
+<p>The <code>structural-fuzzing</code> package (version 0.2.0 at the time of writing)
+provides the core framework used throughout this book. It implements
+structural validation through parameter-space exploration, Pareto analysis,
+sensitivity profiling, robustness quantification, and adversarial threshold
+detection.</p>
+<h3 id="installation">Installation</h3>
+<pre><code class="language-bash"># Core package (installs NumPy as the sole dependency)
+pip install structural-fuzzing
+
+# With ML example dependencies (scikit-learn, pandas)
+pip install structural-fuzzing[examples]
+
+# With development tools (pytest, ruff, build, twine)
+pip install structural-fuzzing[dev]
+
+# With documentation tools (Sphinx, RTD theme)
+pip install structural-fuzzing[docs]
+
+# Everything at once
+pip install structural-fuzzing[examples,dev,docs]
+</code></pre>
+<h3 id="installing-from-source">Installing from source</h3>
+<pre><code class="language-bash">git clone https://github.com/ahb-sjsu/structural-fuzzing.git
+cd structural-fuzzing
+pip install -e &quot;.[dev,examples,docs]&quot;
+</code></pre>
+<h3 id="verifying-the-installation">Verifying the installation</h3>
+<pre><code class="language-python">import structural_fuzzing
+print(structural_fuzzing.__version__)  # Should print &quot;0.2.0&quot; or later
+</code></pre>
+<h2 id="b4-core-and-optional-dependencies">B.4 Core and Optional Dependencies</h2>
+<h3 id="core-numpy-124">Core: NumPy (&gt;= 1.24)</h3>
+<p>NumPy is the only hard dependency. It provides the n-dimensional array
+operations underlying all geometric computations: parameter vectors,
+perturbation sampling, log-space transformations, and statistical
+aggregation. It is installed automatically with <code>structural-fuzzing</code>.</p>
+<h3 id="optional-scikit-learn-13">Optional: scikit-learn (&gt;= 1.3)</h3>
+<p>Required for the machine learning examples in Parts II and III, including
+the defect prediction case study. Provides the classifiers and regressors
+that serve as evaluation targets for structural fuzzing campaigns. Included
+in the <code>[examples]</code> extras group.</p>
+<h3 id="optional-pandas-20">Optional: pandas (&gt;= 2.0)</h3>
+<p>Used in several examples for data loading, preprocessing, and tabular
+result formatting. Included in the <code>[examples]</code> extras group.</p>
+<h2 id="b5-development-and-documentation-dependencies">B.5 Development and Documentation Dependencies</h2>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Version</th>
+<th>Group</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>pytest</td>
+<td>&gt;= 8.0</td>
+<td><code>[dev]</code></td>
+<td>Test runner</td>
+</tr>
+<tr>
+<td>pytest-cov</td>
+<td>&gt;= 4.0</td>
+<td><code>[dev]</code></td>
+<td>Coverage reporting</td>
+</tr>
+<tr>
+<td>ruff</td>
+<td>&gt;= 0.3</td>
+<td><code>[dev]</code></td>
+<td>Linting and formatting</td>
+</tr>
+<tr>
+<td>build</td>
+<td>&gt;= 1.0</td>
+<td><code>[dev]</code></td>
+<td>Building distribution packages</td>
+</tr>
+<tr>
+<td>twine</td>
+<td>&gt;= 5.0</td>
+<td><code>[dev]</code></td>
+<td>Uploading to PyPI</td>
+</tr>
+<tr>
+<td>sphinx</td>
+<td>&gt;= 7.0</td>
+<td><code>[docs]</code></td>
+<td>Documentation generator</td>
+</tr>
+<tr>
+<td>sphinx-rtd-theme</td>
+<td>&gt;= 2.0</td>
+<td><code>[docs]</code></td>
+<td>Read the Docs theme</td>
+</tr>
+</tbody>
+</table>
+<h2 id="b6-external-libraries-for-specific-geometric-methods">B.6 External Libraries for Specific Geometric Methods</h2>
+<p>Several chapters use specialized libraries beyond <code>structural-fuzzing</code>.
+These are not dependencies of the package itself but appear in standalone
+examples and exercises.</p>
+<h3 id="scipy-matrix-operations-and-optimization">SciPy &ndash; Matrix Operations and Optimization</h3>
+<pre><code class="language-bash">pip install scipy
+</code></pre>
+<p>SciPy extends NumPy with sparse matrices, eigenvalue decomposition, spatial
+data structures, and optimization routines. Key submodules used in this book:
+<code>scipy.spatial</code> (Delaunay triangulation, convex hulls, distance matrices),
+<code>scipy.linalg</code> (matrix decompositions, matrix exponentials),
+<code>scipy.optimize</code> (minimization, root finding), and
+<code>scipy.sparse</code> (adjacency and Laplacian matrices).</p>
+<h3 id="gudhi-or-ripser-persistent-homology">GUDHI or Ripser &ndash; Persistent Homology</h3>
+<pre><code class="language-bash">pip install gudhi    # Full TDA toolkit (requires C++ compiler)
+pip install ripser   # Lightweight alternative for Vietoris-Rips persistence
+</code></pre>
+<p>GUDHI provides algorithms for simplicial complexes, persistent homology,
+and topological data analysis. Chapters on topological feature extraction
+use it for computing Vietoris-Rips complexes and Betti numbers. If GUDHI
+installation fails due to compiler requirements, <code>ripser</code> offers a faster,
+more focused alternative.</p>
+<h3 id="geoopt-riemannian-optimization-and-hyperbolic-geometry">Geoopt &ndash; Riemannian Optimization and Hyperbolic Geometry</h3>
+<pre><code class="language-bash">pip install geoopt
+</code></pre>
+<p>Geoopt provides Riemannian optimization primitives built on PyTorch,
+including manifold-constrained gradient descent on the Poincare ball,
+hyperboloid model, and Stiefel manifold. Used in chapters covering
+hyperbolic embeddings and curvature-aware optimization. Note: install
+PyTorch first (CPU-only is sufficient for this book&rsquo;s examples) via
+<a href="https://pytorch.org/get-started/locally/">pytorch.org</a>.</p>
+<h2 id="b7-related-packages-from-the-ecosystem">B.7 Related Packages from the Ecosystem</h2>
+<p>These packages apply structural fuzzing and geometric methods to specific
+domains:</p>
+<ul>
+<li>
+<p><strong>eris-econ</strong> (<code>pip install eris-econ</code>) &ndash; Geometric economics framework
+  implementing multi-dimensional decision manifolds, A* pathfinding on
+  economic surfaces, and Bond Geodesic Equilibrium. Validates a 9D
+  ethical-economic parameter space against 16 behavioral economics targets.
+  Repository: <a href="https://github.com/ahb-sjsu/eris-econ">github.com/ahb-sjsu/eris-econ</a></p>
+</li>
+<li>
+<p><strong>eris-ketos</strong> (<code>pip install eris-ketos</code>) &ndash; Marine ecosystem modeling
+  with geometric structure, extending the decision framework to ecological
+  and environmental domains.</p>
+</li>
+<li>
+<p><strong>arc-agi</strong> &ndash; ARC-AGI-2 solver using geometric embeddings, hyperbolic
+  rule inference, and adversarial structure probing. Applies fuzzing and
+  adversarial threshold techniques to test robustness of learned geometric
+  rule representations.
+  Repository: <a href="https://github.com/ahb-sjsu/arc-prize">github.com/ahb-sjsu/arc-prize</a></p>
+</li>
+</ul>
+<h2 id="b8-chapter-dependency-matrix">B.8 Chapter Dependency Matrix</h2>
+<p>The table below shows which packages are required or recommended for each
+chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy are needed.</p>
+<table>
+<thead>
+<tr>
+<th>Chapter / Part</th>
+<th>Core</th>
+<th>scikit-learn</th>
+<th>pandas</th>
+<th>scipy</th>
+<th>gudhi/ripser</th>
+<th>geoopt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Part I: Foundations</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Ch 1. Why Geometry?</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 2. Mahalanobis Distance</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 3. Hyperbolic Geometry</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>Required</td>
+</tr>
+<tr>
+<td>Ch 4. SPD Manifolds</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 5. Topological Data Analysis</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Required</td>
+<td>Required</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td><strong>Part II: Algorithms</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Ch 6. Pathfinding on Manifolds</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 7. Equilibrium on Manifolds</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 8. Pareto Optimization</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 9. Adversarial Robustness (MRI)</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 10. Adversarial Probing</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td><strong>Part III: Design Patterns</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Ch 11. Subset Enumeration</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 12. Compositional Testing</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 13. Group-Theoretic Augmentation</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 14. Gradient Reversal</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 15. Cholesky Parameterization</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td><strong>Part IV: Systems</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Ch 16. Building Geometric Pipelines</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 17. Scaling to High Dimensions</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 18. Production Deployment</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 19. Case Study: Defect Prediction</td>
+<td>Required</td>
+<td>Required</td>
+<td>Recommended</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+</tr>
+<tr>
+<td>Ch 20. Case Study: Bioacoustics</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>Recommended</td>
+<td>Recommended</td>
+<td>Required</td>
+<td>Required</td>
+</tr>
+</tbody>
+</table>
+<h2 id="b9-complete-installation-for-all-chapters">B.9 Complete Installation for All Chapters</h2>
+<pre><code class="language-bash"># Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+
+# Install structural-fuzzing with all optional groups
+pip install structural-fuzzing[examples,dev,docs]
+
+# Install external geometric libraries
+pip install scipy gudhi geoopt
+
+# Install ecosystem packages
+pip install eris-econ eris-ketos
+</code></pre>
+<p>For a minimal installation covering Parts I and II only:</p>
+<pre><code class="language-bash">pip install structural-fuzzing
+</code></pre>
+<p>This installs only <code>structural-fuzzing</code> and NumPy, sufficient for
+Chapters 1 through 2 and Chapters 6 through 11.</p>
+<h2 id="b10-verifying-the-full-installation">B.10 Verifying the Full Installation</h2>
+<pre><code class="language-python">import sys
+
+for module, name in [(&quot;structural_fuzzing&quot;, &quot;structural-fuzzing&quot;),
+                     (&quot;numpy&quot;, &quot;NumPy&quot;), (&quot;sklearn&quot;, &quot;scikit-learn&quot;),
+                     (&quot;pandas&quot;, &quot;pandas&quot;), (&quot;scipy&quot;, &quot;SciPy&quot;),
+                     (&quot;gudhi&quot;, &quot;GUDHI&quot;), (&quot;geoopt&quot;, &quot;Geoopt&quot;)]:
+    try:
+        mod = __import__(module)
+        print(f&quot;  {name:.&lt;30s} {getattr(mod, '__version__', 'ok')}&quot;)
+    except ImportError:
+        print(f&quot;  {name:.&lt;30s} NOT FOUND&quot;)
+
+print(f&quot;\nPython version: {sys.version}&quot;)
+</code></pre>
+<h2 id="b11-troubleshooting">B.11 Troubleshooting</h2>
+<p><strong>pip resolver errors:</strong> Upgrade pip first with <code>pip install --upgrade pip</code>.</p>
+<p><strong>GUDHI compiler errors:</strong> GUDHI requires a C++ compiler and CMake. On
+Ubuntu: <code>sudo apt install build-essential cmake</code>. On macOS:
+<code>xcode-select --install</code>. Alternatively, use <code>ripser</code>.</p>
+<p><strong>Large PyTorch download from geoopt:</strong> Install PyTorch separately first
+with the CPU-only variant:
+<code>pip install torch --index-url https://download.pytorch.org/whl/cpu</code></p>
+<p><strong>Import errors after installation:</strong> Verify your virtual environment is
+activated with <code>which python</code> (Linux/macOS) or <code>where python</code> (Windows).</p>
+<p><strong>NumPy version conflicts:</strong> If another package pins NumPy &lt; 1.24, use a
+separate virtual environment for the book&rsquo;s exercises.</p>
+<p><strong>Platform notes:</strong> On Windows, use PowerShell or WSL. On macOS Apple
+Silicon, all packages have native ARM64 wheels. Linux has no special
+considerations.</p>
+<h2 id="b12-keeping-dependencies-updated">B.12 Keeping Dependencies Updated</h2>
+<pre><code class="language-bash">pip install --upgrade structural-fuzzing   # Update the package
+pip freeze &gt; requirements-book.txt         # Record versions for reproducibility
+pip install -r requirements-book.txt       # Recreate the environment later
+</code></pre>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="appendix-a-notation.html" class="nav-prev">&larr; Appendix A: Mathematical Notation and Conventions</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="appendix-c-proofs.html" class="nav-next">Appendix C: Selected Proofs and Derivations &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

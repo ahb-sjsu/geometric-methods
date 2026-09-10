@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 3: Hyperbolic Geometry for Hierarchical Data &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 3: Hyperbolic Geometry for Hierarchical Data from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-03-hyperbolic-geometry">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 3: Hyperbolic Geometry for Hierarchical Data</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-02-mahalanobis-distance.html" class="nav-prev">&larr; Chapter 2: Mahalanobis Distance and Weighted Metric Spaces</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-04-spd-manifolds.html" class="nav-next">Chapter 4: SPD Manifolds and Spectral Geometry &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-3-hyperbolic-geometry-for-hierarchical-data">Chapter 3: Hyperbolic Geometry for Hierarchical Data</h1>
+<p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation — Andrew H. Bond</em></p>
+<hr />
+<p>In the preceding chapters we established the machinery of differential geometry on smooth manifolds and studied how curvature shapes the behavior of geodesics, parallel transport, and volume growth. We now turn to the first concrete non-Euclidean geometry that has become indispensable in modern computational modeling: <em>hyperbolic space</em>. Where Euclidean space is the natural home for grid-like, translation-invariant data, hyperbolic space is the natural home for trees, taxonomies, ontologies, and every other structure whose size grows exponentially with depth.</p>
+<p>This chapter develops the Poincaré ball model from first principles, derives the closed-form operations needed for gradient-based optimization, and demonstrates three applications drawn from production systems: taxonomy embedding, hyperbolic multinomial logistic regression, and hyperbolic rule encoding for program synthesis.</p>
+<hr />
+<h2 id="31-why-hyperbolic-space">3.1 Why Hyperbolic Space?</h2>
+<h3 id="311-the-exponential-growth-problem">3.1.1 The Exponential Growth Problem</h3>
+<p>Consider a complete binary tree of depth $d$. It contains $2^{d+1} - 1$ nodes and $2^d$ leaves. More generally, a $k$-ary tree of depth $d$ contains $\Theta(k^d)$ nodes. This exponential growth is not an inconvenience — it is the defining structural property of hierarchical data.</p>
+<p>Now suppose we wish to embed such a tree into a metric space $(X, d_X)$ so that the tree distance $d_T(u,v)$ between any two nodes $u,v$ is faithfully preserved. Formally, we seek a mapping $f: V \to X$ and constants $\alpha, \beta > 0$ such that for all $u,v \in V$:</p>
+<p>$$\alpha \cdot d_T(u,v) \;\leq\; d_X\bigl(f(u), f(v)\bigr) \;\leq\; \beta \cdot d_T(u,v)$$</p>
+<p>The <em>distortion</em> of the embedding is $\beta / \alpha$. The celebrated result of Bourgain (1985) shows that any $n$-point metric space embeds into $\ell_2$ with distortion $O(\log n)$. But for trees the situation in Euclidean space is much worse.</p>
+<p><strong>Theorem 3.1 (Linial, London, and Rabinovich, 1995).</strong> Any embedding of the complete binary tree of depth $d$ into $\mathbb{R}^k$ with the Euclidean metric incurs distortion $\Omega\!\bigl(\sqrt{\log n}\,\bigr)$ when $k$ is fixed, and achieving $O(1)$ distortion requires dimension $k = \Omega(n)$.</p>
+<p>The intuition is geometric. In $\mathbb{R}^k$, the volume of a ball of radius $r$ grows as $r^k$ — polynomially in $r$. A tree, however, has exponentially many nodes at distance $d$ from the root. No polynomial-growth space can accommodate exponential branching without either stretching nearby nodes apart or crushing distant nodes together.</p>
+<h3 id="312-exponential-volume-growth-in-hyperbolic-space">3.1.2 Exponential Volume Growth in Hyperbolic Space</h3>
+<p>Hyperbolic space $\mathbb{H}^k$ of constant sectional curvature $-1$ has a fundamentally different volume growth profile. The volume of a geodesic ball of radius $r$ in $\mathbb{H}^k$ satisfies:</p>
+<p>$$\text{Vol}\bigl(B_r^{\mathbb{H}^k}\bigr) \;=\; \omega_{k-1} \int_0^r \sinh^{k-1}(t)\, dt \;\sim\; C_k \, e^{(k-1)r}$$</p>
+<p>for large $r$, where $\omega_{k-1}$ is the volume of the unit $(k-1)$-sphere. The volume grows <em>exponentially</em> in the radius — exactly matching the branching pattern of trees.</p>
+<p><strong>Theorem 3.2 (Gromov, 1987; Sarkar, 2011).</strong> Any finite tree with $n$ nodes and weighted edges embeds into the Poincaré disk $\mathbb{H}^2$ with distortion $1 + \varepsilon$ for any $\varepsilon > 0$, using only two dimensions.</p>
+<p>This is a dramatic improvement: from $\Omega(n)$ dimensions in Euclidean space to just 2 in hyperbolic space, with arbitrarily low distortion. In practice, one works with moderate dimensions ($d \in [16, 64]$) and adjustable curvature to balance fidelity against numerical stability.</p>
+<h3 id="313-the-poincare-ball-model">3.1.3 The Poincaré Ball Model</h3>
+<p>Among the five classical models of hyperbolic geometry (Poincaré ball, Poincaré half-space, Klein, hyperboloid, and hemisphere), the Poincaré ball is the most convenient for machine learning because it lives inside a bounded subset of $\mathbb{R}^d$ and thus interfaces cleanly with standard optimizers and neural network layers.</p>
+<p><strong>Definition 3.1 (Poincaré Ball).</strong> For curvature parameter $c > 0$, the Poincaré ball of dimension $d$ is the open ball</p>
+<p>$$\mathbb{B}^d_c \;=\; \bigl\{\, x \in \mathbb{R}^d \;:\; c\,\|x\|^2 < 1 \,\bigr\}$$</p>
+<p>equipped with the Riemannian metric tensor</p>
+<p>$$g_x^{\mathbb{B}} \;=\; \bigl(\lambda_x^c\bigr)^2 \, g^E, \qquad \lambda_x^c \;=\; \frac{2}{1 - c\,\|x\|^2}$$</p>
+<p>where $g^E$ is the Euclidean metric and $\lambda_x^c$ is the <em>conformal factor</em>. The sectional curvature is $-c$ everywhere.</p>
+<p>The conformal factor $\lambda_x^c$ diverges as $\|x\| \to 1/\sqrt{c}$, meaning that distances near the boundary of the ball are enormously magnified — a small Euclidean step near the boundary corresponds to a large geodesic distance. This is precisely why exponentially many tree leaves can be packed near the boundary while maintaining their pairwise distances.</p>
+<hr />
+<h2 id="32-core-operations-on-the-poincare-ball">3.2 Core Operations on the Poincaré Ball</h2>
+<p>All practical algorithms on $\mathbb{B}^d_c$ reduce to five operations: Möbius addition, geodesic distance, the exponential map, the logarithmic map, and projection back into the ball. We derive each in turn and provide numerically stable implementations.</p>
+<h3 id="321-mobius-addition">3.2.1 Möbius Addition</h3>
+<p>The group operation on $\mathbb{B}^d_c$ generalizes vector addition. For $x, y \in \mathbb{B}^d_c$, the <em>Möbius addition</em> is:</p>
+<p>$$x \oplus_c y \;=\; \frac{\bigl(1 + 2c\,\langle x, y \rangle + c\,\|y\|^2\bigr)\,x \;+\; \bigl(1 - c\,\|x\|^2\bigr)\,y}{1 + 2c\,\langle x, y \rangle + c^2\,\|x\|^2\,\|y\|^2}$$</p>
+<p>Möbius addition is <em>not</em> commutative: in general $x \oplus_c y \neq y \oplus_c x$. It is, however, <em>gyrocommutative</em> — it satisfies a rotated commutativity law that is the foundation of gyrovector space theory (Ungar, 2008). The identity element is $\mathbf{0}$, and the inverse of $x$ is $-x$.</p>
+<p>Numerical stability requires care in the denominator. When $c\|x\|^2$ and $c\|y\|^2$ are both close to 1, the denominator approaches zero. We clamp it away from zero:</p>
+<pre><code class="language-python">class PoincareBall:
+    &quot;&quot;&quot;Poincaré ball model of hyperbolic space with curvature -c.&quot;&quot;&quot;
+
+    def __init__(self, c: float = 1.0, dim: int = 2):
+        self.c = c
+        self.dim = dim
+        self.EPS = 1e-5
+        self.MAX_NORM = 0.95  # keep points inside 95% of boundary
+
+    def mobius_add(self, x: torch.Tensor, y: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Möbius addition x ⊕_c y on the Poincaré ball.
+
+        Args:
+            x: Tensor of shape (..., d), points on the ball
+            y: Tensor of shape (..., d), points on the ball
+
+        Returns:
+            Tensor of shape (..., d), the Möbius sum
+        &quot;&quot;&quot;
+        c = self.c
+        x_dot_y = (x * y).sum(dim=-1, keepdim=True)
+        x_sq = (x * x).sum(dim=-1, keepdim=True)
+        y_sq = (y * y).sum(dim=-1, keepdim=True)
+
+        numerator = (1 + 2 * c * x_dot_y + c * y_sq) * x + \
+                    (1 - c * x_sq) * y
+        denominator = 1 + 2 * c * x_dot_y + c ** 2 * x_sq * y_sq
+        denominator = denominator.clamp(min=self.EPS)
+
+        return self.project(numerator / denominator)
+</code></pre>
+<p>The final <code>project</code> call (Section 3.2.5) ensures the result remains inside the ball even under floating-point error.</p>
+<h3 id="322-geodesic-distance">3.2.2 Geodesic Distance</h3>
+<p>The geodesic distance between two points $x, y \in \mathbb{B}^d_c$ has a closed form in terms of Möbius addition:</p>
+<p>$$d_c(x, y) \;=\; \frac{2}{\sqrt{c}} \, \text{arctanh}\!\Bigl(\sqrt{c}\,\bigl\|(-x) \oplus_c y\bigr\|\Bigr)$$</p>
+<p>Since $\text{arctanh}(z) = \frac{1}{2}\ln\!\bigl(\frac{1+z}{1-z}\bigr)$, the distance diverges logarithmically as points approach the boundary — confirming the exponential capacity of the space.</p>
+<pre><code class="language-python">    def distance(self, x: torch.Tensor, y: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Geodesic distance between x and y on the Poincaré ball.
+
+        Returns:
+            Tensor of shape (...,), pairwise distances
+        &quot;&quot;&quot;
+        c = self.c
+        neg_x = -x
+        diff = self.mobius_add(neg_x, y)
+        diff_norm = diff.norm(dim=-1).clamp(min=self.EPS)
+        sqrt_c = c ** 0.5
+
+        # Clamp argument to arctanh to avoid NaN at boundary
+        arg = (sqrt_c * diff_norm).clamp(max=1.0 - self.EPS)
+        return (2.0 / sqrt_c) * torch.atanh(arg)
+</code></pre>
+<p><strong>Remark 3.1.</strong> The clamping of the <code>arctanh</code> argument is essential. Without it, points at the boundary produce <code>arctanh(1) = ∞</code>, which propagates <code>NaN</code> through all subsequent gradients. The choice of <code>1 - EPS</code> with <code>EPS = 1e-5</code> provides a good balance between numerical range and stability.</p>
+<h3 id="323-exponential-map">3.2.3 Exponential Map</h3>
+<p>The exponential map $\exp_x^c: T_x\mathbb{B}^d_c \to \mathbb{B}^d_c$ takes a point $x$ on the manifold and a tangent vector $v \in T_x\mathbb{B}^d_c$ and returns the point reached by following the geodesic from $x$ in direction $v$ for unit time:</p>
+<p>$$\exp_x^c(v) \;=\; x \oplus_c \left(\tanh\!\Bigl(\frac{\sqrt{c}\,\lambda_x^c\,\|v\|}{2}\Bigr)\,\frac{v}{\sqrt{c}\,\|v\|}\right)$$</p>
+<p>where $\lambda_x^c = \frac{2}{1 - c\|x\|^2}$ is the conformal factor at $x$.</p>
+<pre><code class="language-python">    def exp_map(self, x: torch.Tensor, v: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Exponential map at point x with tangent vector v.
+
+        Maps from the tangent space at x onto the manifold.
+
+        Args:
+            x: Tensor of shape (..., d), base point on the ball
+            v: Tensor of shape (..., d), tangent vector at x
+
+        Returns:
+            Tensor of shape (..., d), resulting point on the ball
+        &quot;&quot;&quot;
+        c = self.c
+        sqrt_c = c ** 0.5
+        v_norm = v.norm(dim=-1, keepdim=True).clamp(min=self.EPS)
+        x_sq = (x * x).sum(dim=-1, keepdim=True)
+
+        # Conformal factor
+        lambda_x = 2.0 / (1.0 - c * x_sq).clamp(min=self.EPS)
+
+        # Second argument to Möbius addition
+        coeff = torch.tanh(sqrt_c * lambda_x * v_norm / 2.0) / (sqrt_c * v_norm)
+        y = coeff * v
+
+        return self.mobius_add(x, y)
+</code></pre>
+<p>The exponential map is the primary mechanism by which gradient updates in tangent space (which is Euclidean and compatible with standard optimizers like Adam) are transferred onto the manifold.</p>
+<h3 id="324-logarithmic-map">3.2.4 Logarithmic Map</h3>
+<p>The logarithmic map $\log_x^c: \mathbb{B}^d_c \to T_x\mathbb{B}^d_c$ is the inverse of the exponential map. Given two points $x, y \in \mathbb{B}^d_c$, it returns the tangent vector at $x$ pointing toward $y$ whose magnitude equals the geodesic distance:</p>
+<p>$$\log_x^c(y) \;=\; \frac{2}{\sqrt{c}\,\lambda_x^c}\,\text{arctanh}\!\bigl(\sqrt{c}\,\|{-x \oplus_c y}\|\bigr)\,\frac{-x \oplus_c y}{\|-x \oplus_c y\|}$$</p>
+<pre><code class="language-python">    def log_map(self, x: torch.Tensor, y: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Logarithmic map: inverse of exp_map.
+
+        Returns the tangent vector at x that points toward y.
+
+        Args:
+            x: Tensor of shape (..., d), base point on the ball
+            y: Tensor of shape (..., d), target point on the ball
+
+        Returns:
+            Tensor of shape (..., d), tangent vector at x
+        &quot;&quot;&quot;
+        c = self.c
+        sqrt_c = c ** 0.5
+        diff = self.mobius_add(-x, y)
+        diff_norm = diff.norm(dim=-1, keepdim=True).clamp(min=self.EPS)
+        x_sq = (x * x).sum(dim=-1, keepdim=True)
+
+        lambda_x = 2.0 / (1.0 - c * x_sq).clamp(min=self.EPS)
+        arg = (sqrt_c * diff_norm).clamp(max=1.0 - self.EPS)
+
+        coeff = (2.0 / (sqrt_c * lambda_x)) * torch.atanh(arg) / diff_norm
+        return coeff * diff
+</code></pre>
+<p>Together, the exponential and logarithmic maps provide a <em>Riemannian optimization</em> workflow: parameters live on the manifold, gradients are computed in the ambient Euclidean space, retracted to the tangent space via the Riemannian metric, and then mapped back to the manifold via $\exp_x^c$.</p>
+<h3 id="325-projection-onto-the-ball">3.2.5 Projection onto the Ball</h3>
+<p>Floating-point arithmetic can push points outside the open ball. Since operations on $\mathbb{B}^d_c$ are undefined for $c\|x\|^2 \geq 1$, we must project points back inside:</p>
+<p>$$\text{proj}(x) \;=\; \begin{cases} x & \text{if } \|x\| < \frac{r_{\max}}{\sqrt{c}} \\[4pt] \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x & \text{otherwise} \end{cases}$$</p>
+<p>where $r_{\max} < 1$ (typically 0.95) provides a safety margin:</p>
+<pre><code class="language-python">    def project(self, x: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Project points back inside the Poincaré ball.
+
+        Ensures ||x|| &lt; MAX_NORM / sqrt(c) to maintain numerical stability.
+        &quot;&quot;&quot;
+        c = self.c
+        max_radius = self.MAX_NORM / (c ** 0.5)
+        x_norm = x.norm(dim=-1, keepdim=True).clamp(min=self.EPS)
+        cond = x_norm &gt; max_radius
+        projected = x / x_norm * max_radius
+        return torch.where(cond, projected, x)
+</code></pre>
+<p>The choice of $r_{\max} = 0.95$ deserves comment. Setting it too close to 1 risks numerical overflow in the conformal factor $\lambda_x^c$, while setting it too small artificially constrains the usable volume of the ball. At $r_{\max} = 0.95$, the conformal factor is $\lambda = 2/(1 - 0.9025) = 20.51$, which is large but comfortably within float32 range.</p>
+<hr />
+<h2 id="33-embedding-taxonomies">3.3 Embedding Taxonomies</h2>
+<p>We now apply the Poincaré ball to a concrete task: embedding a biological taxonomy so that taxonomic distance is faithfully represented by geodesic distance.</p>
+<h3 id="331-problem-setup">3.3.1 Problem Setup</h3>
+<p>Let $\mathcal{T}$ be a taxonomy (a rooted tree) with $n$ species. Define the <em>taxonomic distance matrix</em> $D \in \mathbb{R}^{n \times n}$ where $D_{ij}$ is the number of edges on the path from species $i$ to species $j$ in $\mathcal{T}$. Our goal is to find an embedding $f: \{1, \ldots, n\} \to \mathbb{B}^d_c$ that minimizes the stress:</p>
+<p>$$\mathcal{L} \;=\; \sum_{i < j} \Bigl(d_c\bigl(f(i), f(j)\bigr) - D_{ij}\Bigr)^2$$</p>
+<h3 id="332-spectral-initialization">3.3.2 Spectral Initialization</h3>
+<p>Random initialization in hyperbolic space converges slowly and often gets trapped in poor local minima. A spectral initialization based on the Gaussian kernel over $D$ provides a much better starting point.</p>
+<ol>
+<li><strong>Compute the Gaussian kernel matrix:</strong></li>
+</ol>
+<p>$$K_{ij} \;=\; \exp\!\Bigl(-\frac{D_{ij}^2}{2\sigma^2}\Bigr)$$</p>
+<p>where $\sigma$ controls the bandwidth. A reasonable default is $\sigma = \text{median}(D)$.</p>
+<ol>
+<li>
+<p><strong>Eigendecomposition:</strong> Compute $K = U \Lambda U^\top$ where $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$ with $\lambda_1 \geq \cdots \geq \lambda_n$.</p>
+</li>
+<li>
+<p><strong>Select the top $d$ eigenvectors:</strong> Form the initial coordinates as $X_0 = U_{:,1:d}\,\Lambda_{1:d}^{1/2}$, weighting each eigenvector by the square root of its eigenvalue.</p>
+</li>
+<li>
+<p><strong>Scale to fit inside the ball:</strong> Normalize so that $\max_i \|x_i\| < r_{\max}/\sqrt{c}$.</p>
+</li>
+</ol>
+<pre><code class="language-python">import numpy as np
+from scipy.linalg import eigh
+
+def spectral_init(distance_matrix: np.ndarray, dim: int = 2,
+                  c: float = 1.0, max_norm: float = 0.9) -&gt; np.ndarray:
+    &quot;&quot;&quot;
+    Spectral initialization for Poincaré ball embedding.
+
+    Args:
+        distance_matrix: (n, n) symmetric matrix of pairwise distances
+        dim: target embedding dimension
+        c: curvature parameter (negative curvature = -c)
+        max_norm: maximum allowed norm after scaling
+
+    Returns:
+        (n, dim) array of initial coordinates inside the ball
+    &quot;&quot;&quot;
+    n = distance_matrix.shape[0]
+    sigma = np.median(distance_matrix[distance_matrix &gt; 0])
+
+    # Gaussian kernel
+    K = np.exp(-distance_matrix ** 2 / (2 * sigma ** 2))
+
+    # Eigendecomposition (eigh returns ascending order)
+    eigenvalues, eigenvectors = eigh(K)
+
+    # Take top-d eigenvalues (they are at the end for eigh)
+    top_eigenvalues = eigenvalues[-dim:][::-1]
+    top_eigenvectors = eigenvectors[:, -dim:][:, ::-1]
+
+    # Weight by sqrt of eigenvalue
+    coords = top_eigenvectors * np.sqrt(np.maximum(top_eigenvalues, 0.0))
+
+    # Scale to fit inside ball
+    max_radius = max_norm / np.sqrt(c)
+    current_max = np.max(np.linalg.norm(coords, axis=1))
+    if current_max &gt; 1e-8:
+        coords = coords * (max_radius / current_max)
+
+    return coords
+</code></pre>
+<h3 id="333-example-cetacean-taxonomy">3.3.3 Example: Cetacean Taxonomy</h3>
+<p>To make this concrete, consider embedding a small cetacean taxonomy. The order Cetacea splits into Mysticeti (baleen whales) and Odontoceti (toothed whales). Under Mysticeti we have families like Balaenopteridae (rorquals: blue whale, humpback) and Balaenidae (right whales: bowhead). Under Odontoceti we have Delphinidae (dolphins: bottlenose, orca) and Phocoenidae (porpoises: harbor porpoise).</p>
+<p>In a Poincaré disk embedding ($d = 2$, $c = 1$), the root (Cetacea) sits near the origin. The Mysticeti and Odontoceti subtrees occupy opposite sectors of the disk, each fanning out toward the boundary. Species within the same family cluster together near the boundary, separated by small geodesic distances despite being at nearly the same Euclidean radius. Species in different suborders are separated by large geodesic distances because any path between them must pass through the low-curvature interior near the root.</p>
+<p>This &ldquo;onion-like&rdquo; structure — general concepts near the center, specific instances near the boundary — is the hallmark of hyperbolic embeddings and directly mirrors the hierarchical structure of the data.</p>
+<hr />
+<h2 id="34-hyperbolic-multinomial-logistic-regression">3.4 Hyperbolic Multinomial Logistic Regression</h2>
+<p>Having embedded data into the Poincaré ball, we need classifiers that operate natively in hyperbolic space. Ganea et al. (2018) showed that the standard multinomial logistic regression (MLR) generalizes naturally to the Poincaré ball.</p>
+<h3 id="341-from-euclidean-to-hyperbolic">3.4.1 From Euclidean to Hyperbolic</h3>
+<p>In Euclidean MLR, the logit for class $k$ is $\langle a_k, x \rangle + b_k$, which measures signed distance from $x$ to the hyperplane $\{z : \langle a_k, z \rangle + b_k = 0\}$. In hyperbolic space, hyperplanes are replaced by <em>geodesic hyperplanes</em> (totally geodesic submanifolds of codimension 1), and signed distance to such a hyperplane takes the form:</p>
+<p>$$\ell_k(x) \;=\; \frac{\lambda_{p_k}^c\,\|a_k\|}{\sqrt{c}} \,\sinh^{-1}\!\Bigl(\frac{2\sqrt{c}\,\langle (-p_k) \oplus_c x,\; a_k \rangle}{(1 - c\,\|(-p_k) \oplus_c x\|^2)\,\|a_k\|}\Bigr)$$</p>
+<p>where $p_k \in \mathbb{B}^d_c$ is the <em>prototype</em> for class $k$ and $a_k \in T_{p_k}\mathbb{B}^d_c$ is the normal direction.</p>
+<p>In practice, a simpler distance-based formulation often works as well or better:</p>
+<h3 id="342-prototype-based-classification">3.4.2 Prototype-Based Classification</h3>
+<p>For each class $k$, learn a prototype $p_k \in \mathbb{B}^d_c$ and a temperature $\tau_k > 0$. The logit for class $k$ is the negative scaled geodesic distance:</p>
+<p>$$\ell_k(x) \;=\; -\frac{d_c(x, p_k)}{\tau_k}$$</p>
+<p>The class probabilities follow from a softmax:</p>
+<p>$$P(y = k \mid x) \;=\; \frac{\exp(\ell_k(x))}{\sum_{j=1}^{K} \exp(\ell_j(x))}$$</p>
+<p>Points closest to prototype $p_k$ in geodesic distance receive the highest probability for class $k$. The per-class temperature $\tau_k$ controls how sharply the decision boundary is drawn: small $\tau_k$ produces a hard boundary, large $\tau_k$ a soft one.</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+class HyperbolicMLR(nn.Module):
+    &quot;&quot;&quot;
+    Hyperbolic multinomial logistic regression via prototypes.
+
+    Prototypes are parameterized in tangent space at the origin
+    and mapped to the ball via exp_map for stable optimization.
+    &quot;&quot;&quot;
+
+    def __init__(self, dim: int, n_classes: int, c: float = 1.0):
+        super().__init__()
+        self.ball = PoincareBall(c=c, dim=dim)
+        self.dim = dim
+        self.n_classes = n_classes
+
+        # Learnable prototype directions in tangent space at origin
+        self.proto_tangent = nn.Parameter(torch.randn(n_classes, dim) * 0.01)
+
+        # Per-class log-temperature (log to ensure positivity)
+        self.log_tau = nn.Parameter(torch.zeros(n_classes))
+
+    def get_prototypes(self) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Map tangent-space parameters to Poincaré ball prototypes.&quot;&quot;&quot;
+        origin = torch.zeros(1, self.dim, device=self.proto_tangent.device)
+        return self.ball.exp_map(
+            origin.expand(self.n_classes, -1),
+            self.proto_tangent
+        )
+
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Compute class logits for input points.
+
+        Args:
+            x: (batch, dim) points on the Poincaré ball
+
+        Returns:
+            (batch, n_classes) logits
+        &quot;&quot;&quot;
+        prototypes = self.get_prototypes()  # (n_classes, dim)
+        tau = self.log_tau.exp()             # (n_classes,)
+
+        # Compute pairwise distances: (batch, n_classes)
+        # Expand x to (batch, 1, dim) and prototypes to (1, n_classes, dim)
+        dists = self.ball.distance(
+            x.unsqueeze(1).expand(-1, self.n_classes, -1),
+            prototypes.unsqueeze(0).expand(x.shape[0], -1, -1)
+        )
+
+        # Logits = negative distance scaled by temperature
+        logits = -dists / tau.unsqueeze(0)
+        return logits
+</code></pre>
+<p>A key design choice: prototypes are <em>parameterized in the tangent space at the origin</em> and mapped to the ball via <code>exp_map</code> at each forward pass. This avoids the need for Riemannian optimizers — standard Euclidean Adam updates the tangent-space parameters, and the exponential map handles the manifold constraint. This &ldquo;tangent space parameterization&rdquo; trick is widely used and generally more stable than direct Riemannian SGD for moderate curvatures.</p>
+<hr />
+<h2 id="35-hyperbolic-rule-encoding">3.5 Hyperbolic Rule Encoding</h2>
+<p>The most sophisticated application of hyperbolic geometry in this book comes from the ARC-AGI system, where hyperbolic space is used to encode <em>rules</em> — the discrete transformation programs that map input grids to output grids. The key insight is that rules have natural hierarchical structure: general rules (e.g., &ldquo;apply color mapping&rdquo;) subsume specific sub-rules (e.g., &ldquo;map red to blue in the upper-left quadrant&rdquo;), forming a tree of increasing specificity.</p>
+<h3 id="351-architecture">3.5.1 Architecture</h3>
+<p>The <code>HyperbolicRuleEncoder</code> is a neural module that maps from a Euclidean latent space $\mathbb{R}^m$ (produced by an upstream encoder) to the Poincaré ball $\mathbb{B}^d_c$:</p>
+<p>$$h \;=\; \exp_{\mathbf{0}}^c\!\bigl(\text{MLP}(z)\bigr), \qquad z \in \mathbb{R}^m,\; h \in \mathbb{B}^d_c$$</p>
+<p>The MLP has two layers with a GELU activation:</p>
+<pre><code class="language-python">class HyperbolicRuleEncoder(nn.Module):
+    &quot;&quot;&quot;
+    Maps Euclidean latent codes to the Poincaré ball for
+    hierarchical rule representation.
+
+    Rules closer to the origin are more general (lower depth
+    in the rule tree). Rules near the boundary are highly
+    specific. Rule similarity is measured by geodesic distance.
+    &quot;&quot;&quot;
+
+    def __init__(self, input_dim: int, hyperbolic_dim: int, c: float = 1.0):
+        super().__init__()
+        self.ball = PoincareBall(c=c, dim=hyperbolic_dim)
+
+        # Two-layer MLP: Euclidean z-space → tangent space at origin
+        self.mlp = nn.Sequential(
+            nn.Linear(input_dim, 2 * hyperbolic_dim),
+            nn.GELU(),
+            nn.Linear(2 * hyperbolic_dim, hyperbolic_dim),
+        )
+
+        # Initialize final layer with small weights for near-origin start
+        nn.init.uniform_(self.mlp[-1].weight, -0.001, 0.001)
+        nn.init.zeros_(self.mlp[-1].bias)
+
+    def encode(self, z: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Encode latent vectors into the Poincaré ball.
+
+        Args:
+            z: (batch, input_dim) Euclidean latent codes
+
+        Returns:
+            h: (batch, hyperbolic_dim) points on the Poincaré ball
+        &quot;&quot;&quot;
+        tangent_vec = self.mlp(z)
+        origin = torch.zeros_like(tangent_vec)
+        h = self.ball.exp_map(origin, tangent_vec)
+        return h
+
+    def rule_similarity(self, h1: torch.Tensor, h2: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Compute similarity between two rule embeddings.
+
+        Uses exp(-distance) so similar rules have similarity near 1
+        and dissimilar rules have similarity near 0.
+
+        Args:
+            h1, h2: (batch, hyperbolic_dim) rule embeddings
+
+        Returns:
+            (batch,) similarity scores in (0, 1]
+        &quot;&quot;&quot;
+        dist = self.ball.distance(h1, h2)
+        return torch.exp(-dist)
+
+    def rule_depth(self, h: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Estimate rule specificity from its position on the ball.
+
+        Rules near the origin (small norm) are general.
+        Rules near the boundary (large norm) are specific.
+        Returns geodesic distance from origin, which grows
+        logarithmically as points approach the boundary.
+
+        Args:
+            h: (batch, hyperbolic_dim) rule embeddings
+
+        Returns:
+            (batch,) depth/specificity scores
+        &quot;&quot;&quot;
+        origin = torch.zeros_like(h)
+        return self.ball.distance(origin, h)
+</code></pre>
+<h3 id="352-interpreting-the-embedding">3.5.2 Interpreting the Embedding</h3>
+<p>The <code>HyperbolicRuleEncoder</code> exploits three properties of the Poincaré ball:</p>
+<ol>
+<li>
+<p><strong>Rule similarity via geodesic distance.</strong> Two rules that perform similar transformations will have nearby latent codes $z_1, z_2$, which the MLP maps to nearby tangent vectors, which <code>exp_map</code> sends to nearby points on the ball. Their similarity $\exp(-d_c(h_1, h_2))$ is close to 1. Rules that perform unrelated transformations end up far apart, with similarity close to 0.</p>
+</li>
+<li>
+<p><strong>Rule depth/specificity via norm.</strong> The geodesic distance from the origin to a point $h \in \mathbb{B}^d_c$ is:</p>
+</li>
+</ol>
+<p>$$d_c(\mathbf{0}, h) \;=\; \frac{2}{\sqrt{c}}\,\text{arctanh}\!\bigl(\sqrt{c}\,\|h\|\bigr)$$</p>
+<p>This is a monotonically increasing function of $\|h\|$ that diverges as $\|h\| \to 1/\sqrt{c}$. The MLP is initialized with near-zero weights so that all rules start near the origin (maximum generality). During training, rules that apply to specific sub-cases are pushed toward the boundary, while rules that capture broad patterns remain near the center.</p>
+<ol>
+<li><strong>Exponential packing capacity.</strong> Because the volume of the ball grows exponentially near the boundary, there is room for exponentially many specific rules without crowding. A single general rule near the center can have $2^k$ specialized descendants at depth $k$, all well-separated.</li>
+</ol>
+<h3 id="353-training-signal">3.5.3 Training Signal</h3>
+<p>The encoder is trained end-to-end with the downstream task. The loss typically includes:</p>
+<ul>
+<li>A <strong>task loss</strong> (e.g., cross-entropy on predicted output grids) that drives the encoder to produce useful rule representations.</li>
+<li>A <strong>hierarchical regularizer</strong> that encourages parent rules to have smaller norm than their children:</li>
+</ul>
+<p>$$\mathcal{L}_{\text{hier}} \;=\; \sum_{(r, r') \in \text{parent-child}} \max\bigl(0,\; \|h_r\| - \|h_{r'}\| + \alpha\bigr)$$</p>
+<p>where $\alpha > 0$ is a margin ensuring children are at least $\alpha$ further from the origin than their parents.</p>
+<hr />
+<h2 id="36-einstein-midpoint-for-aggregation">3.6 Einstein Midpoint for Aggregation</h2>
+<p>A recurring operation in hyperbolic neural networks is <em>weighted averaging</em> — computing the centroid of a set of points on the ball. The Euclidean weighted mean $\bar{x} = \sum_i w_i x_i / \sum_i w_i$ does not generalize directly because $\mathbb{B}^d_c$ is not a vector space.</p>
+<h3 id="361-derivation">3.6.1 Derivation</h3>
+<p>The <em>Einstein midpoint</em> provides a principled solution. It arises from the Klein model of hyperbolic geometry (which has straight-line geodesics) and can be transferred to the Poincaré ball model.</p>
+<p>For points $x_1, \ldots, x_N \in \mathbb{B}^d_c$ with non-negative weights $w_1, \ldots, w_N$, the Einstein midpoint is:</p>
+<p>$$\bar{x} \;=\; \frac{\sum_{i=1}^{N} \gamma_i\, w_i\, x_i}{\sum_{i=1}^{N} \gamma_i\, w_i}$$</p>
+<p>where $\gamma_i = \gamma_c(x_i)$ is the <em>Lorentz factor</em> (conformal factor):</p>
+<p>$$\gamma_c(x) \;=\; \frac{1}{1 - c\,\|x\|^2}$$</p>
+<p>The Lorentz factor upweights points near the boundary, which is geometrically correct: points near the boundary of the Poincaré ball are &ldquo;further out&rdquo; in the actual hyperbolic space, and their positions should contribute more strongly to the midpoint computation to avoid the midpoint being biased toward the origin.</p>
+<p><strong>Proposition 3.1.</strong> The Einstein midpoint of a set of points in $\mathbb{B}^d_c$ lies in $\mathbb{B}^d_c$ (i.e., the formula is closed), and it reduces to the Euclidean weighted mean in the limit $c \to 0$.</p>
+<p><em>Proof sketch.</em> By convexity of the open ball and the fact that the $\gamma$-weighted combination is a convex combination (all $\gamma_i w_i \geq 0$ and we normalize by their sum), the result lies in the convex hull of the $x_i$, which is contained in $\mathbb{B}^d_c$. The limit $c \to 0$ sends all $\gamma_i \to 1$, recovering the Euclidean formula. $\square$</p>
+<pre><code class="language-python">    def einstein_midpoint(self, x: torch.Tensor,
+                          weights: torch.Tensor = None) -&gt; torch.Tensor:
+        &quot;&quot;&quot;
+        Compute the weighted Einstein midpoint of points on the ball.
+
+        Used for aggregating multiple rule representations into
+        a single summary point on the manifold.
+
+        Args:
+            x: (N, dim) or (batch, N, dim) points on the ball
+            weights: (N,) or (batch, N) non-negative weights.
+                     If None, uniform weights are used.
+
+        Returns:
+            (dim,) or (batch, dim) the Einstein midpoint
+        &quot;&quot;&quot;
+        c = self.c
+
+        # Lorentz (conformal) factors: γ_i = 1 / (1 - c||x_i||²)
+        x_sq = (x * x).sum(dim=-1)  # (..., N)
+        gamma = 1.0 / (1.0 - c * x_sq).clamp(min=self.EPS)  # (..., N)
+
+        if weights is None:
+            weights = torch.ones_like(gamma)
+
+        # Weighted combination: Σ γ_i w_i x_i / Σ γ_i w_i
+        scale = gamma * weights  # (..., N)
+        numerator = (scale.unsqueeze(-1) * x).sum(dim=-2)  # (..., dim)
+        denominator = scale.sum(dim=-1, keepdim=True).clamp(min=self.EPS)
+
+        midpoint = numerator / denominator
+        return self.project(midpoint)
+</code></pre>
+<h3 id="362-application-aggregating-rule-embeddings">3.6.2 Application: Aggregating Rule Embeddings</h3>
+<p>In the ARC-AGI system, a single input-output example may activate multiple candidate rules. The Einstein midpoint aggregates their hyperbolic representations into a single summary vector:</p>
+<pre><code class="language-python">def aggregate_rules(encoder: HyperbolicRuleEncoder,
+                    rule_latents: torch.Tensor,
+                    attention_weights: torch.Tensor) -&gt; torch.Tensor:
+    &quot;&quot;&quot;
+    Aggregate multiple rule embeddings into a single representation.
+
+    Args:
+        encoder: the hyperbolic rule encoder
+        rule_latents: (batch, n_rules, input_dim) Euclidean latents
+        attention_weights: (batch, n_rules) attention-derived weights
+
+    Returns:
+        (batch, hyperbolic_dim) aggregated rule embedding
+    &quot;&quot;&quot;
+    # Encode each rule into the Poincaré ball
+    batch, n_rules, _ = rule_latents.shape
+    flat = rule_latents.reshape(batch * n_rules, -1)
+    h_flat = encoder.encode(flat)
+    h = h_flat.reshape(batch, n_rules, -1)  # (batch, n_rules, hyp_dim)
+
+    # Aggregate via Einstein midpoint
+    return encoder.ball.einstein_midpoint(h, weights=attention_weights)
+</code></pre>
+<p>The attention weights typically come from a cross-attention mechanism that scores how relevant each candidate rule is to the current input. The Einstein midpoint then produces a single point on the ball that respects the hyperbolic geometry — it is not simply the Euclidean average of the embeddings, which would systematically underestimate the &ldquo;depth&rdquo; of the aggregate rule.</p>
+<hr />
+<h2 id="37-numerical-considerations-and-best-practices">3.7 Numerical Considerations and Best Practices</h2>
+<p>Working with hyperbolic embeddings introduces numerical challenges that do not arise in Euclidean models. We summarize the key lessons:</p>
+<ol>
+<li>
+<p><strong>Always clamp denominators and <code>arctanh</code> arguments.</strong> The formulas for Möbius addition, distance, and the exponential map all contain terms that can approach zero or one under finite precision. A minimum clamp of $\varepsilon = 10^{-5}$ is usually sufficient for float32.</p>
+</li>
+<li>
+<p><strong>Project after every operation.</strong> Any sequence of Möbius additions or exponential maps can drift outside the ball due to accumulated floating-point error. Call <code>project()</code> after every manifold operation.</p>
+</li>
+<li>
+<p><strong>Parameterize in tangent space.</strong> Rather than directly optimizing points on the ball (which requires Riemannian gradient descent), parameterize them as tangent vectors at the origin and apply <code>exp_map</code> at each forward pass. This allows standard Euclidean optimizers and avoids the need for specialized Riemannian step-size schedules.</p>
+</li>
+<li>
+<p><strong>Use moderate curvature.</strong> Very large $c$ (high curvature) packs the effective space into a tiny Euclidean ball, amplifying floating-point errors. Very small $c$ (low curvature) approaches flat Euclidean geometry and loses the benefits of hyperbolic embedding. Values of $c \in [0.1, 2.0]$ are typical. Curvature can also be made a learnable parameter.</p>
+</li>
+<li>
+<p><strong>Initialize near the origin.</strong> New embeddings and MLP output layers should be initialized with small weights so that initial points lie near the origin. This provides a &ldquo;blank slate&rdquo; from which the optimizer can gradually push points outward as hierarchical structure is learned.</p>
+</li>
+<li>
+<p><strong>Mixed-precision caution.</strong> Float16 has only 3.3 decimal digits of precision. The conformal factor $\lambda_x^c = 2/(1 - c\|x\|^2)$ at $\|x\| = 0.99$ is $\approx 100$, and at $\|x\| = 0.999$ is $\approx 1000$. In float16, $1 - 0.999^2 = 1 - 0.998 = 0.002$ loses significant precision. Use float32 for all hyperbolic operations even when the rest of the model uses mixed precision.</p>
+</li>
+</ol>
+<hr />
+<h2 id="38-summary-and-connections">3.8 Summary and Connections</h2>
+<p>Hyperbolic geometry provides a mathematically principled framework for representing hierarchical data in continuous space. The Poincaré ball model offers:</p>
+<ul>
+<li><strong>Exponential volume growth</strong> matching the branching factor of trees, enabling low-distortion embedding in fixed dimension.</li>
+<li><strong>Closed-form operations</strong> (Möbius addition, geodesic distance, exp/log maps) that are differentiable and compatible with gradient-based optimization.</li>
+<li><strong>Interpretable structure</strong> where distance from the origin encodes depth/specificity and geodesic distance encodes similarity.</li>
+</ul>
+<p>We saw three applications:</p>
+<ul>
+<li><em>Taxonomy embedding</em> (Section 3.3): encoding species trees with spectral initialization and stress minimization.</li>
+<li><em>Hyperbolic MLR</em> (Section 3.4): prototype-based classification using geodesic distance as the logit.</li>
+<li><em>Hyperbolic rule encoding</em> (Section 3.5): mapping program synthesis rules to the Poincaré ball so that general rules sit near the center and specific sub-rules fan out toward the boundary.</li>
+</ul>
+<p>The Einstein midpoint (Section 3.6) provides the aggregation primitive needed to combine multiple hyperbolic representations — a building block we will use extensively in Part II when we develop hyperbolic attention mechanisms and tree-structured decoders.</p>
+<p>In the next chapter, we turn to <em>product manifolds</em> — spaces formed by taking Cartesian products of Euclidean, hyperbolic, and spherical components. These mixed-curvature spaces can simultaneously capture hierarchical, flat, and cyclical structure in a single embedding, extending the ideas of this chapter to data with heterogeneous geometric character.</p>
+<hr />
+<h3 id="exercises">Exercises</h3>
+<p><strong>3.1.</strong> Prove that Möbius addition reduces to standard vector addition in the limit $c \to 0$. <em>(Hint: expand the numerator and denominator to first order in $c$.)</em></p>
+<p><strong>3.2.</strong> Show that $d_c(\mathbf{0}, x) = \frac{2}{\sqrt{c}}\,\text{arctanh}(\sqrt{c}\,\|x\|)$ by computing $(-\mathbf{0}) \oplus_c x$ and substituting into the distance formula.</p>
+<p><strong>3.3.</strong> Implement the full taxonomy embedding pipeline for the cetacean example: construct the distance matrix for a 12-species tree, compute the spectral initialization, and refine by gradient descent on the stress loss. Plot the resulting Poincaré disk embedding and verify that taxonomic neighbors are geodesically close.</p>
+<p><strong>3.4.</strong> The conformal factor $\gamma_c(x) = 1/(1 - c\|x\|^2)$ and the Riemannian conformal factor $\lambda_x^c = 2/(1 - c\|x\|^2)$ differ by a factor of 2. Explain why the Einstein midpoint uses $\gamma$ rather than $\lambda$. <em>(Hint: the Einstein midpoint is derived in the Klein model, not the Poincaré model.)</em></p>
+<p><strong>3.5.</strong> Extend the <code>HyperbolicMLR</code> classifier to use the full Ganea et al. (2018) formulation with geodesic hyperplanes rather than prototype distances. Compare classification accuracy on a synthetic hierarchical dataset.</p>
+<hr />
+<h3 id="bibliographic-notes">Bibliographic Notes</h3>
+<p>The use of hyperbolic geometry for tree embedding traces to Gromov&rsquo;s theory of $\delta$-hyperbolic metric spaces (Gromov, 1987). Sarkar (2011) gave the first constructive low-distortion embedding of trees into $\mathbb{H}^2$. The Poincaré ball model for machine learning was popularized by Nickel and Kiela (2017), who learned word embeddings with dramatically better hierarchy capture than Euclidean models. Ganea et al. (2018) developed hyperbolic neural network layers including the MLR classifier. The Einstein midpoint aggregation was introduced by Gulcehre et al. (2019) and refined by Chami et al. (2019). For a comprehensive treatment of gyrovector spaces underpinning Möbius operations, see Ungar (2008). The connection between curvature and volume growth is covered in standard Riemannian geometry texts; we recommend do Carmo (1992) for the foundations.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-02-mahalanobis-distance.html" class="nav-prev">&larr; Chapter 2: Mahalanobis Distance and Weighted Metric Spaces</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-04-spd-manifolds.html" class="nav-next">Chapter 4: SPD Manifolds and Spectral Geometry &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

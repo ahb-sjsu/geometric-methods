@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 17: Scaling to High-Dimensional Spaces &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 17: Scaling to High-Dimensional Spaces from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-17-scaling">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 17: Scaling to High-Dimensional Spaces</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-16-geometric-pipelines.html" class="nav-prev">&larr; Chapter 16: Building Geometric Pipelines</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-18-production-deployment.html" class="nav-next">Chapter 18: Deploying Geometric Validation in Production &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-17-scaling-to-high-dimensional-spaces">Chapter 17: Scaling to High-Dimensional Spaces</h1>
+<blockquote>
+<p><em>&ldquo;The trouble with high-dimensional spaces is not that they are large, but that they are empty.&rdquo;</em>
+&mdash; Paraphrased from Richard Bellman (1961)</p>
+</blockquote>
+<p>The geometric methods developed in Parts I through III operate beautifully in moderate dimensions. When a model has five parameters grouped into five named dimensions, exhaustive subset enumeration (Chapter 11) evaluates 31 subsets, Pareto frontier extraction completes in microseconds, and the Model Robustness Index (Chapter 9) converges with 300 perturbation samples. The entire structural fuzzing campaign finishes in seconds.</p>
+<p>Now consider a model with 50 parameters. Or 200. Or 2,000. The number of subsets of size up to $k = 4$ is $\binom{50}{1} + \binom{50}{2} + \binom{50}{3} + \binom{50}{4} = 292{,}825$. For $n = 200$, the same sum exceeds $67$ million. Exhaustive enumeration, which was the foundation of the geometric analysis pipeline, becomes computationally impossible.</p>
+<p>This chapter addresses the computational challenges that arise when the methods of preceding chapters encounter high-dimensional parameter spaces. We analyze the complexity of each pipeline stage, identify the bottlenecks, and develop three families of strategies for overcoming them: greedy heuristics that sacrifice optimality for tractability, LASSO-based screening that exploits sparsity, and sampling strategies that provide probabilistic coverage guarantees.</p>
+<hr />
+<h2 id="171-the-curse-of-dimensionality-for-geometric-methods">17.1 The Curse of Dimensionality for Geometric Methods</h2>
+<h3 id="1711-volume-distance-and-concentration">17.1.1 Volume, Distance, and Concentration</h3>
+<p>The curse of dimensionality is not a single phenomenon but a family of related pathologies. Three are particularly damaging for the geometric methods in this book.</p>
+<p><strong>Volume explosion.</strong> The fraction of a unit hypercube&rsquo;s volume within distance $\epsilon$ of the center shrinks as $(2\epsilon)^n$. For $n = 50$ and $\epsilon = 0.1$, this is $0.2^{50} \approx 10^{-35}$. The <code>optimize_subset</code> function in <code>core.py</code> uses 5,000 random samples for subsets of size 3 or more. In 50 dimensions, those samples cover a vanishingly small fraction of the feasible region.</p>
+<p><strong>Distance concentration.</strong> As $n$ grows, the ratio of maximum to minimum pairwise distance in a random point set converges to 1. All points become approximately equidistant, undermining nearest-neighbor methods and distance-based analysis.</p>
+<p><strong>Empty neighborhoods.</strong> For MRI computation (Chapter 9), 300 perturbation samples in 50 dimensions are scattered across an exponentially larger space. The MRI&rsquo;s percentile statistics&mdash;P75 and P95&mdash;remain well-defined but may not capture the true tail behavior of the perturbation response surface.</p>
+<h3 id="1712-what-breaks-and-when">17.1.2 What Breaks and When</h3>
+<p>Not all pipeline stages suffer equally:</p>
+<table>
+<thead>
+<tr>
+<th>Pipeline Stage</th>
+<th>Complexity</th>
+<th>Breaks At</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subset enumeration</td>
+<td>$O\bigl(\sum_{k=1}^{K}\binom{n}{k}\bigr)$</td>
+<td>$n \approx 20$</td>
+<td>Combinatorial explosion</td>
+</tr>
+<tr>
+<td>Per-subset optimization (1D/2D)</td>
+<td>$O(g)$ / $O(g^2)$</td>
+<td>Never</td>
+<td>Fixed grid cost</td>
+</tr>
+<tr>
+<td>Per-subset optimization (3D+)</td>
+<td>$O(r)$</td>
+<td>$n \approx 50$</td>
+<td>Random search coverage degrades</td>
+</tr>
+<tr>
+<td>Pareto frontier extraction</td>
+<td>$O(m \cdot n)$</td>
+<td>$m > 10^6$</td>
+<td>Dominance checks</td>
+</tr>
+<tr>
+<td>Sensitivity profiling</td>
+<td>$O(n \cdot g)$</td>
+<td>$n \approx 500$</td>
+<td>Linear, well-behaved</td>
+</tr>
+<tr>
+<td>MRI computation</td>
+<td>$O(p \cdot n)$</td>
+<td>$n \approx 500$</td>
+<td>Perturbation coverage degrades</td>
+</tr>
+<tr>
+<td>Adversarial threshold search</td>
+<td>$O(n \cdot s)$</td>
+<td>$n \approx 500$</td>
+<td>Linear, well-behaved</td>
+</tr>
+<tr>
+<td>Forward/backward selection</td>
+<td>$O(n^2)$</td>
+<td>$n \approx 200$</td>
+<td>Quadratic greedy iterations</td>
+</tr>
+</tbody>
+</table>
+<p>Here $g$ is <code>n_grid</code> (default 20), $r$ is <code>n_random</code> (default 5,000), $m$ the total subset count, $p$ is <code>n_perturbations</code> (default 300), and $s$ is binary search steps per dimension. The critical bottleneck is subset enumeration&mdash;exponential where everything else is polynomial.</p>
+<hr />
+<h2 id="172-combinatorial-explosion-in-subset-enumeration">17.2 Combinatorial Explosion in Subset Enumeration</h2>
+<p>The <code>enumerate_subsets</code> function in <code>core.py</code> iterates over all subsets of dimensions from size 1 to <code>max_dims</code>, calling <code>optimize_subset</code> on each via <code>itertools.combinations</code>. The total number of subsets is:</p>
+<p>$$S(n, K) = \sum_{k=1}^{K} \binom{n}{k}$$</p>
+<p>For small $K$ this is $O(n^K)$. Concrete counts:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$n$</th>
+<th style="text-align: center;">$K = 2$</th>
+<th style="text-align: center;">$K = 3$</th>
+<th style="text-align: center;">$K = 4$</th>
+<th style="text-align: center;">$K = n$ (full)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">30</td>
+<td style="text-align: center;">31</td>
+</tr>
+<tr>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">55</td>
+<td style="text-align: center;">175</td>
+<td style="text-align: center;">385</td>
+<td style="text-align: center;">1,023</td>
+</tr>
+<tr>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">210</td>
+<td style="text-align: center;">1,350</td>
+<td style="text-align: center;">5,985</td>
+<td style="text-align: center;">$\approx 10^6$</td>
+</tr>
+<tr>
+<td style="text-align: center;">50</td>
+<td style="text-align: center;">1,275</td>
+<td style="text-align: center;">20,825</td>
+<td style="text-align: center;">292,825</td>
+<td style="text-align: center;">$\approx 10^{15}$</td>
+</tr>
+<tr>
+<td style="text-align: center;">100</td>
+<td style="text-align: center;">5,050</td>
+<td style="text-align: center;">166,750</td>
+<td style="text-align: center;">3,921,225</td>
+<td style="text-align: center;">$\approx 10^{30}$</td>
+</tr>
+<tr>
+<td style="text-align: center;">200</td>
+<td style="text-align: center;">20,100</td>
+<td style="text-align: center;">1,333,500</td>
+<td style="text-align: center;">67,054,150</td>
+<td style="text-align: center;">$\approx 10^{60}$</td>
+</tr>
+</tbody>
+</table>
+<p>The raw subset count understates the true cost because each subset must be <em>optimized</em>. The <code>optimize_subset</code> function uses grid search ($g$ or $g^2$ evaluations) for 1D/2D subsets and random search ($r$ evaluations) for 3D+. For $n = 50$ and $K = 4$ with $g = 20, r = 5{,}000$, the total exceeds $1.25 \times 10^9$ function evaluations.</p>
+<hr />
+<h2 id="173-greedy-alternatives">17.3 Greedy Alternatives</h2>
+<h3 id="1731-forward-selection">17.3.1 Forward Selection</h3>
+<p>Forward selection builds a subset incrementally, starting empty and greedily adding the dimension that most reduces MAE. From <code>baselines.py</code>:</p>
+<pre><code class="language-python">def forward_selection(
+    dim_names, evaluate_fn, max_dims=None,
+    inactive_value=1e6, n_grid=20, n_random=5000,
+) -&gt; list[SubsetResult]:
+    n_all = len(dim_names)
+    if max_dims is None:
+        max_dims = n_all
+    selected, remaining = [], list(range(n_all))
+    results = []
+
+    for _ in range(min(max_dims, n_all)):
+        best_mae, best_dim, best_result = float(&quot;inf&quot;), remaining[0], None
+        for candidate in remaining:
+            result = optimize_subset(
+                active_dims=selected + [candidate],
+                all_dim_names=dim_names, evaluate_fn=evaluate_fn,
+                inactive_value=inactive_value,
+                n_grid=n_grid, n_random=n_random,
+            )
+            if result.mae &lt; best_mae:
+                best_mae, best_dim, best_result = result.mae, candidate, result
+        selected.append(best_dim)
+        remaining.remove(best_dim)
+        results.append(best_result)
+    return results
+</code></pre>
+<p>At step $t$, it evaluates $n - t$ candidates. Total <code>optimize_subset</code> calls for $K$ steps: $F(n, K) = Kn - K(K-1)/2$, which is $O(nK)$&mdash;linear in $n$ for fixed $K$.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$n$</th>
+<th style="text-align: center;">Exhaustive ($K = 4$)</th>
+<th style="text-align: center;">Forward ($K = 4$)</th>
+<th style="text-align: center;">Speedup</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">5,985</td>
+<td style="text-align: center;">74</td>
+<td style="text-align: center;">81x</td>
+</tr>
+<tr>
+<td style="text-align: center;">50</td>
+<td style="text-align: center;">292,825</td>
+<td style="text-align: center;">194</td>
+<td style="text-align: center;">1,510x</td>
+</tr>
+<tr>
+<td style="text-align: center;">100</td>
+<td style="text-align: center;">3,921,225</td>
+<td style="text-align: center;">394</td>
+<td style="text-align: center;">9,952x</td>
+</tr>
+<tr>
+<td style="text-align: center;">200</td>
+<td style="text-align: center;">67,054,150</td>
+<td style="text-align: center;">794</td>
+<td style="text-align: center;">84,453x</td>
+</tr>
+</tbody>
+</table>
+<p>Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. But empirically, it typically finds configurations within 5&ndash;15% of the globally optimal MAE.</p>
+<h3 id="1732-backward-elimination">17.3.2 Backward Elimination</h3>
+<p>Backward elimination starts with all $n$ dimensions active and greedily removes the least important one at each step. From <code>baselines.py</code>:</p>
+<pre><code class="language-python">def backward_elimination(
+    dim_names, evaluate_fn,
+    inactive_value=1e6, n_grid=20, n_random=5000,
+) -&gt; list[SubsetResult]:
+    n_all = len(dim_names)
+    active = list(range(n_all))
+    results = []
+
+    full_result = optimize_subset(
+        active_dims=active, all_dim_names=dim_names,
+        evaluate_fn=evaluate_fn, inactive_value=inactive_value,
+        n_grid=n_grid, n_random=n_random,
+    )
+    results.append(full_result)
+
+    while len(active) &gt; 1:
+        best_mae, worst_dim, best_result = float(&quot;inf&quot;), active[0], None
+        for candidate in active:
+            trial_dims = [d for d in active if d != candidate]
+            result = optimize_subset(
+                active_dims=trial_dims, all_dim_names=dim_names,
+                evaluate_fn=evaluate_fn, inactive_value=inactive_value,
+                n_grid=n_grid, n_random=n_random,
+            )
+            if result.mae &lt; best_mae:
+                best_mae, worst_dim, best_result = result.mae, candidate, result
+        active.remove(worst_dim)
+        results.append(best_result)
+    return results
+</code></pre>
+<p>The total calls are $B(n) = n(n-1)/2 + 1$, the same $O(n^2)$ as forward selection run to completion. However, backward elimination has higher per-call cost because early steps involve large subsets (triggering the expensive random search path in <code>optimize_subset</code>).</p>
+<p><strong>Complementary strengths.</strong> Forward selection excels at identifying the <em>most important</em> dimensions; backward elimination excels at identifying the <em>least important</em>. Running both and comparing results is a practical diagnostic: agreement suggests clean dimension structure; divergence suggests complex interactions.</p>
+<h3 id="1733-bidirectional-and-floating-selection">17.3.3 Bidirectional and Floating Selection</h3>
+<p>More sophisticated variants exist. <strong>Bidirectional selection</strong> alternates forward and backward steps: add the best remaining dimension, then check whether any previously selected dimension has become redundant. <strong>Floating selection</strong> (SFFS/SBFS) allows the subset size to fluctuate, backing up when a backward step improves the objective. These methods escape some local optima that trap pure greedy search while maintaining $O(n^2)$ worst-case complexity.</p>
+<hr />
+<h2 id="174-lasso-based-dimension-screening">17.4 LASSO-Based Dimension Screening</h2>
+<h3 id="1741-sparsity-as-a-proxy-for-subset-selection">17.4.1 Sparsity as a Proxy for Subset Selection</h3>
+<p>Instead of selecting dimensions explicitly, the LASSO approach solves a continuous relaxation: optimize over all dimensions simultaneously with an $L^1$ penalty that encourages sparsity:</p>
+<p>$$\mathcal{L}_\alpha(\theta) = \mathcal{L}(\theta) + \alpha \sum_{i=1}^{n} |\log_{10}(\theta_i)|$$</p>
+<p>The penalty is applied in log-space, penalizing deviation from $\theta_i = 1.0$ (the neutral value). The <code>lasso_selection</code> function in <code>baselines.py</code> sweeps over 20 logarithmically spaced regularization strengths $\alpha \in [10^{-3}, 10^2]$. For each $\alpha$, it searches $r = 5{,}000$ random parameter vectors and identifies the best penalized solution. Dimensions with $|\log_{10}(\theta_i)| \geq 0.5$ are considered active.</p>
+<p>The total cost is $O(|\alpha| \cdot r)$ function evaluations&mdash;$100{,}000$ by default, <em>independent of $n$</em>. This makes LASSO screening particularly attractive for high-dimensional problems.</p>
+<h3 id="1742-lasso-as-a-screening-stage">17.4.2 LASSO as a Screening Stage</h3>
+<p>The most effective use is as a <em>screening stage</em> that reduces the effective dimensionality before enumeration begins. The workflow is:</p>
+<ol>
+<li>Run <code>lasso_selection</code> on the full $n$-dimensional problem. Cost: $O(r \cdot |\alpha|)$.</li>
+<li>Identify dimensions that appear in active sets across multiple $\alpha$ values. These are the <em>robust</em> dimensions that survive regularization at various penalty strengths.</li>
+<li>Restrict attention to this reduced set of $n' \ll n$ dimensions.</li>
+<li>Run <code>enumerate_subsets</code> on the reduced set with $n'$ dimensions. Cost: $O(n'^K)$.</li>
+</ol>
+<p>If LASSO reduces $n = 200$ to $n' = 12$, exhaustive enumeration with $K = 4$ requires only $\binom{12}{1} + \binom{12}{2} + \binom{12}{3} + \binom{12}{4} = 793$ subsets&mdash;a reduction from 67 million to under a thousand. The screening stage costs 100,000 evaluations; the enumeration stage costs a few thousand more. The total cost is a tiny fraction of naive exhaustive enumeration.</p>
+<p>The risk is that LASSO screening may discard a dimension that is individually weak but critical in combination with others. This risk is partially mitigated by using a generous activity threshold ($|\log_{10}(\theta_i)| \geq 0.3$ instead of $0.5$) and by examining the LASSO path across all $\alpha$ values rather than relying on a single regularization strength. Dimensions that appear in the active set for any $\alpha$ value should be retained for the enumeration stage.</p>
+<hr />
+<h2 id="175-sampling-strategies-for-high-dimensional-perturbation-spaces">17.5 Sampling Strategies for High-Dimensional Perturbation Spaces</h2>
+<h3 id="1751-the-mri-sampling-problem">17.5.1 The MRI Sampling Problem</h3>
+<p>The MRI (Chapter 9) draws perturbation samples from a log-normal distribution. With $p = 300$ samples in $n = 50$ dimensions, the samples are too sparse to reveal the fine structure of the perturbation response surface. Three strategies improve coverage.</p>
+<h3 id="1752-latin-hypercube-sampling">17.5.2 Latin Hypercube Sampling</h3>
+<p>LHS partitions each dimension&rsquo;s marginal distribution into $p$ equal-probability strata, ensuring each stratum is sampled exactly once. The resulting sample has better space-filling properties than independent sampling, providing approximately $1 + (1/p)$ variance reduction. For MRI, the modification replaces the independent normal draws with stratified draws via <code>scipy.stats.qmc.LatinHypercube</code>, transformed through the inverse normal CDF.</p>
+<h3 id="1753-quasi-random-sequences">17.5.3 Quasi-Random Sequences</h3>
+<p>Sobol and Halton sequences provide deterministic, low-discrepancy point sets. The Koksma&ndash;Hlawka inequality bounds integration error at $O((\log p)^n / p)$, tighter than random sampling&rsquo;s $O(1/\sqrt{p})$ when $n$ is moderate. Quasi-random sequences are most useful for $n < 40$; beyond this, a hybrid approach&mdash;Sobol for the most important dimensions, random for the rest&mdash;works well.</p>
+<h3 id="1754-importance-sampling-along-sensitive-dimensions">17.5.4 Importance Sampling Along Sensitive Dimensions</h3>
+<p>Sensitivity profiling identifies which dimensions most influence MAE. Scaling perturbation variance by sensitivity rank concentrates samples where they matter:</p>
+<pre><code class="language-python">importance = np.array([sr.delta_mae for sr in sensitivity_results])
+importance = importance / importance.sum()
+adaptive_scale = scale * (1.0 + importance * n_dims)
+
+for _ in range(n_perturbations):
+    noise = rng.normal(0.0, adaptive_scale)
+    params_pert = params * np.exp(noise)
+</code></pre>
+<p>This reduces MRI estimate variance by focusing on the dimensions that drive tail behavior.</p>
+<hr />
+<h2 id="176-approximation-strategies-for-pareto-frontiers">17.6 Approximation Strategies for Pareto Frontiers</h2>
+<h3 id="1761-streaming-pareto-maintenance">17.6.1 Streaming Pareto Maintenance</h3>
+<p>The <code>pareto_frontier</code> function in <code>pareto.py</code> handles the two-objective case (dimensionality vs. MAE) efficiently by grouping results by dimensionality, keeping the best MAE at each level, and sweeping through in $O(m)$ time (Chapter 8). The challenge arises when we want Pareto analysis over <em>more than two objectives</em>&mdash;say, (dimensionality, MAE, MRI)&mdash;or when the number of candidates $m$ is in the millions.</p>
+<p>Instead of collecting all results and computing the frontier post hoc, maintain the frontier <em>incrementally</em> as results arrive. Each new result is checked for dominance against the current frontier (not against all prior results). If it is not dominated, it is added, and any frontier members it now dominates are removed. The cost per insertion is $O(|F|)$ where $|F|$ is the frontier size, typically much smaller than $m$.</p>
+<p>For a frontier of size 20 (typical in practice), each insertion requires 20 dominance checks regardless of how many total results have been processed. Over $m$ insertions, the total cost is $O(m \cdot |F|)$ rather than $O(m^2)$.</p>
+<h3 id="1762-epsilon-dominance-for-frontier-compression">17.6.2 Epsilon-Dominance for Frontier Compression</h3>
+<p>In high-dimensional objective spaces, the exact Pareto frontier can itself grow large. <strong>Epsilon-dominance</strong> provides principled compression: a solution $\mathbf{x}$ $\epsilon$-dominates $\mathbf{y}$ if $x_i \leq (1 + \epsilon) \cdot y_i$ for all objectives $i$. The $\epsilon$-Pareto frontier contains at most $O((1/\epsilon)^{d_{\text{obj}}})$ points, where $d_{\text{obj}}$ is the number of objectives. For $\epsilon = 0.05$ (5% tolerance) and 3 objectives, this bounds the frontier at 8,000 points&mdash;manageable regardless of how many candidates are evaluated.</p>
+<hr />
+<h2 id="177-computational-complexity-of-the-full-pipeline">17.7 Computational Complexity of the Full Pipeline</h2>
+<p>The <code>run_campaign</code> function in <code>pipeline.py</code> executes six stages plus optional baselines. With $E$ denoting the cost per <code>evaluate_fn</code> call:</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Cost (evaluations)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subset enumeration</td>
+<td>$\sum_{k=1}^{K}\binom{n}{k} \cdot c(k)$</td>
+<td>$c(k) = g, g^2, r$ for $k = 1, 2, \geq 3$</td>
+</tr>
+<tr>
+<td>Pareto extraction</td>
+<td>$O(m)$, no evaluations</td>
+<td>In-memory computation</td>
+</tr>
+<tr>
+<td>Sensitivity profiling</td>
+<td>$O(n \cdot g)$</td>
+<td>One grid sweep per dimension</td>
+</tr>
+<tr>
+<td>MRI computation</td>
+<td>$O(p)$</td>
+<td>Independent of $n$</td>
+</tr>
+<tr>
+<td>Adversarial search</td>
+<td>$O(n \cdot s)$</td>
+<td>Binary search per dimension</td>
+</tr>
+<tr>
+<td>Compositional test</td>
+<td>$O(n^2 \cdot g)$</td>
+<td>Greedy build order</td>
+</tr>
+<tr>
+<td>Forward selection</td>
+<td>$O(nK) \cdot c_{\text{avg}}$</td>
+<td></td>
+</tr>
+<tr>
+<td>Backward elimination</td>
+<td>$O(n^2) \cdot c_{\text{avg}}$</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Estimated wall-clock times for $E = 1$ms, $g = 20$, $r = 5{,}000$, $p = 300$, $K = 4$:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$n$</th>
+<th style="text-align: center;">Enumeration</th>
+<th style="text-align: center;">Other stages</th>
+<th style="text-align: center;">Total</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">0.5s</td>
+<td style="text-align: center;">0.8s</td>
+<td style="text-align: center;">1.3s</td>
+</tr>
+<tr>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">4.5s</td>
+<td style="text-align: center;">1.7s</td>
+<td style="text-align: center;">6.2s</td>
+</tr>
+<tr>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">68s</td>
+<td style="text-align: center;">5s</td>
+<td style="text-align: center;">73s</td>
+</tr>
+<tr>
+<td style="text-align: center;">50</td>
+<td style="text-align: center;">24min</td>
+<td style="text-align: center;">26s</td>
+<td style="text-align: center;">25min</td>
+</tr>
+<tr>
+<td style="text-align: center;">100</td>
+<td style="text-align: center;">5.4hr</td>
+<td style="text-align: center;">100s</td>
+<td style="text-align: center;">5.4hr</td>
+</tr>
+<tr>
+<td style="text-align: center;">200</td>
+<td style="text-align: center;">186hr</td>
+<td style="text-align: center;">7min</td>
+<td style="text-align: center;">186hr</td>
+</tr>
+</tbody>
+</table>
+<p>Subset enumeration is the bottleneck, becoming intractable between $n = 50$ and $n = 100$.</p>
+<hr />
+<h2 id="178-parallelization-opportunities">17.8 Parallelization Opportunities</h2>
+<h3 id="1781-embarrassingly-parallel-stages">17.8.1 Embarrassingly Parallel Stages</h3>
+<p><strong>Subset enumeration.</strong> Each <code>optimize_subset</code> call is independent. Subsets can be partitioned across $P$ workers, reducing wall-clock time by approximately $P$:</p>
+<pre><code class="language-python">from concurrent.futures import ProcessPoolExecutor
+
+def parallel_enumerate_subsets(dim_names, evaluate_fn, max_dims=4, n_workers=None, **kwargs):
+    all_combos = []
+    for k in range(1, min(max_dims, len(dim_names)) + 1):
+        all_combos.extend(itertools.combinations(range(len(dim_names)), k))
+
+    def evaluate_combo(combo):
+        return optimize_subset(active_dims=combo, all_dim_names=dim_names,
+                               evaluate_fn=evaluate_fn, **kwargs)
+
+    with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(evaluate_combo, all_combos))
+    results.sort(key=lambda r: r.mae)
+    return results
+</code></pre>
+<p><strong>MRI computation.</strong> Perturbation samples can be precomputed and distributed. <strong>Adversarial search.</strong> Each dimension&rsquo;s binary search is independent.</p>
+<h3 id="1782-sequential-stages-with-inner-parallelism">17.8.2 Sequential Stages with Inner Parallelism</h3>
+<p>Forward selection, backward elimination, and the compositional test are sequential across steps but parallel <em>within</em> each step. At step $t$ of forward selection, the $n - t$ candidate evaluations can run simultaneously.</p>
+<h3 id="1783-gpu-acceleration">17.8.3 GPU Acceleration</h3>
+<p>When the evaluation function is GPU-accelerated, perturbation evaluations can be batched. Instead of $p$ sequential evaluations, construct batches of $B$ perturbed parameter vectors and evaluate them in a single kernel launch, reducing the number of launches from 300 to $\lceil 300/B \rceil$.</p>
+<hr />
+<h2 id="179-memory-efficient-implementations">17.9 Memory-Efficient Implementations</h2>
+<h3 id="1791-the-memory-problem">17.9.1 The Memory Problem</h3>
+<p><code>enumerate_subsets</code> stores all results in a list. Each <code>SubsetResult</code> contains a full parameter vector of shape $(n,)$. For $n = 100$ and $K = 4$, the list holds nearly 4 million results consuming approximately 4 GB. For $n = 200$, memory exceeds 60 GB.</p>
+<h3 id="1792-streaming-evaluation">17.9.2 Streaming Evaluation</h3>
+<p>Most downstream analysis needs only the top-$M$ results by MAE and the Pareto frontier. A streaming implementation maintains a bounded priority queue and a streaming Pareto frontier, reducing memory from $O(m)$ to $O(M + |F|)$&mdash;constant regardless of $n$.</p>
+<h3 id="1793-compressed-parameter-storage">17.9.3 Compressed Parameter Storage</h3>
+<p>Since inactive dimensions share the sentinel value <code>1e6</code>, a <code>SubsetResult</code> with $k$ active dimensions out of $n$ total carries $n - k$ redundant values. Storing only active dimension indices and values reduces per-result storage from $O(n)$ to $O(k)$:</p>
+<pre><code class="language-python">@dataclass
+class CompactSubsetResult:
+    dims: tuple[int, ...]
+    dim_names: tuple[str, ...]
+    active_values: tuple[float, ...]  # Only active dimension values
+    mae: float
+
+    def to_full_params(self, n_all, inactive_value=1e6):
+        params = np.full(n_all, inactive_value)
+        for dim, val in zip(self.dims, self.active_values):
+            params[dim] = val
+        return params
+</code></pre>
+<p>For $K = 2$ subsets with $n = 200$, this is a 100x compression.</p>
+<hr />
+<h2 id="1710-when-to-use-exact-methods-vs-approximations">17.10 When to Use Exact Methods vs. Approximations</h2>
+<h3 id="17101-the-decision-framework">17.10.1 The Decision Framework</h3>
+<p>The choice between exact enumeration and approximate methods is not purely a function of $n$. It depends on three factors:</p>
+<ol>
+<li>
+<p><strong>Evaluation cost $E$.</strong> If each function evaluation takes 1 microsecond (as in a simple closed-form model), exhaustive enumeration with $n = 30$ and $K = 4$ requires 28,405 subsets, each costing at most 5,000 evaluations, for a total wall-clock time under 3 minutes. But if each evaluation takes 1 second (as in a simulation-based model), the same campaign requires 40 hours.</p>
+</li>
+<li>
+<p><strong>Dimension interaction strength.</strong> If dimensions contribute independently to MAE, forward selection finds the optimal subset with high probability, and exhaustive enumeration provides little additional value. If dimensions interact strongly (synergies, redundancies, suppression effects), exhaustive enumeration is the only way to discover optimal combinations.</p>
+</li>
+<li>
+<p><strong>Tolerance for suboptimality.</strong> In exploratory analysis, finding a configuration within 10% of optimal is often sufficient. In production deployment, where the selected configuration will run for months, the cost of finding the true optimum may be justified.</p>
+</li>
+</ol>
+<h3 id="17102-diagnostic-tests-for-interaction-strength">17.10.2 Diagnostic Tests for Interaction Strength</h3>
+<p>Before committing to exhaustive enumeration, estimate interaction strength:</p>
+<ol>
+<li>Run forward selection to obtain the greedy ordering $d_1, \ldots, d_K$.</li>
+<li>For each pair $(d_i, d_j)$, compute $\Delta_{ij} = \text{MAE}(\{d_i, d_j\}) - \min(\text{MAE}(\{d_i\}), \text{MAE}(\{d_j\}))$.</li>
+<li>Compute the interaction ratio $R = \max_{i,j} |\Delta_{ij}| / \text{MAE}(\{d_1\})$.</li>
+</ol>
+<p>If $R < 0.05$, interactions are weak and greedy methods suffice. If $R > 0.2$, interactions are strong and more thorough search is warranted.</p>
+<h3 id="17103-the-decision-matrix">17.10.3 The Decision Matrix</h3>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Recommended Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$n \leq 15$, any $E$</td>
+<td>Exhaustive enumeration</td>
+</tr>
+<tr>
+<td>$15 < n \leq 50$, $E < 1$ms</td>
+<td>Exhaustive with $K \leq 3$</td>
+</tr>
+<tr>
+<td>$15 < n \leq 50$, $E > 1$ms</td>
+<td>LASSO screening + reduced enumeration</td>
+</tr>
+<tr>
+<td>$50 < n \leq 200$, weak interactions</td>
+<td>Forward + backward selection</td>
+</tr>
+<tr>
+<td>$50 < n \leq 200$, strong interactions</td>
+<td>LASSO screening + reduced enumeration</td>
+</tr>
+<tr>
+<td>$n > 200$</td>
+<td>LASSO screening + forward selection only</td>
+</tr>
+</tbody>
+</table>
+<p>The pipeline supports this through <code>max_subset_dims</code>:</p>
+<pre><code class="language-python">report = run_campaign(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=2,       # Only enumerate pairs
+    run_baselines=True,      # Greedy methods for higher orders
+    n_mri_perturbations=500, # Increase for high dimensions
+)
+</code></pre>
+<h3 id="17104-a-high-dimensional-campaign">17.10.4 A High-Dimensional Campaign</h3>
+<p>Consider $n = 80$ parameters with 50ms evaluation cost. Naive enumeration with $K = 4$ would require 12.5 years. The recommended approach:</p>
+<pre><code class="language-python"># Phase 1: LASSO screening (100,000 evals = 83 min)
+lasso_results = lasso_selection(dim_names=dim_names, evaluate_fn=evaluate_fn)
+
+# Identify robust dimensions (active across multiple alpha values)
+from collections import Counter
+dim_counts = Counter()
+for result in lasso_results:
+    for d in result.dims:
+        dim_counts[d] += 1
+threshold = 0.3 * len(lasso_results)
+screened_dims = [d for d, c in dim_counts.items() if c &gt;= threshold]
+
+# Phase 2: Exhaustive enumeration on reduced set (~12 dims, ~40 min)
+reduced_results = enumerate_subsets(
+    dim_names=[dim_names[d] for d in screened_dims],
+    evaluate_fn=make_reduced_fn(evaluate_fn, screened_dims),
+    max_dims=4,
+)
+
+# Phase 3: MRI + adversarial testing on top configurations (~10 min)
+</code></pre>
+<p>Total: 2&ndash;3 hours instead of 12.5 years.</p>
+<hr />
+<h2 id="1711-limitations-and-open-problems">17.11 Limitations and Open Problems</h2>
+<p>Several challenges remain unresolved in the current framework.</p>
+<p><strong>Non-linear dimension interactions.</strong> LASSO screening assesses dimensions individually via the $L^1$ penalty on each parameter. Dimensions whose importance emerges only through three-way or higher-order interactions may be incorrectly screened out. Developing screening methods that detect higher-order interactions without exhaustive search is an open problem in both the structural fuzzing framework and the broader feature selection literature.</p>
+<p><strong>Non-stationary evaluation costs.</strong> The cost model in Section 17.7 assumes that each evaluation has fixed cost $E$. In practice, evaluation cost may depend on the parameter values&mdash;some configurations cause the model to converge slowly or trigger expensive fallback computations. Adaptive budget allocation must account for this variance, potentially using multi-armed bandit strategies to estimate per-configuration cost online.</p>
+<p><strong>Theoretical guarantees.</strong> Forward selection provides an approximation ratio for submodular objectives, but the MAE-minimization objective in structural fuzzing is generally <em>not</em> submodular. Establishing theoretical guarantees for the approximation quality of greedy methods in this setting requires either proving submodularity under additional assumptions or developing alternative theoretical frameworks.</p>
+<p><strong>Distributed evaluation.</strong> For very high-dimensional problems ($n > 1{,}000$), even the $O(n^2)$ methods become slow. Distributed evaluation across a cluster introduces communication overhead, fault tolerance concerns, and load balancing challenges that are beyond the scope of this chapter but arise immediately in practice.</p>
+<hr />
+<h2 id="1712-connection-to-chapter-18">17.12 Connection to Chapter 18</h2>
+<p>This chapter addressed scaling in the dimension of the <em>parameter space</em>&mdash;what happens when the model has many parameters and the geometric methods of earlier chapters encounter computational limits. The strategies developed here&mdash;LASSO screening, greedy alternatives, streaming evaluation, adaptive budget allocation&mdash;are each effective in isolation, but their true power emerges when they are composed into coherent workflows.</p>
+<p>Chapter 18 turns to exactly this challenge: composing geometric analyses into <em>pipelines</em> with conditional branching, iterative refinement, and feedback loops between stages. The linear six-stage chain in <code>run_campaign</code> is a starting point; Chapter 18 develops more sophisticated compositions where the output of LASSO screening determines whether to run exhaustive or greedy enumeration, where MRI results trigger additional adversarial testing on fragile configurations, and where the entire pipeline can be re-run with adapted parameters when initial results reveal unexpected structure. The scaling strategies of this chapter become building blocks in that larger architecture.</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>High-dimensional parameter spaces challenge every stage of the structural fuzzing pipeline, but the challenges are unequal. Subset enumeration is the critical bottleneck, growing as $O(n^K)$ and becoming intractable for $n > 20$ at $K = 4$. Three families of strategies address this:</p>
+<ol>
+<li><strong>Greedy methods</strong> (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ while typically finding configurations within 5&ndash;15% of the global optimum.</li>
+<li><strong>LASSO screening</strong> reduces effective dimensionality from $n$ to $n' \ll n$ at cost independent of $n$, enabling exhaustive enumeration on the reduced set.</li>
+<li><strong>Sampling strategies</strong> (Latin hypercube, quasi-random sequences, importance sampling) improve coverage of high-dimensional perturbation spaces for MRI and robustness analysis.</li>
+</ol>
+<p>The remaining pipeline stages&mdash;Pareto extraction, sensitivity profiling, MRI, adversarial search&mdash;are polynomial in $n$ and scale gracefully. Streaming evaluation and compressed storage prevent memory from becoming a bottleneck. The central engineering principle is <em>adaptive strategy selection</em>: use exact methods when feasible, screen aggressively when necessary, and validate approximations by comparing greedy results against partial enumeration on a reduced dimension set.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-16-geometric-pipelines.html" class="nav-prev">&larr; Chapter 16: Building Geometric Pipelines</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-18-production-deployment.html" class="nav-next">Chapter 18: Deploying Geometric Validation in Production &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

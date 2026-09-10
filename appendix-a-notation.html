@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appendix A: Mathematical Notation and Conventions &mdash; Geometric Methods</title>
+  <meta name="description" content="Appendix A: Mathematical Notation and Conventions from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="appendix-a-notation">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Appendix A: Mathematical Notation and Conventions</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <span class="nav-prev"></span>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="appendix-b-software.html" class="nav-next">Appendix B: Software Dependencies and Installation &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="appendix-a-mathematical-notation-and-conventions">Appendix A: Mathematical Notation and Conventions</h1>
+<p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation</em> &mdash; Andrew H. Bond</p>
+<hr />
+<p>This appendix provides a consolidated reference for the mathematical notation, symbols, and conventions used throughout the book. Symbols are organized by category, with brief descriptions and references to the chapters where they are introduced or used most extensively.</p>
+<hr />
+<h2 id="a1-sets-and-spaces">A.1 Sets and Spaces</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\mathbb{R}$</td>
+<td>The set of real numbers</td>
+<td>Throughout</td>
+</tr>
+<tr>
+<td>$\mathbb{R}^n$</td>
+<td>Euclidean $n$-dimensional space; vectors $\mathbf{v} = (v_1, \ldots, v_n)$</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>$\mathbb{R}^{n \times n}$</td>
+<td>The set of real $n \times n$ matrices</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>$\mathbb{B}^d_c$</td>
+<td>Poincare ball of dimension $d$ with curvature $-c$: $\{x \in \mathbb{R}^d : c\|x\|^2 < 1\}$</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$\mathbb{B}^n$</td>
+<td>Poincare ball with default curvature $c = 1$: $\{x \in \mathbb{R}^n : \|x\| < 1\}$</td>
+<td>Ch. 1, 3</td>
+</tr>
+<tr>
+<td>$\mathbb{H}^k$</td>
+<td>Hyperbolic space of dimension $k$ and constant sectional curvature $-1$</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$\text{SPD}(n)$</td>
+<td>The manifold of $n \times n$ symmetric positive definite matrices</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\text{Sym}(n)$</td>
+<td>The vector space of $n \times n$ symmetric matrices</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$T_x M$</td>
+<td>Tangent space to manifold $M$ at point $x$</td>
+<td>Ch. 3, 4</td>
+</tr>
+<tr>
+<td>$T_x \mathbb{B}^d_c$</td>
+<td>Tangent space to the Poincare ball at point $x$</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$T_S \text{SPD}(n)$</td>
+<td>Tangent space to the SPD manifold at $S$; equals $\text{Sym}(n)$</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\ker(\phi)$</td>
+<td>Null space (kernel) of a linear map $\phi$</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>$\phi^{-1}(c)$</td>
+<td>Preimage of $c$ under the map $\phi$</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>$\mathrm{VR}(X, \varepsilon)$</td>
+<td>Vietoris-Rips simplicial complex of point cloud $X$ at scale $\varepsilon$</td>
+<td>Ch. 5</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="a2-vectors-and-matrices">A.2 Vectors and Matrices</h2>
+<h3 id="a21-vectors">A.2.1 Vectors</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\mathbf{v}, \mathbf{a}, \mathbf{b}, \mathbf{s}, \mathbf{x}, \mathbf{y}$</td>
+<td>Vectors in $\mathbb{R}^n$, set in bold lowercase</td>
+<td>Throughout</td>
+</tr>
+<tr>
+<td>$v_i, s_i, a_i$</td>
+<td>The $i$-th component of a vector</td>
+<td>Ch. 1, 2</td>
+</tr>
+<tr>
+<td>$\mathbf{s} = (s_1, s_2, \ldots, s_n)$</td>
+<td>A state vector with named components</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>$\mathbf{w}$</td>
+<td>Weight vector used in scalar projections $\phi(\mathbf{v}) = \mathbf{w}^\top \mathbf{v}$</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>$\mathbf{0}$</td>
+<td>The zero vector (origin); used as base point on manifolds</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$\|x\|$</td>
+<td>Euclidean norm $\sqrt{\sum_i x_i^2}$ of vector $x$</td>
+<td>Throughout</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a22-matrices">A.2.2 Matrices</h3>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\Sigma$</td>
+<td>Covariance matrix (symmetric positive definite)</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>$\Sigma^{-1}$</td>
+<td>Precision matrix (inverse covariance); acts as metric tensor</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>$I$</td>
+<td>Identity matrix</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>$L$</td>
+<td>Lower-triangular Cholesky factor satisfying $\Sigma^{-1} = LL^\top$</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>$U$</td>
+<td>Matrix of eigenvectors from eigendecomposition</td>
+<td>Ch. 4, 5</td>
+</tr>
+<tr>
+<td>$\Lambda$</td>
+<td>Diagonal matrix of eigenvalues</td>
+<td>Ch. 3, 4</td>
+</tr>
+<tr>
+<td>$K$</td>
+<td>Gaussian kernel matrix $K_{ij} = \exp(-D_{ij}^2 / 2\sigma^2)$</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$D$</td>
+<td>Distance matrix; $D_{ij}$ is distance between entities $i$ and $j$</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$W$</td>
+<td>Bilinear form or weight matrix in attention mechanisms</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>$\mathbf{C}$</td>
+<td>Frequency-band covariance matrix from a spectrogram</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\mathbf{B}$</td>
+<td>Band-averaged spectrogram representation $\in \mathbb{R}^{n_\text{bands} \times n_\text{frames}}$</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\mathbf{X}$</td>
+<td>Mel spectrogram matrix $\in \mathbb{R}^{n_\text{mels} \times n_\text{frames}}$</td>
+<td>Ch. 4</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a23-matrix-operations">A.2.3 Matrix Operations</h3>
+<table>
+<thead>
+<tr>
+<th>Notation</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$A^\top$</td>
+<td>Transpose of matrix $A$</td>
+<td>Throughout</td>
+</tr>
+<tr>
+<td>$A^{-1}$</td>
+<td>Inverse of matrix $A$</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>$A^{1/2}$</td>
+<td>Matrix square root (positive definite square root for SPD matrices)</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\|A\|_F$</td>
+<td>Frobenius norm: $\sqrt{\sum_{i,j} A_{ij}^2}$</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\text{tr}(A)$</td>
+<td>Trace of matrix $A$: sum of diagonal entries</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>$\text{diag}(\lambda_1, \ldots, \lambda_n)$</td>
+<td>Diagonal matrix with entries $\lambda_1, \ldots, \lambda_n$</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>$\langle x, y \rangle$</td>
+<td>Inner product $\sum_i x_i y_i$ (Euclidean unless otherwise noted)</td>
+<td>Ch. 3</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="a3-distance-functions">A.3 Distance Functions</h2>
+<h3 id="a31-euclidean-distance">A.3.1 Euclidean Distance</h3>
+<p>$$d_{\text{Euclid}}(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_{i=1}^{n} (a_i - b_i)^2} = \sqrt{(\mathbf{a} - \mathbf{b})^\top (\mathbf{a} - \mathbf{b})}$$</p>
+<p>The default metric on $\mathbb{R}^n$. Treats all dimensions identically. Introduced in Chapter 1 and contrasted with alternatives in Chapters 2&ndash;4.</p>
+<h3 id="a32-mahalanobis-distance">A.3.2 Mahalanobis Distance</h3>
+<p>$$d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top \Sigma^{-1} (\mathbf{a} - \mathbf{b})}$$</p>
+<p>Generalization of Euclidean distance that accounts for different scales and correlations among dimensions. When $\Sigma = I$, reduces to Euclidean distance. The precision matrix $\Sigma^{-1}$ stretches distances along directions of low variance and compresses them along directions of high variance. Chapter 2.</p>
+<h3 id="a33-hyperbolic-poincare-ball-distance">A.3.3 Hyperbolic (Poincare Ball) Distance</h3>
+<p>$$d_c(x, y) = \frac{2}{\sqrt{c}} \, \text{arctanh}\!\Bigl(\sqrt{c}\,\bigl\|(-x) \oplus_c y\bigr\|\Bigr)$$</p>
+<p>Geodesic distance on the Poincare ball $\mathbb{B}^d_c$. Diverges as points approach the boundary. Also expressed via arccosh (Chapter 1):</p>
+<p>$$d_{\mathbb{B}}(x, y) = \text{arccosh}\left(1 + 2\frac{\|x - y\|^2}{(1 - \|x\|^2)(1 - \|y\|^2)}\right)$$</p>
+<p>The two formulations are equivalent when $c = 1$. Chapter 1, Chapter 3.</p>
+<h3 id="a34-log-euclidean-distance">A.3.4 Log-Euclidean Distance</h3>
+<p>$$d_{LE}(S_1, S_2) = \|\log(S_1) - \log(S_2)\|_F$$</p>
+<p>Distance on the SPD manifold, where $\log$ denotes the matrix logarithm. Respects the multiplicative structure of positive definite matrices: eigenvalue ratios contribute equally regardless of magnitude. Chapter 4.</p>
+<h3 id="a35-affine-invariant-distance">A.3.5 Affine-Invariant Distance</h3>
+<p>$$d_{AI}(S_1, S_2) = \|\log(S_1^{-1/2} S_2 S_1^{-1/2})\|_F$$</p>
+<p>Alternative Riemannian metric on SPD(n), invariant under congruence transformations $S \mapsto ASA^\top$. Mentioned in Chapter 4, Section 4.7.</p>
+<h3 id="a36-frobenius-distance">A.3.6 Frobenius Distance</h3>
+<p>$$d_F(S_1, S_2) = \|S_1 - S_2\|_F$$</p>
+<p>Euclidean distance on matrices treated as flat vectors. Does not respect SPD geometry. Used as a baseline in Chapter 4.</p>
+<h3 id="a37-geodesic-distance-from-origin">A.3.7 Geodesic Distance from Origin</h3>
+<p>$$d_c(\mathbf{0}, h) = \frac{2}{\sqrt{c}}\,\text{arctanh}\!\bigl(\sqrt{c}\,\|h\|\bigr)$$</p>
+<p>Special case of hyperbolic distance measuring depth/specificity of a point on the Poincare ball. Monotonically increasing in $\|h\|$. Chapter 3.</p>
+<hr />
+<h2 id="a4-operators-and-maps">A.4 Operators and Maps</h2>
+<h3 id="a41-mobius-addition">A.4.1 Mobius Addition</h3>
+<p>$$x \oplus_c y = \frac{(1 + 2c\,\langle x, y \rangle + c\,\|y\|^2)\,x + (1 - c\,\|x\|^2)\,y}{1 + 2c\,\langle x, y \rangle + c^2\,\|x\|^2\,\|y\|^2}$$</p>
+<p>The group operation on the Poincare ball $\mathbb{B}^d_c$, generalizing vector addition to hyperbolic space. Non-commutative but gyrocommutative. Identity element is $\mathbf{0}$; inverse of $x$ is $-x$. Reduces to standard addition as $c \to 0$. Chapter 3.</p>
+<h3 id="a42-exponential-map-poincare-ball">A.4.2 Exponential Map (Poincare Ball)</h3>
+<p>$$\exp_x^c(v) = x \oplus_c \left(\tanh\!\Bigl(\frac{\sqrt{c}\,\lambda_x^c\,\|v\|}{2}\Bigr)\,\frac{v}{\sqrt{c}\,\|v\|}\right)$$</p>
+<p>Maps a tangent vector $v \in T_x\mathbb{B}^d_c$ to a point on the manifold by following the geodesic from $x$ in direction $v$ for unit time. Chapter 3.</p>
+<h3 id="a43-logarithmic-map-poincare-ball">A.4.3 Logarithmic Map (Poincare Ball)</h3>
+<p>$$\log_x^c(y) = \frac{2}{\sqrt{c}\,\lambda_x^c}\,\text{arctanh}\!\bigl(\sqrt{c}\,\|{-x \oplus_c y}\|\bigr)\,\frac{-x \oplus_c y}{\|-x \oplus_c y\|}$$</p>
+<p>Inverse of the exponential map. Returns the tangent vector at $x$ pointing toward $y$ with magnitude equal to the geodesic distance. Chapter 3.</p>
+<h3 id="a44-matrix-logarithm">A.4.4 Matrix Logarithm</h3>
+<p>$$\log(S) = U \cdot \text{diag}(\log \lambda_1, \ldots, \log \lambda_n) \cdot U^\top$$</p>
+<p>where $S = U\Lambda U^\top$ is the eigendecomposition of SPD matrix $S$ with eigenvalues $\lambda_i > 0$. Maps from SPD(n) to Sym(n) (the tangent space). Chapter 4.</p>
+<h3 id="a45-matrix-exponential">A.4.5 Matrix Exponential</h3>
+<p>$$\exp(X) = U \cdot \text{diag}(e^{\mu_1}, \ldots, e^{\mu_n}) \cdot U^\top$$</p>
+<p>where $X = U \cdot \text{diag}(\mu_1, \ldots, \mu_n) \cdot U^\top$ is the eigendecomposition of symmetric matrix $X$. Maps from Sym(n) to SPD(n). The inverse of the matrix logarithm. Chapter 4.</p>
+<h3 id="a46-conformal-factor">A.4.6 Conformal Factor</h3>
+<p>$$\lambda_x^c = \frac{2}{1 - c\,\|x\|^2}$$</p>
+<p>The Riemannian conformal factor on the Poincare ball. Relates the Poincare metric tensor to the Euclidean metric: $g_x^{\mathbb{B}} = (\lambda_x^c)^2\, g^E$. Diverges as $\|x\| \to 1/\sqrt{c}$, reflecting the exponential magnification of distances near the boundary. Chapter 3.</p>
+<h3 id="a47-lorentz-factor">A.4.7 Lorentz Factor</h3>
+<p>$$\gamma_c(x) = \frac{1}{1 - c\,\|x\|^2}$$</p>
+<p>Used in the Einstein midpoint computation. Differs from the conformal factor $\lambda_x^c$ by a factor of 2 because it is derived in the Klein model rather than the Poincare model. Chapter 3.</p>
+<h3 id="a48-projection-onto-the-poincare-ball">A.4.8 Projection onto the Poincare Ball</h3>
+<p>$$\text{proj}(x) = \begin{cases} x & \text{if } \|x\| < r_{\max}/\sqrt{c} \\ \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x & \text{otherwise} \end{cases}$$</p>
+<p>Projects points back inside the open ball after floating-point drift. The parameter $r_{\max} < 1$ (typically $0.95$) provides a safety margin. Chapter 3.</p>
+<h3 id="a49-scalar-projection">A.4.9 Scalar Projection</h3>
+<p>$$\phi : \mathbb{R}^n \to \mathbb{R}^1, \quad \phi(\mathbf{v}) = \mathbf{w}^\top \mathbf{v}$$</p>
+<p>Any linear projection from a multi-dimensional evaluation to a single scalar. The null space $\ker(\phi)$ has dimension $n - 1$, destroying $n - 1$ directions of information. Chapter 1.</p>
+<hr />
+<h2 id="a5-aggregation-and-means">A.5 Aggregation and Means</h2>
+<h3 id="a51-einstein-midpoint">A.5.1 Einstein Midpoint</h3>
+<p>$$\bar{x} = \frac{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i\, x_i}{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i}$$</p>
+<p>Weighted average of points on the Poincare ball, derived from the Klein model. Upweights points near the boundary via the Lorentz factor $\gamma_c$. Reduces to the Euclidean weighted mean as $c \to 0$. Chapter 3.</p>
+<h3 id="a52-frechet-mean-on-spdn">A.5.2 Frechet Mean on SPD(n)</h3>
+<p>$$\bar{S}_{LE} = \exp\!\left(\sum_{i=1}^{k} w_i \log(S_i)\right)$$</p>
+<p>The Frechet mean under the log-Euclidean metric. Minimizes $\sum_i w_i\, d_{LE}(S_i, M)^2$ over $M \in \text{SPD}(n)$. Closed-form: take the weighted mean in log-space, then exponentiate. Chapter 4.</p>
+<h3 id="a53-geodesic-interpolation-on-spdn">A.5.3 Geodesic Interpolation on SPD(n)</h3>
+<p>$$\gamma(t) = \exp\!\bigl((1-t)\log(S_0) + t\log(S_1)\bigr), \quad t \in [0, 1]$$</p>
+<p>Linear interpolation in log-space, yielding the geodesic (shortest path) on the SPD manifold under the log-Euclidean metric. Chapter 4.</p>
+<hr />
+<h2 id="a6-topology-and-persistent-homology">A.6 Topology and Persistent Homology</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$K_\varepsilon$</td>
+<td>Simplicial complex built from point cloud at scale $\varepsilon$</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$\mathrm{VR}(X, \varepsilon)$</td>
+<td>Vietoris-Rips complex: $k$-simplices are $(k+1)$-subsets with pairwise distance $\leq \varepsilon$</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$H_0$</td>
+<td>Zeroth homology: counts connected components</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$H_1$</td>
+<td>First homology: counts one-dimensional loops (cycles)</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$H_2$</td>
+<td>Second homology: counts two-dimensional voids (cavities)</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$(b_i, d_i)$</td>
+<td>Birth-death pair for the $i$-th topological feature</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$\ell_i = d_i - b_i$</td>
+<td>Persistence (lifetime) of the $i$-th feature</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$\varepsilon$</td>
+<td>Scale parameter in the Rips filtration</td>
+<td>Ch. 1, 5</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a61-persistence-diagram">A.6.1 Persistence Diagram</h3>
+<p>A multiset of points $\{(b_i, d_i)\}$ in the plane where $b_i$ is the birth scale and $d_i$ is the death scale of a topological feature. Points lie on or above the diagonal $b = d$. Distance from the diagonal is proportional to persistence $\ell_i$. Points far from the diagonal represent robust structure; points near the diagonal represent noise. Chapter 5.</p>
+<h3 id="a62-takens-time-delay-embedding">A.6.2 Takens&rsquo; Time-Delay Embedding</h3>
+<p>$$\mathbf{v}(t) = \bigl[x(t),\; x(t + \tau),\; x(t + 2\tau),\; \ldots,\; x(t + (d-1)\tau)\bigr]$$</p>
+<p>Reconstructs the topology of a dynamical attractor from a scalar time series. For embedding dimension $d \geq 2m + 1$ (where $m$ is the attractor&rsquo;s box-counting dimension), the reconstruction is a diffeomorphism onto the original attractor. Chapter 5.</p>
+<h3 id="a63-geodesic-deviation">A.6.3 Geodesic Deviation</h3>
+<p>$$\delta = \frac{L_\text{path} - d_\text{geo}}{d_\text{geo}}$$</p>
+<p>where $L_\text{path} = \sum_{t=1}^{T-1} d_{LE}(\mathbf{C}_t, \mathbf{C}_{t+1})$ is the total path length and $d_\text{geo} = d_{LE}(\mathbf{C}_1, \mathbf{C}_T)$ is the endpoint geodesic distance. Measures how much a spectral trajectory on the SPD manifold deviates from a geodesic. $\delta = 0$ indicates perfectly straight (monotonic) spectral evolution. Chapter 4.</p>
+<hr />
+<h2 id="a7-statistics-and-the-model-robustness-index">A.7 Statistics and the Model Robustness Index</h2>
+<table>
+<thead>
+<tr>
+<th>Symbol</th>
+<th>Meaning</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\bar{\ell}$, $\bar{x}$</td>
+<td>Arithmetic mean</td>
+<td>Throughout</td>
+</tr>
+<tr>
+<td>$\sigma$, $\sigma_\ell$</td>
+<td>Standard deviation</td>
+<td>Ch. 2, 5</td>
+</tr>
+<tr>
+<td>$\sigma_{ii} = \text{Var}(X_i)$</td>
+<td>Variance of dimension $i$ (diagonal of $\Sigma$)</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>$\sigma_{ij} = \text{Cov}(X_i, X_j)$</td>
+<td>Covariance between dimensions $i$ and $j$ (off-diagonal of $\Sigma$)</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>$Q_{75}(\ell)$</td>
+<td>75th percentile of a distribution</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>$P_{75}$, $P_{95}$</td>
+<td>75th and 95th percentile of perturbation deviation</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>MAE</td>
+<td>Mean absolute error</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>MRI</td>
+<td>Model Robustness Index (composite robustness score)</td>
+<td>Ch. 1</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a71-mri-weights">A.7.1 MRI Weights</h3>
+<p>The Model Robustness Index combines mean deviation, 75th percentile, and 95th percentile of perturbation response into a single robustness score. The composite explicitly accounts for tail risk, unlike standard deviation which treats all deviations symmetrically. Chapter 1 (introduced), Chapter 9 (developed).</p>
+<h3 id="a72-softmax-choice-rule">A.7.2 Softmax Choice Rule</h3>
+<p>$$P(\text{reject}) = \frac{\exp(-d_{\text{reject}} / T)}{\exp(-d_{\text{accept}} / T) + \exp(-d_{\text{reject}} / T)}$$</p>
+<p>Probabilistic choice model based on Mahalanobis distances, where $T$ is a temperature parameter controlling decision sharpness. Chapter 2.</p>
+<h3 id="a73-stake-dependent-temperature">A.7.3 Stake-Dependent Temperature</h3>
+<p>$$T(\text{stake}) = \max\left(T_{\text{floor}},\; T_{\text{base}} + \frac{T_\alpha}{\sqrt{\text{stake}}}\right)$$</p>
+<p>Temperature as a function of economic stakes. High stakes yield low temperature (sharper decisions); low stakes yield high temperature (noisier decisions). Chapter 2.</p>
+<h3 id="a74-persistence-diagram-summary-statistics">A.7.4 Persistence Diagram Summary Statistics</h3>
+<p>For a persistence diagram with finite lifetimes $\ell_1, \ldots, \ell_n$, the eight extracted features per homology dimension are:</p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Feature</th>
+<th>Formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Count</td>
+<td>$n$</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Mean lifetime</td>
+<td>$\bar{\ell} = \frac{1}{n}\sum_i \ell_i$</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Std lifetime</td>
+<td>$\sigma_\ell$</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Max lifetime</td>
+<td>$\max_i \ell_i$</td>
+</tr>
+<tr>
+<td>4</td>
+<td>75th percentile</td>
+<td>$Q_{75}(\ell)$</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Mean birth time</td>
+<td>$\frac{1}{n}\sum_i b_i$</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Total persistence</td>
+<td>$\sum_i \ell_i^2$</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Normalized persistence</td>
+<td>$\sqrt{\sum_i \ell_i^2}\, / \, n$</td>
+</tr>
+</tbody>
+</table>
+<p>With $H_0$ and $H_1$, this yields a 16-dimensional feature vector. Chapter 5.</p>
+<hr />
+<h2 id="a8-conventions">A.8 Conventions</h2>
+<h3 id="a81-indexing">A.8.1 Indexing</h3>
+<ul>
+<li><strong>Zero-based indexing</strong> is used in all code and dimension numbering (e.g., &ldquo;Dimension 0&rdquo; is Consequences in the ethical-economic space).</li>
+<li><strong>One-based indexing</strong> is used in mathematical exposition when conventional (e.g., eigenvalues $\lambda_1, \ldots, \lambda_n$, components $s_1, \ldots, s_n$).</li>
+<li>When ambiguity may arise, the text explicitly states which convention is in effect.</li>
+</ul>
+<h3 id="a82-dimension-naming">A.8.2 Dimension Naming</h3>
+<p>Dimensions of state vectors are referred to by name rather than by index. The framework uses dimension enumerations so that code references &ldquo;Complexity&rdquo; or &ldquo;Fairness&rdquo; rather than &ldquo;dimension 2.&rdquo; This convention prevents off-by-one errors and makes operations like &ldquo;activate all dimensions except OO&rdquo; declarative. Chapter 1.</p>
+<p>Common dimension sets used in examples:</p>
+<p><strong>Software defect prediction (5 dimensions):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Name</th>
+<th>Features</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$s_1$</td>
+<td>Size</td>
+<td>LOC, SLOC, blank lines</td>
+</tr>
+<tr>
+<td>$s_2$</td>
+<td>Complexity</td>
+<td>Cyclomatic, essential, design</td>
+</tr>
+<tr>
+<td>$s_3$</td>
+<td>Halstead</td>
+<td>Volume, difficulty, effort, time</td>
+</tr>
+<tr>
+<td>$s_4$</td>
+<td>Object-Orientation</td>
+<td>Coupling, cohesion, inheritance depth</td>
+</tr>
+<tr>
+<td>$s_5$</td>
+<td>Process</td>
+<td>Revisions, distinct authors, code churn</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Ethical-economic space (9 dimensions):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Name</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Consequences</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Rights</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Fairness</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Autonomy</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Trust</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Social Impact</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Virtue/Identity</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Legitimacy</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Epistemic</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a83-sentinel-values">A.8.3 Sentinel Values</h3>
+<p>The sentinel value $10^6$ (denoted <code>inactive_value</code> in code) indicates that a dimension is <em>inactive</em> &mdash; its corresponding feature group is excluded from the metric. When a parameter value exceeds the threshold $10^5$, the framework assigns zero weight to that dimension, effectively removing it from the distance computation:</p>
+<p>$$w_i = \begin{cases} 1 / \max(p_i, 10^{-6}) & \text{if } p_i < 10^5 \\ 0 & \text{if } p_i \geq 10^5 \end{cases}$$</p>
+<p>This mechanism enables subset enumeration: each combination of active/inactive dimensions defines a different sparsity pattern on $\Sigma^{-1}$. Chapters 1, 2.</p>
+<h3 id="a84-log-space-parameterization">A.8.4 Log-Space Parameterization</h3>
+<p>Parameter values are distributed on a logarithmic scale over $[\epsilon, M]$:</p>
+<p>$$v_k = 10^{\log_{10}(\alpha) + k \cdot \frac{\log_{10}(\beta) - \log_{10}(\alpha)}{n-1}}, \quad k = 0, 1, \ldots, n-1$$</p>
+<p>Typical bounds are $\alpha = 0.01$, $\beta = 100$. This provides uniform resolution across orders of magnitude: a change from $0.01$ to $0.1$ and a change from $10$ to $100$ each span one decade and receive equal representation. Chapter 2.</p>
+<p>For Cholesky diagonals, log-space is enforced via $\ell_{ii} = e^{\theta_i}$, mapping the unconstrained real line to strictly positive values. Chapter 2.</p>
+<h3 id="a85-numerical-stability-constants">A.8.5 Numerical Stability Constants</h3>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Typical Value</th>
+<th>Purpose</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$\varepsilon$ (EPS)</td>
+<td>$10^{-5}$</td>
+<td>Clamp for denominators and <code>arctanh</code> arguments on the Poincare ball</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>$r_{\max}$ (MAX_NORM)</td>
+<td>$0.95$</td>
+<td>Maximum allowed norm for points inside the Poincare ball</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>Eigenvalue clamp</td>
+<td>$10^{-10}$</td>
+<td>Minimum eigenvalue before taking matrix logarithm</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>Regularization $\epsilon$</td>
+<td>$10^{-4}$</td>
+<td>Ridge term added to sample covariance matrices: $\mathbf{C} + \epsilon I$</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>Inactive threshold</td>
+<td>$10^5$</td>
+<td>Parameter value above which a dimension is treated as inactive</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>Inactive value</td>
+<td>$10^6$</td>
+<td>Default sentinel assigned to deactivated dimensions</td>
+<td>Ch. 1, 2</td>
+</tr>
+</tbody>
+</table>
+<h3 id="a86-curvature-convention">A.8.6 Curvature Convention</h3>
+<p>Hyperbolic curvature is parameterized as $-c$ where $c > 0$. The Poincare ball $\mathbb{B}^d_c$ has constant sectional curvature $-c$. Setting $c = 1$ gives standard hyperbolic geometry with curvature $-1$. Typical working range is $c \in [0.1, 2.0]$. Curvature may be treated as a learnable parameter. Chapter 3.</p>
+<h3 id="a87-immutability">A.8.7 Immutability</h3>
+<p>State vectors, once constructed, are not modified in place. All operations (perturbation, projection, interpolation) produce new vectors. This convention prevents aliasing bugs and ensures trajectory reproducibility. Chapter 1.</p>
+<h3 id="a88-function-signatures">A.8.8 Function Signatures</h3>
+<p>Throughout the book, mathematical functions and their computational implementations share consistent signatures:</p>
+<table>
+<thead>
+<tr>
+<th>Mathematical</th>
+<th>Code</th>
+<th>Input</th>
+<th>Output</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$d_M(\mathbf{a}, \mathbf{b})$</td>
+<td><code>mahalanobis_distance(a, b, sigma_inv)</code></td>
+<td>Two vectors, precision matrix</td>
+<td>Scalar</td>
+</tr>
+<tr>
+<td>$d_c(x, y)$</td>
+<td><code>ball.distance(x, y)</code></td>
+<td>Two points on ball</td>
+<td>Scalar</td>
+</tr>
+<tr>
+<td>$x \oplus_c y$</td>
+<td><code>ball.mobius_add(x, y)</code></td>
+<td>Two points on ball</td>
+<td>Point on ball</td>
+</tr>
+<tr>
+<td>$\exp_x^c(v)$</td>
+<td><code>ball.exp_map(x, v)</code></td>
+<td>Base point, tangent vector</td>
+<td>Point on ball</td>
+</tr>
+<tr>
+<td>$\log_x^c(y)$</td>
+<td><code>ball.log_map(x, y)</code></td>
+<td>Two points on ball</td>
+<td>Tangent vector</td>
+</tr>
+<tr>
+<td>$\log(S)$</td>
+<td><code>SPDManifold.log_map(S)</code></td>
+<td>SPD matrix</td>
+<td>Symmetric matrix</td>
+</tr>
+<tr>
+<td>$\exp(X)$</td>
+<td><code>SPDManifold.exp_map(X)</code></td>
+<td>Symmetric matrix</td>
+<td>SPD matrix</td>
+</tr>
+<tr>
+<td>$d_{LE}(S_1, S_2)$</td>
+<td><code>SPDManifold.distance(S1, S2)</code></td>
+<td>Two SPD matrices</td>
+<td>Scalar</td>
+</tr>
+<tr>
+<td>$\bar{S}_{LE}$</td>
+<td><code>SPDManifold.frechet_mean(matrices)</code></td>
+<td>Batch of SPD matrices</td>
+<td>SPD matrix</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="a9-common-abbreviations">A.9 Common Abbreviations</h2>
+<table>
+<thead>
+<tr>
+<th>Abbreviation</th>
+<th>Expansion</th>
+<th>Reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ARC-AGI</td>
+<td>Abstraction and Reasoning Corpus for Artificial General Intelligence</td>
+<td>Ch. 1, 3</td>
+</tr>
+<tr>
+<td>BCI</td>
+<td>Brain-Computer Interface</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>DTI</td>
+<td>Diffusion Tensor Imaging</td>
+<td>Ch. 4</td>
+</tr>
+<tr>
+<td>DSWP</td>
+<td>Dominica Sperm Whale Project (dataset)</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>ICI</td>
+<td>Inter-Click Interval</td>
+<td>Ch. 5</td>
+</tr>
+<tr>
+<td>L-BFGS-B</td>
+<td>Limited-memory BFGS with Box constraints</td>
+<td>Ch. 2</td>
+</tr>
+<tr>
+<td>MLR</td>
+<td>Multinomial Logistic Regression</td>
+<td>Ch. 3</td>
+</tr>
+<tr>
+<td>MRI</td>
+<td>Model Robustness Index</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>OO</td>
+<td>Object-Orientation (dimension)</td>
+<td>Ch. 1</td>
+</tr>
+<tr>
+<td>SPD</td>
+<td>Symmetric Positive Definite</td>
+<td>Ch. 2, 4</td>
+</tr>
+<tr>
+<td>TDA</td>
+<td>Topological Data Analysis</td>
+<td>Ch. 5</td>
+</tr>
+</tbody>
+</table>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <span class="nav-prev"></span>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="appendix-b-software.html" class="nav-next">Appendix B: Software Dependencies and Installation &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

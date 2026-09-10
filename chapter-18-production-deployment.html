@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 18: Deploying Geometric Validation in Production &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 18: Deploying Geometric Validation in Production from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-18-production-deployment">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 18: Deploying Geometric Validation in Production</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-17-scaling.html" class="nav-prev">&larr; Chapter 17: Scaling to High-Dimensional Spaces</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-19-case-study-defect-prediction.html" class="nav-next">Chapter 19: Case Study --- Software Defect Prediction &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-18-deploying-geometric-validation-in-production">Chapter 18: Deploying Geometric Validation in Production</h1>
+<blockquote>
+<p><em>&ldquo;What gets measured gets managed&mdash;but only if it gets measured automatically, continuously, and with enough dimensionality to detect the failures that matter.&rdquo;</em>
+&mdash; Adapted from Peter Drucker</p>
+</blockquote>
+<p>The geometric methods developed across Chapters 3&ndash;15 and composed into pipelines in Chapter 16 are powerful precisely because they replace scalar summaries with multi-dimensional analysis. But power in a notebook is not the same as power in production. A geometric validation that runs manually once per quarter provides a snapshot; a geometric validation that runs on every pull request, monitors every deployed model, and alerts on every frontier degradation provides a <em>system</em>. This chapter bridges the gap between the two.</p>
+<p>We begin with the mechanics of integrating the <code>structural-fuzzing</code> package into CI/CD pipelines as a PyPI dependency. We then develop automated regression testing against MRI thresholds (Chapter 9), monitoring of Pareto frontier stability over time, and alerting when geometric baselines degrade. The middle sections address the engineering concerns that distinguish production from research: performance budgets, timeout handling, and designing <code>evaluate_fn</code> for models that live behind API endpoints. We close with LaTeX report generation for stakeholder communication and the versioning of geometric baselines&mdash;the production analog of the &ldquo;save your weights&rdquo; practice in model training.</p>
+<hr />
+<h2 id="181-the-structural-fuzzing-package-as-a-production-dependency">18.1 The structural-fuzzing Package as a Production Dependency</h2>
+<h3 id="1811-installation-and-pinning">18.1.1 Installation and Pinning</h3>
+<p>The <code>structural-fuzzing</code> package is published on PyPI and requires Python 3.10 or later. Its only hard dependency is NumPy (&gt;= 1.24). This minimal dependency footprint is a deliberate design decision: a validation tool that drags in a hundred transitive dependencies becomes a liability in production environments where dependency conflicts are a constant source of breakage.</p>
+<p>In a production <code>requirements.txt</code> or <code>pyproject.toml</code>, pin the version explicitly:</p>
+<pre><code class="language-toml">[project]
+dependencies = [
+    &quot;structural-fuzzing==0.2.0&quot;,
+    # ... other production dependencies
+]
+</code></pre>
+<p>For organizations that mirror PyPI internally, the package installs cleanly from private indices:</p>
+<pre><code class="language-bash">pip install structural-fuzzing==0.2.0 --index-url https://pypi.internal.corp.example.com/simple
+</code></pre>
+<p>The optional <code>examples</code> extras (<code>scikit-learn</code>, <code>pandas</code>) are development conveniences and should not be installed in production images. If your <code>evaluate_fn</code> requires scikit-learn, that dependency belongs in your application&rsquo;s dependency list, not in the validation tool&rsquo;s.</p>
+<h3 id="1812-import-patterns-for-production-code">18.1.2 Import Patterns for Production Code</h3>
+<p>In production systems, import the pipeline entry point and the report types directly:</p>
+<pre><code class="language-python">from structural_fuzzing.pipeline import run_campaign, StructuralFuzzReport
+from structural_fuzzing.mri import compute_mri, ModelRobustnessIndex
+from structural_fuzzing.pareto import pareto_frontier
+from structural_fuzzing.report import format_report, format_latex_tables
+</code></pre>
+<p>Avoid star imports. Avoid importing the entire <code>structural_fuzzing</code> namespace. Each import should be traceable to a specific use in the calling code, which matters when dependency audits ask &ldquo;why does this service depend on <code>structural-fuzzing</code>?&rdquo;</p>
+<hr />
+<h2 id="182-integrating-structural-fuzzing-into-cicd-pipelines">18.2 Integrating Structural Fuzzing into CI/CD Pipelines</h2>
+<h3 id="1821-the-baseline-ci-configuration">18.2.1 The Baseline CI Configuration</h3>
+<p>The project&rsquo;s own CI pipeline (<code>.github/workflows/ci.yaml</code>) provides the template. It runs tests across Python 3.10&ndash;3.13, installs in editable mode with dev extras, and runs <code>pytest</code> with coverage. A production integration extends this pattern by adding a <em>validation job</em> that runs structural fuzzing against the model under test.</p>
+<p>The following GitHub Actions workflow illustrates the pattern. It assumes a repository that contains both a trained model and the evaluation harness:</p>
+<pre><code class="language-yaml">name: Model Validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: &quot;0 6 * * 1&quot;  # Weekly Monday 6 AM UTC
+
+jobs:
+  structural-fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: &quot;3.12&quot;
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e &quot;.[dev]&quot;
+          pip install structural-fuzzing==0.2.0
+
+      - name: Run structural fuzzing campaign
+        run: python scripts/run_validation.py --output results/
+
+      - name: Check MRI threshold
+        run: python scripts/check_thresholds.py results/campaign.json
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: structural-fuzz-results
+          path: results/
+          retention-days: 90
+</code></pre>
+<p>Three design decisions merit attention.</p>
+<p><strong>The <code>schedule</code> trigger.</strong> Structural fuzzing on every commit is often too expensive. The workflow above runs the full campaign weekly on a schedule, while PR-triggered runs execute a lighter check (Section 18.4). The scheduled run establishes the baseline; PR runs check for regressions against it.</p>
+<p><strong>The <code>timeout-minutes</code> limit.</strong> Production CI must have a hard upper bound on execution time. A campaign that runs indefinitely&mdash;because an <code>evaluate_fn</code> hangs, because a combinatorial explosion was not anticipated&mdash;blocks the pipeline and erodes trust in the validation system. Section 18.5 discusses timeout handling in detail.</p>
+<p><strong>Artifact retention.</strong> Campaign results are uploaded as CI artifacts with a 90-day retention window. This creates a versioned history of geometric baselines that can be compared over time (Section 18.8).</p>
+<h3 id="1822-the-validation-script">18.2.2 The Validation Script</h3>
+<p>The <code>run_validation.py</code> script is the bridge between the CI environment and the structural fuzzing API. Its structure follows the <code>run_campaign</code> function signature from <code>structural_fuzzing.pipeline</code>:</p>
+<pre><code class="language-python">#!/usr/bin/env python
+&quot;&quot;&quot;Run structural fuzzing validation in CI.&quot;&quot;&quot;
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+from structural_fuzzing.pipeline import run_campaign
+from structural_fuzzing.report import format_report, format_latex_tables
+
+from my_model import load_model, make_evaluate_fn
+
+
+def main() -&gt; None:
+    output_dir = Path(sys.argv[sys.argv.index(&quot;--output&quot;) + 1])
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    model = load_model(&quot;models/production_v3.pkl&quot;)
+
+    dim_names = [&quot;Size&quot;, &quot;Complexity&quot;, &quot;Halstead&quot;, &quot;OO&quot;, &quot;Process&quot;]
+    evaluate_fn = make_evaluate_fn(model, dataset=&quot;validation_holdout&quot;)
+
+    report = run_campaign(
+        dim_names=dim_names,
+        evaluate_fn=evaluate_fn,
+        max_subset_dims=3,
+        n_mri_perturbations=300,
+        mri_scale=0.5,
+        verbose=True,
+    )
+
+    # Save structured results
+    results = {
+        &quot;mri&quot;: report.mri_result.mri if report.mri_result else None,
+        &quot;mri_p95&quot;: report.mri_result.p95_omega if report.mri_result else None,
+        &quot;pareto_count&quot;: len(report.pareto_results),
+        &quot;pareto_maes&quot;: [p.mae for p in report.pareto_results],
+        &quot;pareto_dims&quot;: [p.n_dims for p in report.pareto_results],
+        &quot;sensitivity_ranking&quot;: [
+            {&quot;dim&quot;: s.dim_name, &quot;delta_mae&quot;: s.delta_mae}
+            for s in report.sensitivity_results
+        ],
+        &quot;adversarial_count&quot;: len(report.adversarial_results),
+    }
+
+    with open(output_dir / &quot;campaign.json&quot;, &quot;w&quot;) as f:
+        json.dump(results, f, indent=2)
+
+    # Save text report
+    with open(output_dir / &quot;report.txt&quot;, &quot;w&quot;) as f:
+        f.write(format_report(report))
+
+    # Save LaTeX tables
+    with open(output_dir / &quot;tables.tex&quot;, &quot;w&quot;) as f:
+        f.write(format_latex_tables(report))
+
+    print(f&quot;\nResults written to {output_dir}/&quot;)
+
+
+if __name__ == &quot;__main__&quot;:
+    main()
+</code></pre>
+<p>The critical design element is the serialization of structured results to JSON. Text reports are for humans; JSON is for the threshold-checking step that follows.</p>
+<hr />
+<h2 id="183-automated-regression-testing-with-mri-thresholds">18.3 Automated Regression Testing with MRI Thresholds</h2>
+<h3 id="1831-defining-threshold-policies">18.3.1 Defining Threshold Policies</h3>
+<p>The Model Robustness Index (Chapter 9) compresses the perturbation response distribution into a single score that explicitly accounts for tail risk. In production, this score becomes a <em>gate</em>: if the MRI exceeds a threshold, the pipeline fails and the change does not merge.</p>
+<p>A threshold policy specifies acceptable bounds on the campaign results:</p>
+<pre><code class="language-python">from dataclasses import dataclass
+
+
+@dataclass
+class ThresholdPolicy:
+    &quot;&quot;&quot;Defines acceptable bounds for structural fuzzing results.&quot;&quot;&quot;
+
+    max_mri: float = 2.0
+    max_mri_p95: float = 4.0
+    min_pareto_count: int = 2
+    max_best_mae: float = 3.0
+    max_adversarial_count: int = 10
+    max_sensitivity_delta: float = 5.0
+</code></pre>
+<p>The <code>max_mri</code> threshold deserves careful calibration. An MRI of 2.0 means the weighted combination of mean deviation, 75th percentile, and 95th percentile is at most 2.0&mdash;the model&rsquo;s error roughly doubles under the worst perturbations seen during validation. Whether this is acceptable depends on the domain. For a defect prediction model that informs code review priorities, an MRI of 2.0 may be fine. For a model that triggers automated security responses, an MRI above 1.0 may be unacceptable. Chapter 9 provides guidance on setting these thresholds based on domain-specific risk tolerance.</p>
+<p>The <code>max_mri_p95</code> threshold independently bounds the tail of the perturbation distribution. A model can have a low composite MRI (because the mean is low) while still exhibiting catastrophic behavior in the worst 5% of perturbations. Bounding P95 separately catches this case.</p>
+<h3 id="1832-the-threshold-checker">18.3.2 The Threshold Checker</h3>
+<p>The <code>check_thresholds.py</code> script loads the JSON results and applies the policy:</p>
+<pre><code class="language-python">#!/usr/bin/env python
+&quot;&quot;&quot;Check structural fuzzing results against threshold policy.&quot;&quot;&quot;
+
+import json
+import sys
+
+
+def check_thresholds(results_path: str) -&gt; bool:
+    with open(results_path) as f:
+        results = json.load(f)
+
+    failures: list[str] = []
+
+    # MRI checks
+    mri = results.get(&quot;mri&quot;)
+    if mri is not None and mri &gt; 2.0:
+        failures.append(f&quot;MRI {mri:.4f} exceeds threshold 2.0&quot;)
+
+    mri_p95 = results.get(&quot;mri_p95&quot;)
+    if mri_p95 is not None and mri_p95 &gt; 4.0:
+        failures.append(f&quot;MRI P95 {mri_p95:.4f} exceeds threshold 4.0&quot;)
+
+    # Pareto frontier check
+    pareto_count = results.get(&quot;pareto_count&quot;, 0)
+    if pareto_count &lt; 2:
+        failures.append(
+            f&quot;Pareto frontier has {pareto_count} points &quot;
+            f&quot;(minimum 2 required)&quot;
+        )
+
+    # Best MAE check
+    pareto_maes = results.get(&quot;pareto_maes&quot;, [])
+    if pareto_maes and min(pareto_maes) &gt; 3.0:
+        failures.append(
+            f&quot;Best Pareto MAE {min(pareto_maes):.4f} exceeds threshold 3.0&quot;
+        )
+
+    # Sensitivity check: no single dimension should dominate excessively
+    for entry in results.get(&quot;sensitivity_ranking&quot;, []):
+        if abs(entry[&quot;delta_mae&quot;]) &gt; 5.0:
+            failures.append(
+                f&quot;Dimension '{entry['dim']}' has excessive sensitivity &quot;
+                f&quot;(delta_MAE={entry['delta_mae']:.4f}, threshold=5.0)&quot;
+            )
+
+    # Report
+    if failures:
+        print(&quot;STRUCTURAL FUZZING THRESHOLD CHECK: FAILED&quot;)
+        for f in failures:
+            print(f&quot;  - {f}&quot;)
+        return False
+    else:
+        print(&quot;STRUCTURAL FUZZING THRESHOLD CHECK: PASSED&quot;)
+        print(f&quot;  MRI: {mri:.4f}&quot;)
+        print(f&quot;  Pareto points: {pareto_count}&quot;)
+        print(f&quot;  Best MAE: {min(pareto_maes):.4f}&quot; if pareto_maes else &quot;&quot;)
+        return True
+
+
+if __name__ == &quot;__main__&quot;:
+    success = check_thresholds(sys.argv[1])
+    sys.exit(0 if success else 1)
+</code></pre>
+<p>The exit code is the contract with the CI system: zero means pass, non-zero means fail. When <code>check_thresholds.py</code> exits with code 1, the GitHub Actions step fails, the PR check turns red, and the change cannot merge without an explicit override.</p>
+<h3 id="1833-baseline-comparison-mode">18.3.3 Baseline Comparison Mode</h3>
+<p>Threshold checking against fixed constants is a starting point. The more powerful mode compares against a <em>previous baseline</em>:</p>
+<pre><code class="language-python">def check_regression(current_path: str, baseline_path: str) -&gt; bool:
+    &quot;&quot;&quot;Check for regressions relative to a stored baseline.&quot;&quot;&quot;
+    with open(current_path) as f:
+        current = json.load(f)
+    with open(baseline_path) as f:
+        baseline = json.load(f)
+
+    failures: list[str] = []
+
+    # MRI regression: current should not be more than 20% worse
+    if current[&quot;mri&quot;] is not None and baseline[&quot;mri&quot;] is not None:
+        ratio = current[&quot;mri&quot;] / baseline[&quot;mri&quot;]
+        if ratio &gt; 1.2:
+            failures.append(
+                f&quot;MRI regressed by {(ratio - 1) * 100:.1f}% &quot;
+                f&quot;({baseline['mri']:.4f} -&gt; {current['mri']:.4f})&quot;
+            )
+
+    # Pareto frontier should not shrink
+    if current[&quot;pareto_count&quot;] &lt; baseline[&quot;pareto_count&quot;]:
+        failures.append(
+            f&quot;Pareto frontier shrunk from {baseline['pareto_count']} &quot;
+            f&quot;to {current['pareto_count']} points&quot;
+        )
+
+    # Best MAE should not increase by more than 10%
+    curr_best = min(current[&quot;pareto_maes&quot;]) if current[&quot;pareto_maes&quot;] else float(&quot;inf&quot;)
+    base_best = min(baseline[&quot;pareto_maes&quot;]) if baseline[&quot;pareto_maes&quot;] else float(&quot;inf&quot;)
+    if curr_best &gt; base_best * 1.1:
+        failures.append(
+            f&quot;Best MAE regressed by {(curr_best / base_best - 1) * 100:.1f}% &quot;
+            f&quot;({base_best:.4f} -&gt; {curr_best:.4f})&quot;
+        )
+
+    if failures:
+        print(&quot;REGRESSION CHECK: FAILED&quot;)
+        for f in failures:
+            print(f&quot;  - {f}&quot;)
+        return False
+    else:
+        print(&quot;REGRESSION CHECK: PASSED&quot;)
+        return True
+</code></pre>
+<p>The 20% MRI degradation tolerance and 10% MAE tolerance are configurable parameters, not universal constants. They should be set based on the same domain-specific risk analysis that informs the absolute thresholds.</p>
+<hr />
+<h2 id="184-designing-evaluate_fn-for-production-models">18.4 Designing evaluate_fn for Production Models</h2>
+<h3 id="1841-the-contract">18.4.1 The Contract</h3>
+<p>The <code>run_campaign</code> function (Chapter 16) requires a single callable with the signature:</p>
+<pre><code class="language-python">evaluate_fn: Callable[[np.ndarray], tuple[float, dict[str, float]]]
+</code></pre>
+<p>The function takes a parameter vector (a NumPy array of length $n$, where $n$ is the number of dimensions) and returns a tuple of <code>(mae, errors)</code>. The <code>mae</code> is the primary scalar objective; <code>errors</code> is a dictionary of named error components that the framework uses for sensitivity analysis and adversarial threshold detection.</p>
+<p>In research, <code>evaluate_fn</code> typically wraps a scikit-learn model and a local dataset. In production, the model may live behind a gRPC endpoint, the dataset may be sampled from a data warehouse, and the function must handle network failures, authentication, and rate limits.</p>
+<h3 id="1842-wrapping-a-production-model">18.4.2 Wrapping a Production Model</h3>
+<p>The following pattern wraps a model served via HTTP:</p>
+<pre><code class="language-python">import time
+from functools import lru_cache
+from typing import Any
+
+import numpy as np
+import requests
+
+
+def make_evaluate_fn(
+    endpoint: str,
+    api_key: str,
+    dataset_uri: str,
+    timeout_seconds: float = 30.0,
+    max_retries: int = 3,
+) -&gt; callable:
+    &quot;&quot;&quot;Create an evaluate_fn that calls a production model endpoint.
+
+    Parameters
+    ----------
+    endpoint : str
+        Model serving endpoint URL.
+    api_key : str
+        Authentication token.
+    dataset_uri : str
+        URI of the validation dataset.
+    timeout_seconds : float
+        Per-request timeout.
+    max_retries : int
+        Number of retries on transient failures.
+    &quot;&quot;&quot;
+    session = requests.Session()
+    session.headers.update({
+        &quot;Authorization&quot;: f&quot;Bearer {api_key}&quot;,
+        &quot;Content-Type&quot;: &quot;application/json&quot;,
+    })
+
+    def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+        payload = {
+            &quot;params&quot;: params.tolist(),
+            &quot;dataset_uri&quot;: dataset_uri,
+        }
+
+        last_error: Exception | None = None
+        for attempt in range(max_retries):
+            try:
+                resp = session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=timeout_seconds,
+                )
+                resp.raise_for_status()
+                result = resp.json()
+                return result[&quot;mae&quot;], result[&quot;errors&quot;]
+            except (requests.Timeout, requests.ConnectionError) as e:
+                last_error = e
+                wait = 2 ** attempt  # Exponential backoff
+                time.sleep(wait)
+            except requests.HTTPError as e:
+                if e.response is not None and e.response.status_code == 429:
+                    wait = float(
+                        e.response.headers.get(&quot;Retry-After&quot;, 2 ** attempt)
+                    )
+                    time.sleep(wait)
+                    last_error = e
+                else:
+                    raise
+
+        raise RuntimeError(
+            f&quot;evaluate_fn failed after {max_retries} retries: {last_error}&quot;
+        )
+
+    return evaluate_fn
+</code></pre>
+<p>Three aspects of this implementation matter for production reliability.</p>
+<p><strong>Retries with exponential backoff.</strong> A transient network failure should not terminate the entire campaign. The exponential backoff prevents retry storms that would overwhelm the model serving infrastructure.</p>
+<p><strong>Rate limit handling.</strong> Production model endpoints often enforce rate limits. The <code>429</code> handler respects the <code>Retry-After</code> header, adapting to the server&rsquo;s back-pressure signal.</p>
+<p><strong>Timeout per request.</strong> The <code>timeout_seconds</code> parameter bounds individual evaluations. This is distinct from the campaign-level timeout (Section 18.5) which bounds the entire run.</p>
+<h3 id="1843-caching-evaluations">18.4.3 Caching Evaluations</h3>
+<p>Structural fuzzing explores many parameter configurations, and some may be evaluated more than once (e.g., the all-dimensions baseline appears in both subset enumeration and MRI computation). Caching eliminates redundant evaluations:</p>
+<pre><code class="language-python">def make_cached_evaluate_fn(
+    base_fn: callable,
+    cache_size: int = 4096,
+) -&gt; callable:
+    &quot;&quot;&quot;Wrap an evaluate_fn with an LRU cache.
+
+    Note: NumPy arrays are not hashable. We convert to a tuple
+    of rounded values for cache keys.
+    &quot;&quot;&quot;
+    cache: dict[tuple, tuple[float, dict[str, float]]] = {}
+
+    def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+        key = tuple(np.round(params, decimals=10))
+        if key not in cache:
+            if len(cache) &gt;= cache_size:
+                # Evict oldest entry (FIFO)
+                oldest = next(iter(cache))
+                del cache[oldest]
+            cache[key] = base_fn(params)
+        return cache[key]
+
+    return evaluate_fn
+</code></pre>
+<p>The rounding in the cache key prevents floating-point drift from defeating cache lookups. For parameter spaces explored on a log scale, rounding to 10 decimal places is well below the precision that matters.</p>
+<hr />
+<h2 id="185-performance-budgets-and-timeout-handling">18.5 Performance Budgets and Timeout Handling</h2>
+<h3 id="1851-estimating-campaign-cost">18.5.1 Estimating Campaign Cost</h3>
+<p>A structural fuzzing campaign&rsquo;s computational cost is determined by the number of <code>evaluate_fn</code> calls, which depends on the configuration:</p>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Evaluations</th>
+<th>Formula</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subset enumeration</td>
+<td>$\sum_{k=1}^{K} \binom{n}{k} \cdot C(k)$</td>
+<td>$C(k)$: optimization cost per subset of size $k$</td>
+</tr>
+<tr>
+<td>Sensitivity profiling</td>
+<td>$2n$</td>
+<td>One with, one without per dimension</td>
+</tr>
+<tr>
+<td>MRI perturbation</td>
+<td>$N_\text{pert}$</td>
+<td>Typically 300</td>
+</tr>
+<tr>
+<td>Adversarial search</td>
+<td>$n \cdot \lceil\log_2(R / \epsilon)\rceil$</td>
+<td>Binary search per dimension</td>
+</tr>
+<tr>
+<td>Compositional test</td>
+<td>$n \cdot C$</td>
+<td>One optimization per step</td>
+</tr>
+</tbody>
+</table>
+<p>For the default configuration with $n = 5$ dimensions, $K = 4$, $N_\text{pert} = 300$, and $C(k)$ using the grid/random strategy with 20 grid points and 5000 random samples:</p>
+<ul>
+<li>Subset enumeration: $\binom{5}{1} \cdot 20 + \binom{5}{2} \cdot 20^2 + \binom{5}{3} \cdot 5000 + \binom{5}{4} \cdot 5000 \approx 79,100$ evaluations</li>
+<li>Sensitivity: $10$ evaluations</li>
+<li>MRI: $300$ evaluations</li>
+<li>Adversarial: $\approx 100$ evaluations</li>
+<li>Compositional: $\approx 25,000$ evaluations</li>
+</ul>
+<p>Total: roughly 104,000 evaluations. If each evaluation takes 10 milliseconds, the campaign completes in about 17 minutes. If each evaluation takes 1 second (typical for a model behind an API), the campaign would take nearly 29 hours&mdash;far too long for CI.</p>
+<h3 id="1852-budgeting-strategies">18.5.2 Budgeting Strategies</h3>
+<p>The solution is to adjust campaign parameters to fit a time budget:</p>
+<pre><code class="language-python">def budget_campaign_params(
+    n_dims: int,
+    eval_time_seconds: float,
+    budget_minutes: float = 20.0,
+) -&gt; dict:
+    &quot;&quot;&quot;Compute campaign parameters that fit within a time budget.
+
+    Parameters
+    ----------
+    n_dims : int
+        Number of dimensions in the model.
+    eval_time_seconds : float
+        Estimated time per evaluate_fn call, in seconds.
+    budget_minutes : float
+        Total time budget for the campaign, in minutes.
+
+    Returns
+    -------
+    dict
+        Keyword arguments for run_campaign.
+    &quot;&quot;&quot;
+    budget_seconds = budget_minutes * 60
+    budget_evals = int(budget_seconds / eval_time_seconds)
+
+    # Reserve 30% for MRI, 10% for sensitivity/adversarial,
+    # 60% for subset enumeration
+    mri_budget = int(budget_evals * 0.30)
+    enum_budget = int(budget_evals * 0.60)
+
+    # Determine max subset size that fits
+    from math import comb
+    max_k = 1
+    total = 0
+    for k in range(1, n_dims + 1):
+        n_subsets = comb(n_dims, k)
+        evals_per = 20 ** k if k &lt;= 2 else 5000
+        cost = n_subsets * evals_per
+        if total + cost &gt; enum_budget:
+            break
+        total += cost
+        max_k = k
+
+    # Scale MRI perturbations
+    n_perturbations = min(mri_budget, 500)
+    n_perturbations = max(n_perturbations, 50)  # Floor
+
+    return {
+        &quot;max_subset_dims&quot;: max_k,
+        &quot;n_mri_perturbations&quot;: n_perturbations,
+        &quot;n_grid&quot;: 15,
+        &quot;n_random&quot;: min(3000, enum_budget // max(comb(n_dims, max_k), 1)),
+    }
+</code></pre>
+<p>The 60/30/10 split prioritizes subset enumeration (the most informative phase) and MRI (the most operationally relevant). Sensitivity profiling and adversarial search are cheap and run unconditionally.</p>
+<h3 id="1853-campaign-level-timeouts">18.5.3 Campaign-Level Timeouts</h3>
+<p>Beyond budgeting, a hard timeout prevents runaway campaigns:</p>
+<pre><code class="language-python">import signal
+from contextlib import contextmanager
+
+
+class CampaignTimeoutError(Exception):
+    &quot;&quot;&quot;Raised when a campaign exceeds its time budget.&quot;&quot;&quot;
+    pass
+
+
+@contextmanager
+def campaign_timeout(seconds: int):
+    &quot;&quot;&quot;Context manager that raises CampaignTimeoutError after `seconds`.
+
+    Note: This uses SIGALRM and is only available on Unix systems.
+    For cross-platform support, use threading.Timer instead.
+    &quot;&quot;&quot;
+    def handler(signum, frame):
+        raise CampaignTimeoutError(
+            f&quot;Campaign exceeded {seconds}s timeout&quot;
+        )
+
+    old_handler = signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
+
+# Usage in CI:
+# with campaign_timeout(1200):  # 20 minutes
+#     report = run_campaign(...)
+</code></pre>
+<p>When the timeout fires, the <code>CampaignTimeoutError</code> propagates up, the CI step fails, and the artifact upload step (marked <code>if: always()</code>) still runs, capturing whatever partial results were produced.</p>
+<hr />
+<h2 id="186-monitoring-model-robustness-over-time">18.6 Monitoring Model Robustness Over Time</h2>
+<h3 id="1861-the-robustness-time-series">18.6.1 The Robustness Time Series</h3>
+<p>A single MRI value is a snapshot. A <em>time series</em> of MRI values, collected weekly or after every model retrain, reveals trends that no individual measurement can capture. Is the model becoming more brittle as the data distribution shifts? Is robustness improving as the training pipeline matures? These questions require longitudinal data.</p>
+<p>The monitoring system is straightforward: store campaign results in a time-series database (or, for simpler setups, append to a JSON Lines file) and compute statistics over windows:</p>
+<pre><code class="language-python">import json
+from datetime import datetime
+from pathlib import Path
+
+
+def append_to_history(
+    results: dict,
+    history_path: Path,
+    model_version: str,
+) -&gt; None:
+    &quot;&quot;&quot;Append campaign results to the history file.&quot;&quot;&quot;
+    entry = {
+        &quot;timestamp&quot;: datetime.utcnow().isoformat(),
+        &quot;model_version&quot;: model_version,
+        **results,
+    }
+    with open(history_path, &quot;a&quot;) as f:
+        f.write(json.dumps(entry) + &quot;\n&quot;)
+
+
+def load_history(history_path: Path) -&gt; list[dict]:
+    &quot;&quot;&quot;Load all history entries.&quot;&quot;&quot;
+    entries = []
+    with open(history_path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                entries.append(json.loads(line))
+    return entries
+
+
+def compute_trend(
+    history: list[dict],
+    metric: str = &quot;mri&quot;,
+    window: int = 8,
+) -&gt; dict:
+    &quot;&quot;&quot;Compute trend statistics over the last `window` entries.
+
+    Returns
+    -------
+    dict
+        Keys: current, mean, std, slope, is_degrading.
+    &quot;&quot;&quot;
+    values = [
+        e[metric] for e in history[-window:]
+        if e.get(metric) is not None
+    ]
+    if len(values) &lt; 2:
+        return {&quot;current&quot;: values[-1] if values else None,
+                &quot;insufficient_data&quot;: True}
+
+    import numpy as np
+    arr = np.array(values)
+    xs = np.arange(len(arr), dtype=float)
+
+    # Linear regression for slope
+    slope = float(np.polyfit(xs, arr, 1)[0])
+
+    return {
+        &quot;current&quot;: float(arr[-1]),
+        &quot;mean&quot;: float(arr.mean()),
+        &quot;std&quot;: float(arr.std()),
+        &quot;slope&quot;: slope,
+        &quot;is_degrading&quot;: slope &gt; 0,  # Positive slope = increasing MRI = worse
+        &quot;window_size&quot;: len(values),
+    }
+</code></pre>
+<p>The <code>slope</code> field is the key signal. A consistently positive MRI slope means robustness is degrading over time&mdash;even if each individual measurement is still below the absolute threshold. Catching a <em>trend</em> before it crosses a <em>threshold</em> is the difference between proactive maintenance and firefighting.</p>
+<h3 id="1862-alerting-on-pareto-frontier-degradation">18.6.2 Alerting on Pareto Frontier Degradation</h3>
+<p>The Pareto frontier is a more nuanced robustness signal than MRI alone. A frontier with four non-dominated points at model version $v$ that collapses to two points at version $v+1$ indicates that the model has lost diversity in its accuracy-simplicity tradeoffs&mdash;even if the best MAE is unchanged.</p>
+<p>Frontier degradation can be detected by comparing the <em>hypervolume indicator</em> (the area dominated by the frontier in the $(k, \text{MAE})$ plane) across versions:</p>
+<pre><code class="language-python">def pareto_hypervolume(
+    pareto_dims: list[int],
+    pareto_maes: list[float],
+    ref_dims: int = 10,
+    ref_mae: float = 10.0,
+) -&gt; float:
+    &quot;&quot;&quot;Compute the hypervolume dominated by the Pareto frontier.
+
+    Uses a reference point (ref_dims, ref_mae) as the upper-right
+    corner of the dominated region. Larger hypervolume is better.
+    &quot;&quot;&quot;
+    if not pareto_dims or not pareto_maes:
+        return 0.0
+
+    # Sort by dims ascending
+    points = sorted(zip(pareto_dims, pareto_maes))
+
+    area = 0.0
+    prev_dims = 0
+    for dims, mae in points:
+        if mae &lt; ref_mae:
+            width = dims - prev_dims
+            height = ref_mae - mae
+            area += width * height
+            prev_dims = dims
+
+    # Add final rectangle to reference point
+    if prev_dims &lt; ref_dims:
+        last_mae = points[-1][1]
+        if last_mae &lt; ref_mae:
+            area += (ref_dims - prev_dims) * (ref_mae - last_mae)
+
+    return area
+
+
+def check_frontier_degradation(
+    current: dict,
+    baseline: dict,
+    min_hypervolume_ratio: float = 0.85,
+) -&gt; tuple[bool, str]:
+    &quot;&quot;&quot;Check if the Pareto frontier has degraded relative to baseline.
+
+    Returns (passed, message).
+    &quot;&quot;&quot;
+    curr_hv = pareto_hypervolume(
+        current[&quot;pareto_dims&quot;], current[&quot;pareto_maes&quot;]
+    )
+    base_hv = pareto_hypervolume(
+        baseline[&quot;pareto_dims&quot;], baseline[&quot;pareto_maes&quot;]
+    )
+
+    if base_hv == 0:
+        return True, &quot;No baseline hypervolume to compare against&quot;
+
+    ratio = curr_hv / base_hv
+    if ratio &lt; min_hypervolume_ratio:
+        return False, (
+            f&quot;Pareto hypervolume degraded to {ratio:.1%} of baseline &quot;
+            f&quot;({curr_hv:.2f} vs {base_hv:.2f})&quot;
+        )
+    return True, f&quot;Pareto hypervolume ratio: {ratio:.1%}&quot;
+</code></pre>
+<p>The 85% threshold means the frontier&rsquo;s dominated area must remain within 15% of the baseline. This is a <em>relative</em> check, not absolute, which makes it robust to differences in scale across models.</p>
+<h3 id="1863-integration-with-monitoring-infrastructure">18.6.3 Integration with Monitoring Infrastructure</h3>
+<p>For teams that use Prometheus, Datadog, or similar observability platforms, campaign results can be exported as custom metrics:</p>
+<pre><code class="language-python">def emit_metrics(results: dict, model_name: str) -&gt; dict[str, float]:
+    &quot;&quot;&quot;Convert campaign results to flat metric dictionary.
+
+    The caller is responsible for sending these to the monitoring
+    backend (e.g., Prometheus push gateway, Datadog API).
+    &quot;&quot;&quot;
+    metrics = {}
+    prefix = f&quot;structural_fuzz.{model_name}&quot;
+
+    if results.get(&quot;mri&quot;) is not None:
+        metrics[f&quot;{prefix}.mri&quot;] = results[&quot;mri&quot;]
+    if results.get(&quot;mri_p95&quot;) is not None:
+        metrics[f&quot;{prefix}.mri_p95&quot;] = results[&quot;mri_p95&quot;]
+
+    metrics[f&quot;{prefix}.pareto_count&quot;] = results.get(&quot;pareto_count&quot;, 0)
+
+    if results.get(&quot;pareto_maes&quot;):
+        metrics[f&quot;{prefix}.best_mae&quot;] = min(results[&quot;pareto_maes&quot;])
+
+    metrics[f&quot;{prefix}.adversarial_count&quot;] = results.get(
+        &quot;adversarial_count&quot;, 0
+    )
+
+    return metrics
+</code></pre>
+<p>The flat metric dictionary integrates with any monitoring backend. A Grafana dashboard plotting <code>structural_fuzz.defect_model.mri</code> over time provides at-a-glance robustness monitoring without requiring stakeholders to understand the geometric details.</p>
+<hr />
+<h2 id="187-interpreting-results-in-automated-contexts">18.7 Interpreting Results in Automated Contexts</h2>
+<h3 id="1871-the-interpretation-problem">18.7.1 The Interpretation Problem</h3>
+<p>In a notebook, a practitioner reads the campaign report, examines the Pareto frontier, and makes a judgment. In CI, there is no practitioner&mdash;only a pass/fail gate. The gap between rich geometric output and binary CI decisions is bridged by <em>interpretation rules</em>: codified heuristics that translate multi-dimensional results into actionable signals.</p>
+<p>The following interpretation framework maps campaign results to severity levels:</p>
+<pre><code class="language-python">from enum import Enum
+
+
+class Severity(Enum):
+    OK = &quot;ok&quot;
+    WARNING = &quot;warning&quot;
+    CRITICAL = &quot;critical&quot;
+
+
+def interpret_campaign(results: dict) -&gt; list[dict]:
+    &quot;&quot;&quot;Interpret campaign results into actionable findings.&quot;&quot;&quot;
+    findings: list[dict] = []
+
+    # MRI interpretation
+    mri = results.get(&quot;mri&quot;)
+    if mri is not None:
+        if mri &gt; 3.0:
+            findings.append({
+                &quot;metric&quot;: &quot;MRI&quot;,
+                &quot;severity&quot;: Severity.CRITICAL,
+                &quot;value&quot;: mri,
+                &quot;message&quot;: (
+                    f&quot;MRI of {mri:.2f} indicates severe fragility. &quot;
+                    f&quot;The model's error triples under worst-case &quot;
+                    f&quot;perturbations.&quot;
+                ),
+            })
+        elif mri &gt; 2.0:
+            findings.append({
+                &quot;metric&quot;: &quot;MRI&quot;,
+                &quot;severity&quot;: Severity.WARNING,
+                &quot;value&quot;: mri,
+                &quot;message&quot;: (
+                    f&quot;MRI of {mri:.2f} indicates moderate fragility. &quot;
+                    f&quot;Consider investigating high-sensitivity dimensions.&quot;
+                ),
+            })
+        else:
+            findings.append({
+                &quot;metric&quot;: &quot;MRI&quot;,
+                &quot;severity&quot;: Severity.OK,
+                &quot;value&quot;: mri,
+                &quot;message&quot;: f&quot;MRI of {mri:.2f} is within acceptable bounds.&quot;,
+            })
+
+    # Sensitivity concentration
+    rankings = results.get(&quot;sensitivity_ranking&quot;, [])
+    if len(rankings) &gt;= 2:
+        top_delta = abs(rankings[0][&quot;delta_mae&quot;])
+        second_delta = abs(rankings[1][&quot;delta_mae&quot;])
+        if second_delta &gt; 0 and top_delta / second_delta &gt; 3.0:
+            findings.append({
+                &quot;metric&quot;: &quot;sensitivity_concentration&quot;,
+                &quot;severity&quot;: Severity.WARNING,
+                &quot;value&quot;: top_delta / second_delta,
+                &quot;message&quot;: (
+                    f&quot;Dimension '{rankings[0]['dim']}' dominates sensitivity &quot;
+                    f&quot;({top_delta:.2f} vs {second_delta:.2f}). &quot;
+                    f&quot;The model is over-dependent on a single feature group.&quot;
+                ),
+            })
+
+    # Adversarial threshold count
+    adv_count = results.get(&quot;adversarial_count&quot;, 0)
+    if adv_count &gt; len(rankings) * 2:
+        findings.append({
+            &quot;metric&quot;: &quot;adversarial_thresholds&quot;,
+            &quot;severity&quot;: Severity.WARNING,
+            &quot;value&quot;: adv_count,
+            &quot;message&quot;: (
+                f&quot;Found {adv_count} adversarial thresholds. &quot;
+                f&quot;Multiple dimensions have tipping points.&quot;
+            ),
+        })
+
+    return findings
+</code></pre>
+<p>Each finding includes a severity level, the metric that triggered it, the raw value, and a human-readable message. The message is written for automated Slack notifications or PR comments, not for geometric experts&mdash;it explains the <em>implication</em> of the value, not the mathematical definition.</p>
+<h3 id="1872-pr-comments-from-ci">18.7.2 PR Comments from CI</h3>
+<p>GitHub Actions can post findings directly as PR comments, making geometric validation visible in the developer workflow:</p>
+<pre><code class="language-yaml">      - name: Post validation comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = JSON.parse(
+              fs.readFileSync('results/campaign.json', 'utf8')
+            );
+            const mri = results.mri ? results.mri.toFixed(4) : 'N/A';
+            const pareto = results.pareto_count || 0;
+            const bestMae = results.pareto_maes &amp;&amp; results.pareto_maes.length
+              ? Math.min(...results.pareto_maes).toFixed(4)
+              : 'N/A';
+
+            const body = [
+              '## Structural Fuzzing Validation',
+              '',
+              '| Metric | Value |',
+              '|--------|-------|',
+              `| MRI | ${mri} |`,
+              `| Pareto points | ${pareto} |`,
+              `| Best MAE | ${bestMae} |`,
+              `| Adversarial thresholds | ${results.adversarial_count || 0} |`,
+              '',
+              `Full report available in [CI artifacts](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}).`,
+            ].join('\n');
+
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });
+</code></pre>
+<p>This closes the feedback loop: the developer who changed the model sees the geometric impact of their change directly in the pull request, without navigating to a separate dashboard.</p>
+<hr />
+<h2 id="188-latex-report-generation-for-stakeholders">18.8 LaTeX Report Generation for Stakeholders</h2>
+<h3 id="1881-the-reporting-pipeline">18.8.1 The Reporting Pipeline</h3>
+<p>Not every consumer of geometric validation results is a developer reading PR comments. Model governance boards, regulatory reviewers, and academic collaborators expect formatted reports with tables, captions, and proper typesetting. The <code>format_latex_tables</code> function in <code>structural_fuzzing.report</code> generates publication-ready LaTeX directly from campaign results.</p>
+<p>The function produces three tables: the Pareto frontier (with <code>\label{tab:pareto}</code>), the sensitivity ranking (with <code>\label{tab:sensitivity}</code>), and the MRI summary (with <code>\label{tab:mri}</code>). Each table uses the <code>booktabs</code> package for professional formatting:</p>
+<pre><code class="language-python">from structural_fuzzing.report import format_latex_tables
+
+latex_code = format_latex_tables(report)
+with open(&quot;validation_report/tables.tex&quot;, &quot;w&quot;) as f:
+    f.write(latex_code)
+</code></pre>
+<p>The generated LaTeX integrates into a larger document via <code>\input{tables.tex}</code>. A minimal wrapper document:</p>
+<pre><code class="language-latex">\documentclass{article}
+\usepackage{booktabs}
+
+\title{Model Validation Report: Defect Predictor v3.2}
+\author{Automated Validation Pipeline}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Geometric Validation Results}
+
+The following results were produced by the structural fuzzing
+framework (v0.2.0) running against the production validation
+holdout set.
+
+\input{tables.tex}
+
+\section{Interpretation}
+
+The Model Robustness Index of 1.43 indicates that under
+worst-case perturbations within the explored parameter space,
+the model's mean absolute error increases by a factor of
+approximately 1.4. The 95th percentile perturbation produces
+a deviation of 3.1, indicating non-trivial tail risk.
+
+The Pareto frontier identifies four non-dominated configurations,
+suggesting meaningful tradeoffs between model complexity and
+prediction accuracy. See Chapter~5 of \cite{bond2026geometric}
+for the theoretical basis of Pareto analysis in this context.
+
+\end{document}
+</code></pre>
+<h3 id="1882-automating-report-generation-in-ci">18.8.2 Automating Report Generation in CI</h3>
+<p>The CI pipeline can produce compiled PDFs by adding a LaTeX compilation step:</p>
+<pre><code class="language-yaml">      - name: Generate LaTeX report
+        run: |
+          python scripts/generate_report.py results/ report/
+
+      - name: Compile PDF
+        uses: xu-cheng/latex-action@v3
+        with:
+          root_file: report/validation_report.tex
+          working_directory: report/
+
+      - name: Upload PDF report
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report-pdf
+          path: report/validation_report.pdf
+</code></pre>
+<p>The compiled PDF is available as a downloadable artifact. For organizations that require audit trails, these PDFs provide timestamped, version-controlled evidence of model validation at every release.</p>
+<hr />
+<h2 id="189-versioning-geometric-baselines">18.9 Versioning Geometric Baselines</h2>
+<h3 id="1891-the-baseline-problem">18.9.1 The Baseline Problem</h3>
+<p>A regression check requires a baseline to regress against. Where does the baseline come from? Who updates it? What happens when the model architecture changes and the old baseline is no longer comparable?</p>
+<p>The simplest approach stores the baseline JSON alongside the model in version control:</p>
+<pre><code>models/
+    production_v3/
+        model.pkl
+        geometric_baseline.json
+        threshold_policy.json
+</code></pre>
+<p>When a new model version is promoted to production, its campaign results become the new baseline:</p>
+<pre><code class="language-python">import shutil
+
+
+def promote_baseline(
+    campaign_results_path: str,
+    baseline_path: str,
+    archive_dir: str,
+) -&gt; None:
+    &quot;&quot;&quot;Promote current results to baseline, archiving the old one.&quot;&quot;&quot;
+    baseline = Path(baseline_path)
+    archive = Path(archive_dir)
+    archive.mkdir(parents=True, exist_ok=True)
+
+    # Archive old baseline with timestamp
+    if baseline.exists():
+        timestamp = datetime.utcnow().strftime(&quot;%Y%m%dT%H%M%S&quot;)
+        archive_name = f&quot;baseline_{timestamp}.json&quot;
+        shutil.copy2(baseline, archive / archive_name)
+
+    # Promote new results
+    shutil.copy2(campaign_results_path, baseline)
+    print(f&quot;Promoted {campaign_results_path} to {baseline_path}&quot;)
+</code></pre>
+<h3 id="1892-schema-versioning">18.9.2 Schema Versioning</h3>
+<p>As the structural fuzzing framework evolves, the JSON schema of campaign results may change. A <code>schema_version</code> field in every results file prevents silent incompatibilities:</p>
+<pre><code class="language-python">def save_results(results: dict, path: str) -&gt; None:
+    &quot;&quot;&quot;Save campaign results with schema version.&quot;&quot;&quot;
+    versioned = {
+        &quot;schema_version&quot;: &quot;1.0&quot;,
+        &quot;framework_version&quot;: &quot;0.2.0&quot;,
+        &quot;timestamp&quot;: datetime.utcnow().isoformat(),
+        **results,
+    }
+    with open(path, &quot;w&quot;) as f:
+        json.dump(versioned, f, indent=2)
+
+
+def load_results(path: str) -&gt; dict:
+    &quot;&quot;&quot;Load campaign results, validating schema version.&quot;&quot;&quot;
+    with open(path) as f:
+        data = json.load(f)
+
+    version = data.get(&quot;schema_version&quot;, &quot;unknown&quot;)
+    if version != &quot;1.0&quot;:
+        raise ValueError(
+            f&quot;Unsupported schema version: {version}. &quot;
+            f&quot;Expected 1.0. Re-run the campaign to generate &quot;
+            f&quot;a compatible baseline.&quot;
+        )
+    return data
+</code></pre>
+<p>When the schema changes, the loader raises an explicit error rather than silently misinterpreting fields. This is the geometric analog of the &ldquo;your saved model is incompatible with this version of the framework&rdquo; error that every ML practitioner has encountered.</p>
+<h3 id="1893-baseline-branching-for-ab-tests">18.9.3 Baseline Branching for A/B Tests</h3>
+<p>When multiple model variants are under evaluation simultaneously (A/B tests, champion/challenger deployments), each variant needs its own baseline:</p>
+<pre><code>baselines/
+    champion/
+        geometric_baseline.json
+        threshold_policy.json
+    challenger_v1/
+        geometric_baseline.json
+        threshold_policy.json
+    challenger_v2/
+        geometric_baseline.json
+        threshold_policy.json
+</code></pre>
+<p>The CI pipeline selects the appropriate baseline based on the branch or an environment variable:</p>
+<pre><code class="language-yaml">      - name: Check thresholds
+        run: |
+          VARIANT=&quot;${{ github.head_ref || 'champion' }}&quot;
+          BASELINE=&quot;baselines/${VARIANT}/geometric_baseline.json&quot;
+          if [ ! -f &quot;$BASELINE&quot; ]; then
+            BASELINE=&quot;baselines/champion/geometric_baseline.json&quot;
+          fi
+          python scripts/check_thresholds.py \
+            results/campaign.json \
+            --baseline &quot;$BASELINE&quot;
+</code></pre>
+<p>The fallback to the champion baseline ensures that new variants are compared against the production standard when no variant-specific baseline exists.</p>
+<hr />
+<h2 id="1810-a-complete-production-integration-example">18.10 A Complete Production Integration Example</h2>
+<p>Bringing the pieces together, the following is a complete GitHub Actions workflow for a team that deploys a defect prediction model weekly, runs structural fuzzing on every PR and nightly, and generates PDF reports for the model governance board:</p>
+<pre><code class="language-yaml">name: Model Validation Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - &quot;models/**&quot;
+      - &quot;src/**&quot;
+      - &quot;scripts/run_validation.py&quot;
+  schedule:
+    - cron: &quot;0 3 * * *&quot;  # Nightly at 3 AM UTC
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: &quot;3.12&quot;
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e &quot;.[dev]&quot;
+          pip install structural-fuzzing==0.2.0
+
+      - name: Estimate evaluation cost
+        id: budget
+        run: |
+          python -c &quot;
+          from scripts.budget import estimate_budget
+          params = estimate_budget(
+              n_dims=5,
+              eval_time_seconds=0.05,
+              budget_minutes=30,
+          )
+          print(f'max_subset_dims={params[\&quot;max_subset_dims\&quot;]}')
+          print(f'n_mri_perturbations={params[\&quot;n_mri_perturbations\&quot;]}')
+          &quot; &gt;&gt; &quot;$GITHUB_OUTPUT&quot;
+
+      - name: Run structural fuzzing
+        run: |
+          python scripts/run_validation.py \
+            --output results/ \
+            --model models/production_latest.pkl \
+            --dataset data/validation_holdout.parquet
+
+      - name: Check absolute thresholds
+        run: python scripts/check_thresholds.py results/campaign.json
+
+      - name: Check regression against baseline
+        run: |
+          python scripts/check_thresholds.py \
+            results/campaign.json \
+            --baseline baselines/champion/geometric_baseline.json \
+            --max-mri-regression 0.20 \
+            --max-mae-regression 0.10
+
+      - name: Update history
+        if: github.event_name == 'schedule'
+        run: |
+          python scripts/update_history.py \
+            results/campaign.json \
+            monitoring/mri_history.jsonl
+
+      - name: Generate PDF report
+        if: github.event_name == 'schedule'
+        run: python scripts/generate_report.py results/ report/
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-${{ github.sha }}
+          path: |
+            results/
+            report/
+          retention-days: 90
+</code></pre>
+<p>This workflow embodies the production deployment principles developed throughout this chapter: budget-aware campaign configuration, absolute and relative threshold checks, longitudinal monitoring, stakeholder reporting, and versioned artifacts.</p>
+<hr />
+<h2 id="1811-operational-considerations">18.11 Operational Considerations</h2>
+<h3 id="18111-flaky-evaluations">18.11.1 Flaky Evaluations</h3>
+<p>Production <code>evaluate_fn</code> implementations are subject to non-determinism: stochastic models produce different outputs on each call, data sampling introduces variance, and network latency adds noise. A campaign that fails on Monday and passes on Tuesday&mdash;with no code changes&mdash;erodes trust in the validation system.</p>
+<p>The mitigation is to run the MRI computation with enough perturbations to produce stable statistics (at least 200; 300 is the default) and to set thresholds with headroom. If the MRI consistently measures 1.4 and the threshold is 1.5, a noisy evaluation will occasionally cross the boundary. Setting the threshold at 2.0 provides operational margin while still catching genuine regressions.</p>
+<h3 id="18112-secrets-management">18.11.2 Secrets Management</h3>
+<p>The <code>evaluate_fn</code> for a production model endpoint requires API keys, database credentials, or service account tokens. These must never appear in CI logs, workflow files, or campaign results.</p>
+<p>Store secrets in the CI platform&rsquo;s secret store (GitHub Actions secrets, GitLab CI variables) and pass them via environment variables:</p>
+<pre><code class="language-yaml">      - name: Run structural fuzzing
+        env:
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          DATA_WAREHOUSE_URI: ${{ secrets.DATA_WAREHOUSE_URI }}
+        run: python scripts/run_validation.py --output results/
+</code></pre>
+<p>The validation script reads from <code>os.environ</code>, never from configuration files that might be committed.</p>
+<h3 id="18113-resource-isolation">18.11.3 Resource Isolation</h3>
+<p>A structural fuzzing campaign that evaluates 100,000+ parameter configurations exerts sustained load on the model serving infrastructure. In production, this load should be directed at a <em>staging</em> or <em>shadow</em> replica, not at the production endpoint serving live traffic. The CI workflow should configure <code>evaluate_fn</code> to point at the staging environment, which is the same model version but isolated from production traffic.</p>
+<hr />
+<h2 id="1812-summary">18.12 Summary</h2>
+<p>Deploying geometric validation in production transforms it from an analytical technique into an engineering system. The key components are:</p>
+<ol>
+<li>
+<p><strong>Package dependency management.</strong> The <code>structural-fuzzing</code> package&rsquo;s minimal dependency footprint (NumPy only) makes it safe to include in production environments.</p>
+</li>
+<li>
+<p><strong>CI/CD integration.</strong> Campaign results gate merges via threshold checks; PR comments surface geometric metrics in the developer workflow.</p>
+</li>
+<li>
+<p><strong>MRI thresholds.</strong> Absolute bounds catch catastrophic fragility; relative bounds (regression checks against baselines) catch gradual degradation.</p>
+</li>
+<li>
+<p><strong>Pareto frontier monitoring.</strong> Hypervolume comparison detects loss of tradeoff diversity that scalar metrics would miss.</p>
+</li>
+<li>
+<p><strong>Performance budgets.</strong> Campaign parameters are automatically tuned to fit CI time constraints.</p>
+</li>
+<li>
+<p><strong>evaluate_fn engineering.</strong> Production models behind API endpoints require retry logic, caching, and timeout handling.</p>
+</li>
+<li>
+<p><strong>LaTeX reporting.</strong> Automated PDF generation provides audit-ready documentation for governance and regulatory review.</p>
+</li>
+<li>
+<p><strong>Baseline versioning.</strong> Schema-versioned JSON baselines, archived on promotion, enable longitudinal comparison and A/B test support.</p>
+</li>
+</ol>
+<p>The system described in this chapter does not require any changes to the model itself. It operates entirely on the <code>evaluate_fn</code> interface established in Chapter 16: give the framework a callable that maps parameter vectors to errors, and it will quantify robustness, identify fragilities, and enforce quality gates&mdash;automatically, repeatedly, and with full geometric fidelity.</p>
+<hr />
+<h2 id="1813-connection-to-chapter-19">18.13 Connection to Chapter 19</h2>
+<p>This chapter treated the <code>evaluate_fn</code> as a black box: given a parameter vector, it returns a scalar error and a dictionary of named components. Chapter 19 opens the black box with a complete end-to-end case study in software defect prediction. It walks through every stage of the structural fuzzing campaign on a concrete dataset, demonstrating how the production deployment patterns of this chapter translate into actionable insights about model behavior, fragility, and opportunity. Where this chapter asked &ldquo;how do we deploy geometric validation?&rdquo;, Chapter 19 asks &ldquo;what does a complete geometric validation look like in practice?&rdquo;</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-17-scaling.html" class="nav-prev">&larr; Chapter 17: Scaling to High-Dimensional Spaces</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-19-case-study-defect-prediction.html" class="nav-next">Chapter 19: Case Study --- Software Defect Prediction &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

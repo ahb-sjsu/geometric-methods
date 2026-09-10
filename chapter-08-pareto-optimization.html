@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 8: Pareto Optimization &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 8: Pareto Optimization from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-08-pareto-optimization">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 8: Pareto Optimization</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-07-equilibrium-on-manifolds.html" class="nav-prev">&larr; Chapter 7: Equilibrium on Manifolds</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-09-adversarial-robustness.html" class="nav-next">Chapter 9: Adversarial Robustness and the Model Robustness I… &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-8-pareto-optimization">Chapter 8: Pareto Optimization</h1>
+<blockquote>
+<p><em>&ldquo;The optimum is not a point but a surface, and the task of the engineer is to understand that surface before choosing where to stand on it.&rdquo;</em>
+&mdash; Vilfredo Pareto, <em>Manual of Political Economy</em> (1906), adapted</p>
+</blockquote>
+<p>The preceding chapters have developed a geometric vocabulary for multi-dimensional model analysis: state vectors (Chapter 1), subset enumeration (Chapter 11), distance metrics, and sensitivity profiling. Each of these tools produces results in multiple dimensions. Yet at some point the practitioner must <em>decide</em>&mdash;which configuration to deploy, which feature set to adopt, how much complexity to tolerate. The temptation is to collapse the multi-dimensional result into a single number and optimize that number. This chapter explains why that temptation must be resisted, what to do instead, and how the structural fuzzing framework implements the alternative.</p>
+<p>The alternative is Pareto optimization: identifying the set of configurations that cannot be improved on one objective without sacrificing another, and then reasoning about the structure of that set directly. No weights are chosen. No objectives are combined. The geometry of the tradeoff surface speaks for itself.</p>
+<hr />
+<h2 id="81-pareto-dominance-the-fundamental-definition">8.1 Pareto Dominance: The Fundamental Definition</h2>
+<h3 id="811-dominance-in-two-objectives">8.1.1 Dominance in Two Objectives</h3>
+<p>Consider two configurations $\mathbf{a}$ and $\mathbf{b}$, each evaluated on two objectives $f_1$ and $f_2$ that we wish to minimize. Configuration $\mathbf{a}$ <em>dominates</em> $\mathbf{b}$, written $\mathbf{a} \prec \mathbf{b}$, if and only if:</p>
+<p>$$f_1(\mathbf{a}) \leq f_1(\mathbf{b}) \quad \text{and} \quad f_2(\mathbf{a}) \leq f_2(\mathbf{b})$$</p>
+<p>with at least one strict inequality. Dominance is a partial order: given two arbitrary configurations, it is entirely possible that neither dominates the other. Configuration $\mathbf{a}$ may excel on $f_1$ while $\mathbf{b}$ excels on $f_2$. In this case the two are <em>mutually non-dominated</em>, and no amount of algorithmic cleverness can rank one above the other without introducing a preference between the objectives.</p>
+<h3 id="812-the-general-case">8.1.2 The General Case</h3>
+<p>For $m$ objectives $f_1, f_2, \ldots, f_m$ (all to be minimized), dominance generalizes naturally:</p>
+<p>$$\mathbf{a} \prec \mathbf{b} \iff \forall\, i \in \{1, \ldots, m\}: f_i(\mathbf{a}) \leq f_i(\mathbf{b}) \;\;\text{and}\;\; \exists\, j: f_j(\mathbf{a}) < f_j(\mathbf{b})$$</p>
+<p>The <em>Pareto frontier</em> (or Pareto front) is the set of all configurations that are not dominated by any other configuration in the search space:</p>
+<p>$$\mathcal{P} = \{\mathbf{a} \in \mathcal{S} : \nexists\, \mathbf{b} \in \mathcal{S} \;\text{such that}\; \mathbf{b} \prec \mathbf{a}\}$$</p>
+<p>Every configuration not on the Pareto frontier is strictly inferior to at least one configuration that is: it can be improved on one or more objectives without cost to any other. The frontier is the irreducible set of optimal tradeoffs&mdash;the &ldquo;efficient surface&rdquo; in Pareto&rsquo;s original terminology.</p>
+<h3 id="813-geometric-interpretation">8.1.3 Geometric Interpretation</h3>
+<p>In the objective space $\mathbb{R}^m$, the Pareto frontier forms a $(m-1)$-dimensional surface. For two objectives, it is a curve. For three, a surface. The frontier separates the <em>attainable</em> region (objective vectors achievable by some configuration) from the <em>ideal</em> region (objective vectors better than anything achievable). The shape of this surface&mdash;its curvature, its extent, the gaps along it&mdash;encodes the fundamental tradeoff structure of the problem.</p>
+<p>A convex Pareto frontier indicates that tradeoffs are smooth: small sacrifices in one objective yield small gains in another. A concave frontier indicates the opposite: the objectives are synergistic in some regions, and moving along the frontier can simultaneously improve both. A frontier with sharp corners indicates phase transitions&mdash;qualitative changes in the optimal strategy as the tradeoff ratio shifts.</p>
+<hr />
+<h2 id="82-why-scalarization-fails">8.2 Why Scalarization Fails</h2>
+<h3 id="821-the-weighted-sum-approach">8.2.1 The Weighted-Sum Approach</h3>
+<p>The most common approach to multi-objective optimization is <em>scalarization</em>: combine the objectives into a single scalar using a weighted sum,</p>
+<p>$$\Phi(\mathbf{x}) = \sum_{i=1}^{m} w_i \, f_i(\mathbf{x})$$</p>
+<p>and then minimize $\Phi$. This reduces the problem to standard single-objective optimization, for which powerful algorithms exist.</p>
+<p>The difficulty is that scalarization destroys precisely the information that Chapter 1 argued is irrecoverable. Recall the Scalar Irrecoverability Theorem (Section 1.1.1): the projection $\phi : \mathbb{R}^m \to \mathbb{R}^1$ has a null space of dimension $m - 1$. Any two configurations that differ only within this null space are indistinguishable under $\phi$, yet they may occupy entirely different positions on the Pareto frontier. Choosing weights <em>before</em> understanding the frontier is choosing a projection <em>before</em> understanding the space&mdash;precisely the methodological error that the geometric approach is designed to prevent.</p>
+<h3 id="822-the-convexity-limitation">8.2.2 The Convexity Limitation</h3>
+<p>Even when the practitioner is willing to choose weights, scalarization has a structural limitation: weighted-sum optimization can only find points on the <em>convex hull</em> of the Pareto frontier. If the frontier is non-convex&mdash;containing concave regions or &ldquo;pockets&rdquo;&mdash;no choice of positive weights can reach the configurations in those regions.</p>
+<p>To see why, observe that minimizing $\Phi(\mathbf{x}) = \sum w_i f_i(\mathbf{x})$ is equivalent to finding the point on the Pareto frontier where the hyperplane $\sum w_i f_i = c$ (for varying $c$) first touches the attainable region. Hyperplanes are convex sets, so they can only touch the convex hull of the frontier. Points in non-convex indentations of the frontier are invisible to any weighted sum.</p>
+<p>In the structural fuzzing context, non-convex frontiers arise naturally. Consider the two objectives &ldquo;number of feature groups&rdquo; (dimensionality $k$) and &ldquo;prediction error&rdquo; (MAE). A configuration using two carefully chosen feature groups may outperform all three-group configurations&mdash;creating a non-convex pocket at $k = 3$. No weighted combination of $k$ and MAE can discover this pocket. Only direct enumeration and dominance-based filtering can find it.</p>
+<h3 id="823-the-preference-inversion-problem">8.2.3 The Preference Inversion Problem</h3>
+<p>A subtler failure mode of scalarization is <em>preference inversion</em>: the optimal configuration under weights $\mathbf{w}_1$ may be ranked lower than a suboptimal configuration under slightly different weights $\mathbf{w}_2$, with no way to determine which weights are &ldquo;correct&rdquo; without external domain knowledge. In practice, this means that two teams analyzing the same data with slightly different weight choices can reach opposite conclusions about which configuration is best&mdash;and both are &ldquo;right&rdquo; within their respective scalarizations.</p>
+<p>Pareto analysis avoids this entirely. The Pareto frontier is invariant to the choice of weights: it is a property of the configurations and objectives themselves, not of any preference structure imposed on them. The frontier presents the full tradeoff surface and lets the practitioner make an informed choice <em>after</em> seeing the options, rather than baking preferences into the optimization <em>before</em> seeing the results.</p>
+<hr />
+<h2 id="83-constructing-the-pareto-frontier-from-subset-results">8.3 Constructing the Pareto Frontier from Subset Results</h2>
+<p>In the structural fuzzing framework, the most natural pair of objectives is:</p>
+<ul>
+<li><strong>Objective 1: Minimize dimensionality</strong> $k$ (number of active feature groups). Fewer groups mean simpler models, faster training, easier interpretation.</li>
+<li><strong>Objective 2: Minimize prediction error</strong> (MAE). Lower error means better predictive accuracy.</li>
+</ul>
+<p>The <code>enumerate_subsets</code> function from Chapter 11 produces a list of <code>SubsetResult</code> objects, each recording the best MAE achievable with a particular subset of dimensions. The <code>pareto_frontier</code> function extracts the non-dominated configurations from this list.</p>
+<h3 id="831-the-subsetresult-data-structure">8.3.1 The SubsetResult Data Structure</h3>
+<p>Each subset optimization produces a <code>SubsetResult</code> that bundles the subset identity with its performance:</p>
+<pre><code class="language-python">@dataclass
+class SubsetResult:
+    dims: tuple[int, ...]       # Indices of active dimensions
+    dim_names: tuple[str, ...]  # Human-readable names
+    n_dims: int                 # Number of active dimensions
+    param_values: np.ndarray    # Full parameter vector (including inactive)
+    mae: float                  # Mean absolute error at optimum
+    errors: dict[str, float]    # Per-component error breakdown
+    pareto_optimal: bool = False
+</code></pre>
+<p>The <code>errors</code> dictionary provides a per-component breakdown&mdash;not just the aggregate MAE but how each evaluation metric (accuracy, precision, recall, F1, AUC) contributes to the total error. This decomposition is essential for understanding <em>why</em> a configuration performs as it does, not just <em>how well</em>. The <code>pareto_optimal</code> flag is initially <code>False</code> and is set by the Pareto frontier extraction algorithm.</p>
+<h3 id="832-from-enumeration-to-frontier">8.3.2 From Enumeration to Frontier</h3>
+<p>The connection between subset enumeration (Chapter 11) and Pareto analysis is direct. Subset enumeration explores the space of possible feature-group combinations:</p>
+<pre><code class="language-python">def enumerate_subsets(
+    dim_names: Sequence[str],
+    evaluate_fn: Callable[[np.ndarray], tuple[float, dict[str, float]]],
+    max_dims: int = 4,
+    inactive_value: float = 1e6,
+    n_grid: int = 20,
+    n_random: int = 5000,
+    verbose: bool = False,
+) -&gt; list[SubsetResult]:
+    n_all = len(dim_names)
+    results: list[SubsetResult] = []
+
+    for k in range(1, min(max_dims, n_all) + 1):
+        combos = list(itertools.combinations(range(n_all), k))
+        if verbose:
+            print(f&quot;  Enumerating {len(combos)} subsets of size {k}...&quot;)
+        for combo in combos:
+            result = optimize_subset(
+                active_dims=combo,
+                all_dim_names=dim_names,
+                evaluate_fn=evaluate_fn,
+                inactive_value=inactive_value,
+                n_grid=n_grid,
+                n_random=n_random,
+            )
+            results.append(result)
+
+    results.sort(key=lambda r: r.mae)
+    return results
+</code></pre>
+<p>For $n$ dimensions with maximum subset size $k$, this generates $\sum_{j=1}^{k} \binom{n}{j}$ configurations. Each is a point in the two-dimensional objective space $(k, \text{MAE})$. The Pareto frontier is the lower-left boundary of this point cloud&mdash;the configurations where no other point has both fewer dimensions and lower error.</p>
+<hr />
+<h2 id="84-non-dominated-sorting-the-algorithm">8.4 Non-Dominated Sorting: The Algorithm</h2>
+<h3 id="841-the-three-phase-algorithm">8.4.1 The Three-Phase Algorithm</h3>
+<p>The <code>pareto_frontier</code> function implements non-dominated sorting in three phases:</p>
+<pre><code class="language-python">def pareto_frontier(
+    results: list[SubsetResult],
+    tolerance: float = 0.01,
+) -&gt; list[SubsetResult]:
+    if not results:
+        return []
+
+    # Reset all pareto flags
+    for r in results:
+        r.pareto_optimal = False
+
+    # Find best MAE at each dimensionality
+    best_at_k: dict[int, SubsetResult] = {}
+    for r in results:
+        k = r.n_dims
+        if k not in best_at_k or r.mae &lt; best_at_k[k].mae:
+            best_at_k[k] = r
+
+    # Extract candidates sorted by n_dims
+    candidates = sorted(best_at_k.values(), key=lambda r: r.n_dims)
+
+    # Filter to Pareto front: a candidate is dominated if another candidate
+    # has fewer dims AND better-or-equal MAE
+    pareto: list[SubsetResult] = []
+    best_mae_so_far = float(&quot;inf&quot;)
+
+    for candidate in candidates:
+        if candidate.mae &lt; best_mae_so_far - tolerance:
+            candidate.pareto_optimal = True
+            pareto.append(candidate)
+            best_mae_so_far = candidate.mae
+        elif not pareto:
+            # Always include the first (lowest-dim) candidate
+            candidate.pareto_optimal = True
+            pareto.append(candidate)
+            best_mae_so_far = candidate.mae
+
+    return pareto
+</code></pre>
+<p><strong>Phase 1: Reduction to representatives.</strong> Among all subsets of size $k$, only the one with the lowest MAE can possibly be Pareto-optimal. If two configurations have the same dimensionality, the one with worse MAE is dominated by the one with better MAE (same $k$, higher error). The <code>best_at_k</code> dictionary selects a single representative for each dimensionality level, reducing potentially hundreds of candidates to at most $n$ representatives.</p>
+<p><strong>Phase 2: Sorting by dimensionality.</strong> The representatives are sorted in ascending order of <code>n_dims</code>. This ordering is critical because the Pareto condition involves comparing each candidate against all candidates of <em>lower</em> dimensionality. By processing candidates from lowest to highest dimensionality, we can maintain a running minimum and make the dominance check in constant time per candidate.</p>
+<p><strong>Phase 3: Forward sweep with tolerance.</strong> We scan the sorted candidates, maintaining <code>best_mae_so_far</code>&mdash;the lowest MAE achieved at any dimensionality already processed. A candidate at dimensionality $k$ enters the Pareto front only if its MAE strictly improves upon the running best by at least the tolerance threshold $\epsilon$:</p>
+<p>$$\text{MAE}(k) < \text{best\_mae\_so\_far} - \epsilon$$</p>
+<p>The first candidate (lowest dimensionality) is always included, establishing the baseline. Each subsequent Pareto-optimal point must demonstrate that the additional complexity buys a meaningful improvement in accuracy.</p>
+<h3 id="842-complexity-analysis">8.4.2 Complexity Analysis</h3>
+<p>Phase 1 requires a single pass over all $m$ results: $O(m)$. Phase 2 sorts at most $n$ representatives: $O(n \log n)$, where $n$ is the number of distinct dimensionality levels. Phase 3 is a single linear scan: $O(n)$. The total complexity is $O(m + n \log n)$, which is dominated by the initial pass when $m \gg n$ (as is typical, since $m = \sum \binom{n}{j}$ grows combinatorially while $n$ is the number of dimensions).</p>
+<h3 id="843-the-role-of-tolerance">8.4.3 The Role of Tolerance</h3>
+<p>The <code>tolerance</code> parameter (default $\epsilon = 0.01$) deserves careful attention. Without tolerance ($\epsilon = 0$), the frontier includes every dimensionality level where the best MAE is even infinitesimally better than at lower dimensionalities. This produces a frontier cluttered with configurations that offer negligible improvement at the cost of additional complexity.</p>
+<p>With tolerance, the frontier enforces a <em>minimum marginal improvement</em>. A configuration at dimensionality $k$ must reduce MAE by at least $\epsilon$ relative to the best lower-dimensional configuration to be considered non-dominated. This reflects an engineering reality: improvements smaller than the tolerance are likely within measurement noise, numerical precision limits, or the variance of the optimization procedure itself.</p>
+<p>The tolerance also has a geometric interpretation. In the $(k, \text{MAE})$ plane, standard Pareto dominance uses axis-aligned dominance cones. The tolerance parameter widens the dominance cone along the MAE axis by $\epsilon$, making it harder for marginally better configurations to survive the dominance filter. The result is a sparser, more interpretable frontier.</p>
+<hr />
+<h2 id="85-the-structural-fuzzing-pareto-implementation">8.5 The Structural Fuzzing Pareto Implementation</h2>
+<h3 id="851-integration-in-the-campaign-pipeline">8.5.1 Integration in the Campaign Pipeline</h3>
+<p>The <code>run_campaign</code> function orchestrates the full structural fuzzing analysis, with Pareto extraction as its second stage:</p>
+<pre><code class="language-python">def run_campaign(
+    dim_names: Sequence[str],
+    evaluate_fn: Callable[[np.ndarray], tuple[float, dict[str, float]]],
+    max_subset_dims: int = 4,
+    n_mri_perturbations: int = 300,
+    mri_scale: float = 0.5,
+    mri_weights: tuple[float, float, float] = (0.5, 0.3, 0.2),
+    start_dim: int = 0,
+    candidate_dims: Sequence[int] | None = None,
+    run_baselines: bool = True,
+    adversarial_tolerance: float = 0.5,
+    inactive_value: float = 1e6,
+    n_grid: int = 20,
+    n_random: int = 5000,
+    verbose: bool = True,
+) -&gt; StructuralFuzzReport:
+</code></pre>
+<p>The pipeline proceeds in six stages: (1) subset enumeration, (2) Pareto frontier extraction, (3) sensitivity profiling, (4) Model Robustness Index computation, (5) adversarial threshold search, and (6) compositional testing. The Pareto frontier from stage 2 feeds into subsequent stages: the sensitivity profile and MRI are computed at the best configuration found during enumeration, and the adversarial search probes each dimension for tipping points relative to that configuration.</p>
+<p>The relevant pipeline excerpt shows the handoff from enumeration to Pareto analysis:</p>
+<pre><code class="language-python"># Step 1: Enumerate subsets
+subset_results = enumerate_subsets(
+    dim_names=dim_names_list,
+    evaluate_fn=evaluate_fn,
+    max_dims=max_subset_dims,
+    inactive_value=inactive_value,
+    n_grid=n_grid,
+    n_random=n_random,
+    verbose=verbose,
+)
+
+# Step 2: Pareto frontier
+pareto_results = pareto_frontier(subset_results)
+</code></pre>
+<p>The result is a <code>StructuralFuzzReport</code> that carries both the full set of subset results and the extracted Pareto frontier, enabling downstream analysis to operate on either.</p>
+<h3 id="852-design-decisions">8.5.2 Design Decisions</h3>
+<p>Several design decisions in the implementation merit discussion.</p>
+<p><strong>Dimensionality as a discrete objective.</strong> The framework treats dimensionality $k$ as a discrete integer objective rather than a continuous variable. This is a deliberate choice. The number of active feature groups is inherently discrete&mdash;you either include a group or you do not. Treating it as continuous (e.g., via regularization strength) blurs the distinction between &ldquo;feature group present&rdquo; and &ldquo;feature group absent,&rdquo; producing configurations that are difficult to interpret. The discrete treatment preserves the structural clarity of subset-based analysis.</p>
+<p><strong>Mutation of the <code>pareto_optimal</code> flag.</strong> The <code>pareto_frontier</code> function modifies the <code>pareto_optimal</code> flag on the input <code>SubsetResult</code> objects in place. This is a pragmatic choice: it allows downstream code (reporting, visualization) to query any result&rsquo;s Pareto status without maintaining a separate index. The tradeoff is that the function has a side effect, which violates the immutability principle discussed in Chapter 1. In practice, the Pareto computation is run exactly once per campaign, making the mutation harmless.</p>
+<p><strong>The first-candidate guarantee.</strong> The algorithm always includes the lowest-dimensionality candidate in the frontier, even if its MAE is not strictly better than any other candidate (the <code>elif not pareto</code> branch). This ensures the frontier spans the full range of dimensionalities, giving the practitioner a baseline at minimum complexity. Without this guarantee, the frontier could start at $k = 3$ if no $k = 1$ or $k = 2$ configuration met the tolerance threshold&mdash;leaving the practitioner with no information about what simpler models can achieve.</p>
+<hr />
+<h2 id="86-visualizing-tradeoff-surfaces">8.6 Visualizing Tradeoff Surfaces</h2>
+<h3 id="861-the-dimensionality-mae-plot">8.6.1 The Dimensionality-MAE Plot</h3>
+<p>The primary visualization for Pareto analysis in the structural fuzzing framework is a scatter plot with dimensionality $k$ on the horizontal axis and MAE on the vertical axis. Every evaluated configuration appears as a point. The Pareto-optimal points are highlighted&mdash;typically with a different color or a connecting line&mdash;forming the frontier.</p>
+<pre><code>MAE
+ |
+ |  x
+ |  x   x
+ |  o       x   x
+ |      o       x
+ |          o
+ |              o
+ +--------------------&gt; k
+    1   2   3   4
+
+ o = Pareto-optimal    x = dominated
+</code></pre>
+<p>The visual encodes three pieces of information simultaneously:</p>
+<ol>
+<li><strong>The frontier itself</strong> shows the best achievable MAE at each dimensionality.</li>
+<li><strong>The gap between dominated points and the frontier</strong> shows how much room there is for subset selection to matter. A large gap means the choice of <em>which</em> dimensions to include is as important as <em>how many</em>.</li>
+<li><strong>The slope of the frontier</strong> shows the marginal return to complexity. A steep section means the next dimension buys significant accuracy; a flat section means it does not.</li>
+</ol>
+<h3 id="862-the-error-decomposition-view">8.6.2 The Error Decomposition View</h3>
+<p>The aggregate MAE hides which components of the error improve as dimensions are added. A stacked bar chart, with one bar per Pareto-optimal configuration and segments for each error component, reveals this decomposition:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$k$</th>
+<th style="text-align: center;">Accuracy Error</th>
+<th style="text-align: center;">Precision Error</th>
+<th style="text-align: center;">Recall Error</th>
+<th style="text-align: center;">F1 Error</th>
+<th style="text-align: center;">AUC Error</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">3.2</td>
+<td style="text-align: center;">4.1</td>
+<td style="text-align: center;">5.8</td>
+<td style="text-align: center;">4.9</td>
+<td style="text-align: center;">2.1</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">1.8</td>
+<td style="text-align: center;">2.3</td>
+<td style="text-align: center;">3.1</td>
+<td style="text-align: center;">2.7</td>
+<td style="text-align: center;">1.4</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">1.2</td>
+<td style="text-align: center;">1.5</td>
+<td style="text-align: center;">1.8</td>
+<td style="text-align: center;">1.6</td>
+<td style="text-align: center;">1.0</td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">0.9</td>
+<td style="text-align: center;">1.1</td>
+<td style="text-align: center;">1.3</td>
+<td style="text-align: center;">1.2</td>
+<td style="text-align: center;">0.8</td>
+</tr>
+</tbody>
+</table>
+<p>This table&mdash;derived from the <code>errors</code> dictionary on each <code>SubsetResult</code>&mdash;shows that recall error improves most dramatically between $k = 1$ and $k = 3$, while AUC error is already low at $k = 1$. The geometric interpretation: the feature groups added at $k = 2$ and $k = 3$ primarily improve the model&rsquo;s ability to detect positive cases (defective modules), while the model&rsquo;s ranking quality (AUC) is largely determined by the first feature group alone.</p>
+<h3 id="863-three-objective-frontiers">8.6.3 Three-Objective Frontiers</h3>
+<p>When three objectives are present&mdash;say dimensionality, MAE, and robustness (MRI)&mdash;the Pareto frontier becomes a surface in $\mathbb{R}^3$. Visualization requires projection. Three useful projections are:</p>
+<ul>
+<li>$(k, \text{MAE})$: the accuracy-complexity tradeoff, ignoring robustness.</li>
+<li>$(k, \text{MRI})$: the robustness-complexity tradeoff, ignoring accuracy.</li>
+<li>$(\text{MAE}, \text{MRI})$: the accuracy-robustness tradeoff, ignoring complexity.</li>
+</ul>
+<p>Each projection shows a two-dimensional Pareto frontier. A configuration that appears on all three projected frontiers is a strong candidate&mdash;it is non-dominated regardless of which pair of objectives the practitioner prioritizes.</p>
+<hr />
+<h2 id="87-pareto-analysis-for-feature-selection">8.7 Pareto Analysis for Feature Selection</h2>
+<h3 id="871-the-feature-selection-problem">8.7.1 The Feature Selection Problem</h3>
+<p>Feature selection is a classic multi-objective problem: include more features to improve accuracy, or exclude features to reduce overfitting, training time, and interpretive burden. Traditional approaches&mdash;filter methods, wrapper methods, embedded methods&mdash;ultimately reduce to a single-objective problem by fixing a feature count or a regularization strength. Pareto analysis treats the problem natively as multi-objective.</p>
+<p>In the structural fuzzing framework, features are organized into <em>groups</em> (the &ldquo;dimensions&rdquo; of the state space), and subset enumeration explores all combinations of groups up to a specified maximum size. This is a structured form of feature selection: rather than choosing among $2^{16}$ individual feature subsets (for 16 features), the practitioner chooses among $2^5 - 1 = 31$ group subsets (for 5 groups). The grouping reduces the combinatorial explosion while preserving the semantically meaningful structure of the feature space.</p>
+<h3 id="872-reading-the-frontier-for-feature-group-importance">8.7.2 Reading the Frontier for Feature Group Importance</h3>
+<p>The Pareto frontier reveals feature group importance more precisely than univariate sensitivity analysis. Consider a 5-group defect prediction model with groups {Size, Complexity, Halstead, OO, Process}. The frontier might look like:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$k$</th>
+<th style="text-align: left;">Best Subset</th>
+<th style="text-align: center;">MAE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: left;">{Complexity}</td>
+<td style="text-align: center;">3.8</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: left;">{Complexity, Process}</td>
+<td style="text-align: center;">2.1</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: left;">{Complexity, Process, Size}</td>
+<td style="text-align: center;">1.7</td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: left;">All groups</td>
+<td style="text-align: center;">1.5</td>
+</tr>
+</tbody>
+</table>
+<p>Several observations follow immediately:</p>
+<ol>
+<li><strong>Complexity is the foundation.</strong> It appears in every Pareto-optimal subset.</li>
+<li><strong>Process is the strongest complement.</strong> Adding Process to Complexity reduces MAE by 1.7&mdash;the largest single-step improvement.</li>
+<li><strong>Size contributes modestly.</strong> Adding Size to {Complexity, Process} reduces MAE by 0.4.</li>
+<li><strong>OO and Halstead together contribute only 0.2.</strong> Going from 3 groups to all 5 yields diminishing returns.</li>
+<li><strong>No 4-group configuration appears on the frontier.</strong> The best 4-group configuration does not improve enough over the best 3-group configuration to survive the tolerance filter.</li>
+</ol>
+<p>This analysis is richer than a simple importance ranking. It tells you not just <em>which</em> groups matter but <em>how they combine</em>: Complexity and Process are jointly essential, Size is valuable but not critical, and OO and Halstead are dispensable.</p>
+<h3 id="873-the-pareto-guided-selection-rule">8.7.3 The Pareto-Guided Selection Rule</h3>
+<p>The frontier suggests a concrete decision procedure:</p>
+<ol>
+<li>Compute the Pareto frontier over all subsets.</li>
+<li>For each consecutive pair of Pareto-optimal points $(k_i, \text{MAE}_i)$ and $(k_{i+1}, \text{MAE}_{i+1})$, compute the marginal cost-benefit ratio:</li>
+</ol>
+<p>$$\rho_i = \frac{\text{MAE}_i - \text{MAE}_{i+1}}{k_{i+1} - k_i}$$</p>
+<ol>
+<li>Select the configuration just before $\rho_i$ drops below a domain-specific threshold.</li>
+</ol>
+<p>For the defect prediction example, the ratios are:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Transition</th>
+<th style="text-align: center;">$\Delta k$</th>
+<th style="text-align: center;">$\Delta \text{MAE}$</th>
+<th style="text-align: center;">$\rho$</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">$k=1 \to k=2$</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">1.7</td>
+<td style="text-align: center;">1.70</td>
+</tr>
+<tr>
+<td style="text-align: left;">$k=2 \to k=3$</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">0.4</td>
+<td style="text-align: center;">0.40</td>
+</tr>
+<tr>
+<td style="text-align: left;">$k=3 \to k=5$</td>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">0.2</td>
+<td style="text-align: center;">0.10</td>
+</tr>
+</tbody>
+</table>
+<p>With a threshold of $\rho \geq 0.3$, the practitioner selects $k = 3$ (three feature groups). Each additional group beyond three buys less than 0.3 MAE improvement per group added&mdash;below the threshold of practical significance. The decision is data-driven, explicit, and reproducible.</p>
+<hr />
+<h2 id="88-the-defect-prediction-example">8.8 The Defect Prediction Example</h2>
+<h3 id="881-problem-setup">8.8.1 Problem Setup</h3>
+<p>The <code>examples/defect_prediction/model.py</code> file implements a complete defect prediction model with known ground truth, providing a controlled testbed for Pareto analysis. The model uses five feature groups, each containing related software metrics:</p>
+<pre><code class="language-python">FEATURE_GROUPS = {
+    &quot;Size&quot;: [0, 1, 2],
+    &quot;Complexity&quot;: [3, 4, 5],
+    &quot;Halstead&quot;: [6, 7, 8, 9],
+    &quot;OO&quot;: [10, 11, 12],
+    &quot;Process&quot;: [13, 14, 15],
+}
+</code></pre>
+<p>The synthetic data generator embeds a known causal structure: defect probability is driven primarily by Complexity and Process metrics, with a weak contribution from Size, and no contribution from OO:</p>
+<pre><code class="language-python">logit = (
+    -3
+    + 0.1 * np.log1p(cyclomatic)
+    + 0.15 * np.log1p(essential)
+    + 0.05 * np.log1p(design)
+    + 0.12 * np.log1p(revisions)
+    + 0.1 * np.log1p(authors)
+    + 0.08 * np.log1p(churn / 100)
+    + 0.03 * np.log1p(loc / 1000)
+    + rng.normal(0, 0.5, n_samples)
+)
+</code></pre>
+<p>The coefficients reveal the ground truth importance: essential complexity (0.15) and revisions (0.12) are strongest, followed by cyclomatic complexity (0.10), authors (0.10), churn (0.08), design complexity (0.05), and LOC (0.03). OO metrics (coupling, cohesion, inheritance depth) have zero coefficient&mdash;they are pure noise.</p>
+<h3 id="882-the-evaluation-function">8.8.2 The Evaluation Function</h3>
+<p>The <code>make_evaluate_fn</code> factory creates an evaluation function compatible with the structural fuzzing framework. For each configuration, feature groups with parameter values below 1000 are included; those at or above 1000 are excluded:</p>
+<pre><code class="language-python">def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    active_features: list[int] = []
+    for i, indices in enumerate(group_indices):
+        if params[i] &lt; 1000:
+            active_features.extend(indices)
+
+    if not active_features:
+        errors = {name: -val for name, val in target_values.items()}
+        mae = sum(abs(v) for v in errors.values()) / len(errors)
+        return mae, errors
+
+    X_tr = X_train[:, active_features]
+    X_te = X_test[:, active_features]
+
+    rf = RandomForestClassifier(n_estimators=50, random_state=42, n_jobs=1)
+    rf.fit(X_tr, y_train)
+
+    y_pred = rf.predict(X_te)
+    y_prob = rf.predict_proba(X_te)
+    # ... compute accuracy, precision, recall, F1, AUC ...
+</code></pre>
+<p>The evaluation function trains a random forest on the active features, computes five performance metrics, and returns the average absolute deviation from target values as the MAE. The <code>errors</code> dictionary records each metric&rsquo;s deviation individually, enabling the error decomposition analysis discussed in Section 8.6.2.</p>
+<h3 id="883-running-the-pareto-analysis">8.8.3 Running the Pareto Analysis</h3>
+<p>A complete Pareto analysis of the defect prediction model proceeds as follows:</p>
+<pre><code class="language-python">from structural_fuzzing.core import enumerate_subsets
+from structural_fuzzing.pareto import pareto_frontier
+from examples.defect_prediction.model import make_evaluate_fn, GROUP_NAMES
+
+evaluate_fn = make_evaluate_fn(n_samples=1000, seed=42)
+
+# Enumerate all subsets up to size 4
+all_results = enumerate_subsets(
+    dim_names=GROUP_NAMES,
+    evaluate_fn=evaluate_fn,
+    max_dims=4,
+    verbose=True,
+)
+
+# Extract Pareto frontier
+frontier = pareto_frontier(all_results, tolerance=0.01)
+
+print(&quot;Pareto frontier:&quot;)
+for r in frontier:
+    print(f&quot;  k={r.n_dims}  {r.dim_names}  MAE={r.mae:.4f}&quot;)
+</code></pre>
+<p>For 5 groups with <code>max_dims=4</code>, the enumeration evaluates $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} = 5 + 10 + 10 + 5 = 30$ subsets. Each 1D subset requires 20 evaluations (grid search), each 2D subset requires 400 (grid product), and each 3D or 4D subset requires 5000 (random search). The total evaluation budget is $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 = 100 + 4000 + 50{,}000 + 25{,}000 = 79{,}100$ model evaluations.</p>
+<h3 id="884-interpreting-the-results">8.8.4 Interpreting the Results</h3>
+<p>The Pareto frontier for this model recovers the known ground truth. The frontier typically contains:</p>
+<ul>
+<li><strong>$k = 1$: {Complexity}.</strong> The single most informative group, as expected from the large coefficients on cyclomatic, essential, and design complexity.</li>
+<li><strong>$k = 2$: {Complexity, Process}.</strong> The two groups with the largest aggregate coefficients.</li>
+<li><strong>$k = 3$: {Complexity, Process, Size}.</strong> Size contributes weakly but measurably through the LOC coefficient.</li>
+<li><strong>$k = 5$: All groups.</strong> The random forest can extract marginal signal from Halstead (which is correlated with Size and Complexity) but gains nothing from OO.</li>
+</ul>
+<p>The absence of $k = 4$ from the frontier confirms that no 4-group configuration improves enough over the best 3-group configuration to meet the tolerance threshold. The best 4-group subsets are either {Complexity, Process, Size, Halstead} or {Complexity, Process, Size, OO}, both of which reduce MAE by less than 0.01 relative to {Complexity, Process, Size}.</p>
+<p>This result validates the Pareto approach: without any knowledge of the ground-truth coefficients, the analysis correctly identifies which feature groups matter, in what order, and where the point of diminishing returns lies.</p>
+<hr />
+<h2 id="89-beyond-two-objectives-multi-objective-extensions">8.9 Beyond Two Objectives: Multi-Objective Extensions</h2>
+<h3 id="891-adding-robustness-as-a-third-objective">8.9.1 Adding Robustness as a Third Objective</h3>
+<p>The campaign pipeline computes the Model Robustness Index (MRI) for the best configuration found during enumeration. But MRI can also be computed for every Pareto-optimal configuration, creating a three-objective problem: minimize dimensionality, minimize MAE, and minimize MRI (lower MRI indicates greater robustness).</p>
+<p>This extension reveals an important phenomenon: the most accurate configuration is not always the most robust. A model using all five feature groups may achieve the lowest MAE but exhibit high MRI because perturbations in the noisy OO features propagate through the random forest. A simpler model using only {Complexity, Process} may have slightly higher MAE but much lower MRI, because all active features carry genuine signal and the model&rsquo;s predictions are stable under perturbation.</p>
+<p>The three-objective Pareto frontier makes this tradeoff explicit. A configuration that is Pareto-optimal in (dimensionality, MAE) may be dominated when robustness is included, and vice versa. The three-way frontier is the correct object for decision-making when all three concerns&mdash;simplicity, accuracy, and stability&mdash;are relevant.</p>
+<h3 id="892-fairness-and-subgroup-performance">8.9.2 Fairness and Subgroup Performance</h3>
+<p>In applications where the model serves diverse populations, subgroup performance metrics become additional objectives. For defect prediction, relevant subgroups might be &ldquo;large modules vs. small modules&rdquo; or &ldquo;legacy code vs. new code.&rdquo; Each subgroup&rsquo;s recall or precision becomes an objective to be minimized (or maximized, after negation).</p>
+<p>The Pareto frontier in this expanded objective space identifies configurations that balance performance across subgroups without requiring the practitioner to assign relative importance to each subgroup a priori. This connects directly to Chapter 1&rsquo;s discussion of hidden compensation (Section 1.1.3): a scalar metric can mask disparities that the Pareto frontier reveals.</p>
+<h3 id="893-computational-cost">8.9.3 Computational Cost</h3>
+<p>The cost of Pareto frontier extraction grows with the number of objectives, but only modestly. The non-dominated sorting algorithm from Section 8.4 generalizes straightforwardly: for $m$ objectives and $n$ candidates, a naive pairwise dominance check requires $O(n^2 m)$ comparisons. For the structural fuzzing application, $n$ is the number of distinct dimensionality levels (at most equal to the number of feature groups, typically 5&ndash;10) and $m$ is the number of objectives (typically 2&ndash;4). The Pareto extraction itself is never the bottleneck; the model evaluations within <code>enumerate_subsets</code> dominate the computation.</p>
+<hr />
+<h2 id="810-common-pitfalls">8.10 Common Pitfalls</h2>
+<h3 id="8101-confusing-the-frontier-with-the-optimum">8.10.1 Confusing the Frontier with the Optimum</h3>
+<p>The Pareto frontier is not a single answer. It is a <em>set</em> of answers, each optimal under a different implicit weighting of the objectives. Practitioners accustomed to single-objective optimization sometimes extract the frontier and then immediately select the point with the lowest MAE, discarding the dimensionality information. This defeats the purpose. The frontier exists precisely so that the tradeoff can be examined and a deliberate choice made.</p>
+<h3 id="8102-over-interpreting-small-frontiers">8.10.2 Over-Interpreting Small Frontiers</h3>
+<p>When the number of dimensionality levels is small (say, 3&ndash;5), the frontier contains very few points and its shape is difficult to interpret. A frontier with two points&mdash;one at $k = 1$ and one at $k = 5$&mdash;tells you only that intermediate configurations do not improve enough over $k = 1$ to meet the tolerance. It does not tell you that $k = 2, 3, 4$ are useless; it tells you that the <em>best</em> configurations at those sizes were not sufficiently better than at $k = 1$. The distinction matters when the number of candidate subsets at each size is small.</p>
+<h3 id="8103-tolerance-sensitivity">8.10.3 Tolerance Sensitivity</h3>
+<p>The tolerance parameter $\epsilon$ has outsized influence on small frontiers. Setting $\epsilon = 0$ produces the maximum number of Pareto-optimal points; setting $\epsilon$ too large collapses the frontier to a single point. There is no universally correct value. A principled approach is to set $\epsilon$ equal to the standard deviation of the optimization noise&mdash;the variation in MAE that arises from the stochastic elements of the search (random initialization, random search in 3D+ subsets). Improvements smaller than this noise floor are not reliably meaningful.</p>
+<hr />
+<h2 id="811-connection-to-what-follows">8.11 Connection to What Follows</h2>
+<p>The Pareto frontier identifies <em>which</em> configurations represent optimal tradeoffs. It does not, by itself, reveal <em>how fragile</em> those tradeoffs are. A configuration sitting on the frontier may occupy a broad, stable region of the parameter space, or it may perch on a narrow ridge where small perturbations send it tumbling off the frontier entirely.</p>
+<p>Chapter 9 addresses this question directly through adversarial robustness testing. Where this chapter asks &ldquo;what are the best tradeoffs?&rdquo;, Chapter 9 asks &ldquo;how far can we push each tradeoff before it breaks?&rdquo; The two analyses compose naturally: first identify the Pareto-optimal configurations (this chapter), then stress-test each one to find its breaking points (Chapter 9). Together, they provide a complete picture of the tradeoff landscape&mdash;not just its surface, but its depth and stability.</p>
+<p>The progression from enumeration (Chapter 11) through Pareto analysis (this chapter) to adversarial probing (Chapter 9) reflects a general principle of the geometric approach: understanding a space requires examining it at multiple scales. Enumeration maps the space coarsely. Pareto analysis identifies the interesting regions. Adversarial testing probes the fine structure of those regions. Each step narrows the focus while increasing the resolution, building toward the complete geometric characterization that is the goal of the structural fuzzing framework.</p>
+<hr />
+<h2 id="exercises">Exercises</h2>
+<ol>
+<li>
+<p><strong>Dominance relation properties.</strong> Prove that Pareto dominance is a strict partial order: it is irreflexive ($\mathbf{a} \nprec \mathbf{a}$), asymmetric ($\mathbf{a} \prec \mathbf{b} \implies \mathbf{b} \nprec \mathbf{a}$), and transitive ($\mathbf{a} \prec \mathbf{b}$ and $\mathbf{b} \prec \mathbf{c}$ imply $\mathbf{a} \prec \mathbf{c}$). Why is totality ($\mathbf{a} \prec \mathbf{b}$ or $\mathbf{b} \prec \mathbf{a}$ for all $\mathbf{a} \neq \mathbf{b}$) generally absent?</p>
+</li>
+<li>
+<p><strong>Convexity and scalarization.</strong> Construct a set of four points in $(k, \text{MAE})$ space such that the Pareto frontier is non-convex. Show that no positive weight vector $\mathbf{w} = (w_1, w_2)$ with $w_1, w_2 > 0$ recovers the complete frontier when used for scalarized optimization.</p>
+</li>
+<li>
+<p><strong>Tolerance calibration.</strong> Run <code>pareto_frontier</code> on the defect prediction example with tolerance values $\epsilon \in \{0, 0.001, 0.01, 0.1, 1.0\}$. Plot the number of Pareto-optimal configurations as a function of $\epsilon$. At what value of $\epsilon$ does the frontier collapse to a single point? Relate this value to the range of MAE values in the subset results.</p>
+</li>
+<li>
+<p><strong>Three-objective frontier.</strong> Extend the defect prediction analysis to compute MRI for each Pareto-optimal configuration (in the two-objective sense). Identify configurations that are Pareto-optimal in the two-objective $(k, \text{MAE})$ sense but dominated in the three-objective $(k, \text{MAE}, \text{MRI})$ sense. What does this tell you about the relationship between accuracy and robustness?</p>
+</li>
+<li>
+<p><strong>Greedy vs. exhaustive.</strong> Compare the Pareto frontier obtained from <code>enumerate_subsets</code> with the compositional sequence from <code>compositional_test</code> for the defect prediction model. At which dimensionality levels do the two methods select different subsets? Explain the disagreement in terms of feature group interactions.</p>
+</li>
+</ol>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-07-equilibrium-on-manifolds.html" class="nav-prev">&larr; Chapter 7: Equilibrium on Manifolds</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-09-adversarial-robustness.html" class="nav-next">Chapter 9: Adversarial Robustness and the Model Robustness I… &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

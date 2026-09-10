@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 11: The Subset Enumeration Pattern &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 11: The Subset Enumeration Pattern from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-11-subset-enumeration">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 11: The Subset Enumeration Pattern</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-10-adversarial-probing.html" class="nav-prev">&larr; Chapter 10: Adversarial Probing</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-12-compositional-testing.html" class="nav-next">Chapter 12: Compositional Testing &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-11-the-subset-enumeration-pattern">Chapter 11: The Subset Enumeration Pattern</h1>
+<blockquote>
+<p><em>&ldquo;The art of being wise is the art of knowing what to overlook.&rdquo;</em>
+&mdash; William James, <em>The Principles of Psychology</em> (1890)</p>
+</blockquote>
+<p>A model with $n$ parameter dimensions admits $2^n - 1$ non-empty subsets of those dimensions. Each subset defines a different structural question: <em>what happens when the model uses only these inputs?</em> For $n = 5$, there are 31 subsets&mdash;tractable. For $n = 10$, there are 1,023. For $n = 20$, over a million. The exponential growth is a combinatorial fact, and no algorithm can avoid it in general. But the equally important fact&mdash;the one that makes the subset enumeration pattern practical&mdash;is that most real problems have moderate effective dimensionality. Feature groups, not individual features, are the natural unit of structural analysis, and the number of meaningful groups rarely exceeds ten.</p>
+<p>This chapter develops the subset enumeration pattern: the systematic exploration of all dimension combinations up to a specified cardinality. We begin with the combinatorial landscape and the conditions under which brute-force enumeration is feasible. We then examine the <code>optimize_subset</code> algorithm in detail, including its log-space parameterization and sentinel-value encoding for inactive dimensions. The <code>SubsetResult</code> data structure captures the output of each optimization in a typed, composable form. The <code>enumerate_subsets</code> function orchestrates the full sweep. We close with practical heuristics&mdash;cardinality limits, early stopping&mdash;and a worked example from software defect prediction that reveals which feature groups genuinely drive predictive performance.</p>
+<p>The pattern connects backward to the motivating example of Chapter 1, where subset enumeration first appeared as Step 1 of the geometric validation pipeline, and forward to Chapter 8, where Pareto frontier analysis operates over the space of <code>SubsetResult</code> objects to identify non-dominated tradeoffs between model complexity and predictive quality.</p>
+<hr />
+<h2 id="111-the-combinatorial-explosion">11.1 The Combinatorial Explosion</h2>
+<h3 id="1111-counting-subsets">11.1.1 Counting Subsets</h3>
+<p>Given a set of $n$ dimensions, the number of subsets of size exactly $k$ is:</p>
+<p>$$\binom{n}{k} = \frac{n!}{k!(n-k)!}$$</p>
+<p>The total number of subsets of size 1 through $k_{\max}$ is:</p>
+<p>$$N(n, k_{\max}) = \sum_{k=1}^{k_{\max}} \binom{n}{k}$$</p>
+<p>For the defect prediction example introduced in Chapter 1, $n = 5$ feature groups (Size, Complexity, Halstead, OO, Process). The subset counts are:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$k$</th>
+<th style="text-align: center;">$\binom{5}{k}$</th>
+<th style="text-align: center;">Cumulative</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">15</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">25</td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">30</td>
+</tr>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">31</td>
+</tr>
+</tbody>
+</table>
+<p>Thirty-one subsets is a small number. Even with an expensive evaluation function&mdash;say, training a random forest classifier&mdash;the full enumeration completes in seconds. This is the regime where brute-force subset testing is not merely acceptable but <em>optimal</em>: it guarantees that no combination is overlooked, eliminates the need for heuristic search strategies, and produces a complete map of the structural landscape.</p>
+<h3 id="1112-the-scaling-boundary">11.1.2 The Scaling Boundary</h3>
+<p>The picture changes with $n$. The following table shows $N(n, k_{\max})$ for representative values:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$n$</th>
+<th style="text-align: center;">$k_{\max} = 2$</th>
+<th style="text-align: center;">$k_{\max} = 3$</th>
+<th style="text-align: center;">$k_{\max} = 4$</th>
+<th style="text-align: center;">$k_{\max} = n$</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">25</td>
+<td style="text-align: center;">30</td>
+<td style="text-align: center;">31</td>
+</tr>
+<tr>
+<td style="text-align: center;">8</td>
+<td style="text-align: center;">36</td>
+<td style="text-align: center;">92</td>
+<td style="text-align: center;">162</td>
+<td style="text-align: center;">255</td>
+</tr>
+<tr>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">55</td>
+<td style="text-align: center;">175</td>
+<td style="text-align: center;">385</td>
+<td style="text-align: center;">1,023</td>
+</tr>
+<tr>
+<td style="text-align: center;">15</td>
+<td style="text-align: center;">120</td>
+<td style="text-align: center;">575</td>
+<td style="text-align: center;">1,940</td>
+<td style="text-align: center;">32,767</td>
+</tr>
+<tr>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">210</td>
+<td style="text-align: center;">1,350</td>
+<td style="text-align: center;">6,195</td>
+<td style="text-align: center;">1,048,575</td>
+</tr>
+</tbody>
+</table>
+<p>Two observations. First, the full enumeration $k_{\max} = n$ is practical only for $n \leq 15$ or so, depending on evaluation cost. Second, limiting $k_{\max}$ to 3 or 4 keeps the count manageable even for $n = 20$. This is the key insight behind the <code>max_dims</code> parameter in the <code>enumerate_subsets</code> function: by bounding the maximum subset cardinality, we trade completeness for tractability, and the trade is almost always favorable because the marginal information gained from subsets of size $k > 4$ is typically small.</p>
+<p>Why? Because the structural questions of interest are usually comparative: <em>does adding dimension $d$ to an existing subset improve performance?</em> The answer to this question is already captured by subsets of size $k$ and $k+1$ for small $k$. If Complexity alone achieves MAE 3.8 and {Complexity, Process} achieves MAE 2.1, then we know the marginal value of Process in the presence of Complexity. Extending to {Complexity, Process, Size} at MAE 1.7 tells us the marginal value of Size given the other two. By $k = 4$, the marginal contributions are usually small and the structural picture is clear.</p>
+<h3 id="1113-why-brute-force-beats-heuristics">11.1.3 Why Brute Force Beats Heuristics</h3>
+<p>The alternative to brute-force enumeration is heuristic search: forward selection, backward elimination, or stochastic methods like genetic algorithms. These approaches are necessary when $n$ is large, but they carry well-documented risks:</p>
+<ol>
+<li>
+<p><strong>Forward selection</strong> adds dimensions greedily, choosing the single best addition at each step. It cannot recover from a poor early choice: if the best 2D subset is {Complexity, Process} but forward selection started with Size (because Size is the best 1D choice), it may converge to a suboptimal path.</p>
+</li>
+<li>
+<p><strong>Backward elimination</strong> starts with all dimensions and removes the least important one at each step. It cannot detect synergies between dimensions that are individually weak but jointly strong.</p>
+</li>
+<li>
+<p><strong>Both methods produce a single path</strong> through the lattice of subsets, not a map of the full landscape. They answer &ldquo;what is a good subset?&rdquo; but not &ldquo;what do all subsets look like?&rdquo;&mdash;and the latter question is what structural fuzzing needs.</p>
+</li>
+</ol>
+<p>When $n$ is small enough for brute force, there is no reason to accept these limitations. The <code>enumerate_subsets</code> function exists precisely for this regime: it tests every subset, sorts the results by performance, and returns the complete landscape for downstream analysis.</p>
+<hr />
+<h2 id="112-the-optimize_subset-algorithm">11.2 The <code>optimize_subset</code> Algorithm</h2>
+<p>The core of subset enumeration is the <code>optimize_subset</code> function, which takes a set of active dimensions and finds the best parameter values for those dimensions while holding all inactive dimensions at a sentinel value. The algorithm makes three design decisions that merit detailed examination: log-space parameterization, sentinel values for inactive dimensions, and adaptive search strategy.</p>
+<h3 id="1121-log-space-parameterization">11.2.1 Log-Space Parameterization</h3>
+<p>Parameters that represent scales, weights, or regularization strengths typically span several orders of magnitude. A parameter that might reasonably take any value from 0.01 to 100 has a range ratio of 10,000:1. A uniform grid over this range would place 99% of its points above 1.0, leaving the sub-unit region&mdash;often the most interesting&mdash;severely undersampled.</p>
+<p>The solution is to parameterize in log-space. The <code>optimize_subset</code> function generates grid values as:</p>
+<pre><code class="language-python">grid_values = np.logspace(np.log10(0.01), np.log10(100), n_grid)
+</code></pre>
+<p>This produces <code>n_grid</code> points uniformly spaced on a logarithmic scale between $10^{-2}$ and $10^2$. With <code>n_grid = 20</code>, the values are approximately:</p>
+<p>$$0.01, \; 0.017, \; 0.029, \; 0.050, \; 0.085, \; \ldots, \; 11.7, \; 20.0, \; 34.1, \; 58.5, \; 100.0$$</p>
+<p>Each adjacent pair of grid points differs by a constant multiplicative factor of $(10^4)^{1/19} \approx 1.66$. This provides uniform resolution in the sense that matters: a change from 0.01 to 0.017 is as significant (in relative terms) as a change from 58.5 to 100.0.</p>
+<p>For random search in higher dimensions, the same principle applies:</p>
+<pre><code class="language-python">log_low, log_high = np.log10(0.01), np.log10(100)
+log_vals = rng.uniform(log_low, log_high, n_active)
+for i, dim in enumerate(active_dims):
+    params[dim] = 10 ** log_vals[i]
+</code></pre>
+<p>The random samples are drawn uniformly in $[\log_{10}(0.01), \log_{10}(100)] = [-2, 2]$ and then exponentiated, producing a distribution that is uniform in log-space. This is equivalent to drawing from a log-uniform distribution over $[0.01, 100]$, which is the maximum-entropy prior for a scale parameter whose order of magnitude is unknown.</p>
+<h3 id="1122-sentinel-values-for-inactive-dimensions">11.2.2 Sentinel Values for Inactive Dimensions</h3>
+<p>When only a subset of dimensions is active, the remaining dimensions must be assigned values that effectively &ldquo;turn them off.&rdquo; The <code>optimize_subset</code> function uses a sentinel value of $10^6$ (the <code>inactive_value</code> parameter):</p>
+<pre><code class="language-python">params = np.full(n_all, inactive_value)
+params[active_dims[0]] = v
+</code></pre>
+<p>The parameter vector always has length $n$ (the total number of dimensions), but only the entries corresponding to active dimensions receive optimized values. All others are set to $10^6$.</p>
+<p>This sentinel-value convention has several advantages over alternatives like maintaining variable-length parameter vectors or using a boolean mask:</p>
+<ol>
+<li>
+<p><strong>Fixed-size vectors.</strong> The evaluation function always receives an array of the same length, regardless of which dimensions are active. This simplifies the function&rsquo;s interface and eliminates shape-mismatch bugs.</p>
+</li>
+<li>
+<p><strong>Interpretability.</strong> The sentinel value $10^6$ is orders of magnitude larger than any value in the search range $[0.01, 100]$. Any evaluation function that uses the parameter as a weight, scale factor, or regularization coefficient will naturally treat $10^6$ as &ldquo;inactive&rdquo; without special-case logic.</p>
+</li>
+<li>
+<p><strong>Composability.</strong> The full parameter vector, including sentinel values, is stored in the <code>SubsetResult</code>. This means any downstream operation&mdash;Pareto analysis, sensitivity profiling, adversarial search&mdash;can re-evaluate the configuration by passing the stored vector directly to the evaluation function. No reconstruction logic is needed.</p>
+</li>
+</ol>
+<p>The defect prediction example illustrates the convention. The evaluation function checks each group&rsquo;s parameter against a threshold:</p>
+<pre><code class="language-python">for i, indices in enumerate(group_indices):
+    if params[i] &lt; 1000:
+        active_features.extend(indices)
+</code></pre>
+<p>A parameter value of $10^6$ is well above the threshold of 1000, so the corresponding feature group is excluded. A parameter value in $[0.01, 100]$ is well below the threshold, so the group is included. The gap between the search range and the threshold provides a wide margin that prevents numerical edge cases.</p>
+<h3 id="1123-adaptive-search-strategy">11.2.3 Adaptive Search Strategy</h3>
+<p>The <code>optimize_subset</code> function uses three different search strategies depending on the number of active dimensions:</p>
+<p><strong>1D subsets: grid search.</strong> For a single active dimension, the algorithm evaluates all <code>n_grid</code> points on the log-spaced grid:</p>
+<pre><code class="language-python">if n_active == 1:
+    for v in grid_values:
+        params = np.full(n_all, inactive_value)
+        params[active_dims[0]] = v
+        mae, errors = evaluate_fn(params)
+        if mae &lt; best_mae:
+            best_mae = mae
+            best_params = params.copy()
+            best_errors = errors.copy()
+</code></pre>
+<p>With <code>n_grid = 20</code>, this requires 20 evaluations. The grid is exhaustive within its resolution, guaranteeing that the optimal value (to within a factor of 1.66) is found.</p>
+<p><strong>2D subsets: full grid search.</strong> For two active dimensions, the algorithm evaluates all pairs on the grid:</p>
+<pre><code class="language-python">elif n_active == 2:
+    for v0, v1 in itertools.product(grid_values, grid_values):
+        params = np.full(n_all, inactive_value)
+        params[active_dims[0]] = v0
+        params[active_dims[1]] = v1
+        mae, errors = evaluate_fn(params)
+</code></pre>
+<p>With <code>n_grid = 20</code>, this requires $20^2 = 400$ evaluations. The cost is quadratic in <code>n_grid</code> but still modest for typical evaluation functions. The full grid ensures that all pairwise interactions between the two dimensions are captured&mdash;an important property, since interactions are precisely what subset enumeration is designed to detect.</p>
+<p><strong>3D+ subsets: random search in log-space.</strong> For three or more active dimensions, the grid approach becomes impractical ($20^3 = 8000$, $20^4 = 160000$). The algorithm switches to random search:</p>
+<pre><code class="language-python">else:
+    rng = np.random.default_rng(42)
+    log_low, log_high = np.log10(0.01), np.log10(100)
+    for _ in range(n_random):
+        params = np.full(n_all, inactive_value)
+        log_vals = rng.uniform(log_low, log_high, n_active)
+        for i, dim in enumerate(active_dims):
+            params[dim] = 10 ** log_vals[i]
+        mae, errors = evaluate_fn(params)
+</code></pre>
+<p>With <code>n_random = 5000</code>, this samples 5000 random points in the log-space hypercube. Random search is surprisingly effective in low dimensions: in a $k$-dimensional space, the probability that at least one sample falls within a hypercube of side length $\epsilon$ (in log-space) is approximately $1 - (1 - \epsilon^k)^{n}$, which exceeds 0.95 for $\epsilon = 0.3$ and $n = 5000$ when $k \leq 4$.</p>
+<p>The fixed seed (<code>rng = np.random.default_rng(42)</code>) ensures reproducibility: the same subset always produces the same search trajectory and the same result.</p>
+<hr />
+<h2 id="113-subsetresult-as-a-typed-data-structure">11.3 <code>SubsetResult</code> as a Typed Data Structure</h2>
+<p>Each call to <code>optimize_subset</code> returns a <code>SubsetResult</code> object. This is not merely a container for the output; it is a typed data structure designed for downstream composition.</p>
+<pre><code class="language-python">@dataclass
+class SubsetResult:
+    &quot;&quot;&quot;Result of optimizing a single parameter subset.&quot;&quot;&quot;
+
+    dims: tuple[int, ...]
+    dim_names: tuple[str, ...]
+    n_dims: int
+    param_values: np.ndarray
+    mae: float
+    errors: dict[str, float]
+    pareto_optimal: bool = False
+</code></pre>
+<p>The fields serve distinct roles:</p>
+<ul>
+<li>
+<p><strong><code>dims</code></strong> and <strong><code>dim_names</code></strong>: the active dimensions, both by index and by name. The index form enables array operations; the name form enables human-readable output. The tuple type ensures immutability&mdash;a <code>SubsetResult</code> cannot be silently modified after creation.</p>
+</li>
+<li>
+<p><strong><code>n_dims</code></strong>: the cardinality of the active subset. Storing this explicitly (rather than computing <code>len(dims)</code> each time) supports efficient sorting and filtering: &ldquo;give me all results with exactly 2 active dimensions&rdquo; is a constant-time field access, not a linear scan.</p>
+</li>
+<li>
+<p><strong><code>param_values</code></strong>: the full parameter vector, including sentinel values for inactive dimensions. This is the vector that, when passed to the evaluation function, reproduces the recorded MAE. Storing the complete vector rather than just the active values eliminates the need for reconstruction logic and makes re-evaluation trivial.</p>
+</li>
+<li>
+<p><strong><code>mae</code></strong>: the mean absolute error achieved by this configuration. This is the primary sort key for comparing configurations.</p>
+</li>
+<li>
+<p><strong><code>errors</code></strong>: a dictionary of per-metric errors. For the defect prediction example, this might contain <code>{"Accuracy": 3.2, "Precision": -1.5, "Recall": 5.1, "F1": 2.8, "AUC": -0.3}</code>. The dictionary preserves the full multi-dimensional evaluation&mdash;exactly the information that, as Chapter 1 argued, scalar summaries destroy.</p>
+</li>
+<li>
+<p><strong><code>pareto_optimal</code></strong>: a boolean flag, initially <code>False</code>, set to <code>True</code> by the Pareto frontier analysis (Chapter 8) for configurations that are non-dominated in the (n_dims, MAE) plane. This flag allows downstream code to filter for Pareto-optimal results without re-computing the frontier.</p>
+</li>
+</ul>
+<p>The <code>__repr__</code> method provides a concise summary:</p>
+<pre><code class="language-python">def __repr__(self) -&gt; str:
+    names = &quot;, &quot;.join(self.dim_names)
+    return f&quot;SubsetResult(dims=[{names}], n_dims={self.n_dims}, mae={self.mae:.4f})&quot;
+</code></pre>
+<p>A typical output might be:</p>
+<pre><code>SubsetResult(dims=[Complexity, Process], n_dims=2, mae=2.1034)
+</code></pre>
+<p>This design follows the principle stated in Section 1.2.2: state vectors are immutable, dimensions are named not numbered, and the full multi-dimensional evaluation is preserved.</p>
+<hr />
+<h2 id="114-the-enumerate_subsets-function">11.4 The <code>enumerate_subsets</code> Function</h2>
+<p>With <code>optimize_subset</code> handling individual subsets and <code>SubsetResult</code> capturing the output, the <code>enumerate_subsets</code> function orchestrates the full sweep:</p>
+<pre><code class="language-python">def enumerate_subsets(
+    dim_names: Sequence[str],
+    evaluate_fn: Callable[[np.ndarray], tuple[float, dict[str, float]]],
+    max_dims: int = 4,
+    inactive_value: float = 1e6,
+    n_grid: int = 20,
+    n_random: int = 5000,
+    verbose: bool = False,
+) -&gt; list[SubsetResult]:
+</code></pre>
+<p>The function iterates over all subset sizes from 1 to <code>max_dims</code>, generates all combinations at each size using <code>itertools.combinations</code>, and calls <code>optimize_subset</code> for each:</p>
+<pre><code class="language-python">for k in range(1, min(max_dims, n_all) + 1):
+    combos = list(itertools.combinations(range(n_all), k))
+    if verbose:
+        print(f&quot;  Enumerating {len(combos)} subsets of size {k}...&quot;)
+    for combo in combos:
+        result = optimize_subset(
+            active_dims=combo,
+            all_dim_names=dim_names,
+            evaluate_fn=evaluate_fn,
+            inactive_value=inactive_value,
+            n_grid=n_grid,
+            n_random=n_random,
+        )
+        results.append(result)
+</code></pre>
+<p>The results are sorted by MAE in ascending order before return:</p>
+<pre><code class="language-python">results.sort(key=lambda r: r.mae)
+return results
+</code></pre>
+<p>This means <code>results[0]</code> is always the best configuration found, regardless of how many dimensions it uses. The caller can then apply additional filtering (e.g., &ldquo;best result with at most 2 dimensions&rdquo;) or pass the full list to Pareto frontier analysis.</p>
+<h3 id="1141-the-role-of-max_dims">11.4.1 The Role of <code>max_dims</code></h3>
+<p>The <code>max_dims</code> parameter is the primary lever for controlling computational cost. Its effect on the total number of evaluations is:</p>
+<p>$$E(n, k_{\max}) = \sum_{k=1}^{k_{\max}} \binom{n}{k} \cdot C(k)$$</p>
+<p>where $C(k)$ is the per-subset evaluation count: $C(1) = n_{\text{grid}}$, $C(2) = n_{\text{grid}}^2$, $C(k \geq 3) = n_{\text{random}}$. For the defect prediction example with $n = 5$, $n_{\text{grid}} = 20$, $n_{\text{random}} = 5000$:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">$k$</th>
+<th style="text-align: center;">Subsets</th>
+<th style="text-align: center;">Evals per subset</th>
+<th style="text-align: center;">Total evals</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">1</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">20</td>
+<td style="text-align: center;">100</td>
+</tr>
+<tr>
+<td style="text-align: center;">2</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">400</td>
+<td style="text-align: center;">4,000</td>
+</tr>
+<tr>
+<td style="text-align: center;">3</td>
+<td style="text-align: center;">10</td>
+<td style="text-align: center;">5,000</td>
+<td style="text-align: center;">50,000</td>
+</tr>
+<tr>
+<td style="text-align: center;">4</td>
+<td style="text-align: center;">5</td>
+<td style="text-align: center;">5,000</td>
+<td style="text-align: center;">25,000</td>
+</tr>
+</tbody>
+</table>
+<p>With <code>max_dims = 4</code>, the total is 79,100 evaluations. With <code>max_dims = 2</code>, it drops to 4,100. The choice depends on the cost of a single evaluation: if <code>evaluate_fn</code> takes 1 millisecond (as in the defect prediction example with pre-trained models), the full sweep completes in under 80 seconds. If it takes 1 second, <code>max_dims = 2</code> might be the practical limit.</p>
+<h3 id="1142-integration-with-the-pipeline">11.4.2 Integration with the Pipeline</h3>
+<p>The <code>enumerate_subsets</code> function is the first step of the full structural fuzzing campaign, orchestrated by the <code>run_campaign</code> function in <code>pipeline.py</code>:</p>
+<pre><code class="language-python"># Step 1: Enumerate subsets
+subset_results = enumerate_subsets(
+    dim_names=dim_names_list,
+    evaluate_fn=evaluate_fn,
+    max_dims=max_subset_dims,
+    inactive_value=inactive_value,
+    n_grid=n_grid,
+    n_random=n_random,
+    verbose=verbose,
+)
+</code></pre>
+<p>The returned list of <code>SubsetResult</code> objects flows into every subsequent stage. The Pareto frontier analysis (Step 2) receives the subset results and identifies non-dominated configurations. The sensitivity profiling (Step 3) uses the best configuration&rsquo;s parameter vector as its baseline. The MRI computation (Step 4) perturbs that same baseline. The adversarial search (Step 5) probes its boundaries.</p>
+<p>This architecture embodies a principle worth stating explicitly: <strong>subset enumeration produces the raw data; all other analyses are views over that data.</strong> The <code>SubsetResult</code> list is the foundational artifact of a structural fuzzing campaign, and its completeness determines the quality of every downstream analysis.</p>
+<p>The <code>StructuralFuzzReport</code> dataclass makes this relationship concrete:</p>
+<pre><code class="language-python">@dataclass
+class StructuralFuzzReport:
+    &quot;&quot;&quot;Complete structural fuzzing campaign report.&quot;&quot;&quot;
+
+    dim_names: list[str]
+    subset_results: list[SubsetResult]
+    pareto_results: list[SubsetResult]
+    sensitivity_results: list[SensitivityResult]
+    mri_result: ModelRobustnessIndex | None
+    adversarial_results: list[AdversarialResult]
+    composition_result: CompositionResult | None
+    forward_results: list[SubsetResult] = field(default_factory=list)
+    backward_results: list[SubsetResult] = field(default_factory=list)
+</code></pre>
+<p>The <code>subset_results</code> field stores the complete enumeration. The <code>pareto_results</code> field stores the subset of those results that are Pareto-optimal. Both use the same <code>SubsetResult</code> type, differing only in the <code>pareto_optimal</code> flag.</p>
+<hr />
+<h2 id="115-practical-heuristics">11.5 Practical Heuristics</h2>
+<h3 id="1151-choosing-max_dims">11.5.1 Choosing <code>max_dims</code></h3>
+<p>The choice of <code>max_dims</code> involves a tradeoff between coverage and cost. Three guidelines:</p>
+<p><strong>Rule of thumb: $k_{\max} = \min(4, n)$.</strong> For most problems, subsets of size 4 or smaller capture the dominant structural patterns. The marginal information from 5-way interactions is rarely worth the combinatorial cost. The default <code>max_dims = 4</code> in <code>enumerate_subsets</code> reflects this heuristic.</p>
+<p><strong>Cost-calibrated choice.</strong> If the evaluation function has a known per-call cost $t$, compute the total time $T = E(n, k_{\max}) \cdot t$ for candidate values of $k_{\max}$ and choose the largest $k_{\max}$ that fits within the time budget. For the defect prediction example with $t \approx 1$ ms, even $k_{\max} = 5$ completes in under two minutes.</p>
+<p><strong>Diminishing returns.</strong> After running with a given $k_{\max}$, inspect the results. If the best configuration of size $k_{\max}$ is not substantially better than the best of size $k_{\max} - 1$, there is little reason to increase $k_{\max}$. The Pareto frontier provides a natural diagnostic: if the frontier flattens (the MAE improvement from adding one more dimension is less than some threshold $\delta$), the enumeration has reached the point of diminishing returns.</p>
+<h3 id="1152-early-stopping">11.5.2 Early Stopping</h3>
+<p>The current <code>enumerate_subsets</code> implementation tests all subsets at each size before moving to the next. An alternative is early stopping: if no subset of size $k$ improves on the best result of size $k - 1$ by more than $\delta$, skip sizes $k+1, k+2, \ldots$</p>
+<p>This heuristic is not implemented in the framework&rsquo;s core because it sacrifices completeness: a subset of size $k+1$ might improve dramatically over anything at size $k$ due to a synergy that only emerges when three or more dimensions interact. Such cases are rare but consequential, and the whole point of brute-force enumeration is to catch them. In practice, early stopping is best reserved for exploratory runs where speed matters more than thoroughness.</p>
+<h3 id="1153-tuning-n_grid-and-n_random">11.5.3 Tuning <code>n_grid</code> and <code>n_random</code></h3>
+<p>The <code>n_grid</code> parameter controls the resolution of 1D and 2D searches. Increasing it from 20 to 50 improves resolution (the multiplicative step drops from 1.66 to 1.19) but increases the 2D cost from 400 to 2,500 evaluations per subset. For smooth evaluation functions, <code>n_grid = 20</code> is usually sufficient. For functions with narrow optima or sharp transitions, <code>n_grid = 50</code> or higher may be warranted.</p>
+<p>The <code>n_random</code> parameter controls the coverage of 3D+ searches. The expected coverage of a random search depends on the effective dimensionality of the loss landscape. If the loss depends strongly on only one of the $k$ active dimensions, then 5,000 random samples provide excellent coverage of that dimension even in a $k$-dimensional space. If the loss depends on all $k$ dimensions with comparable sensitivity, coverage scales as $n_{\text{random}}^{1/k}$&mdash;about 17 effective grid points per dimension for $k = 3$ and $n_{\text{random}} = 5000$, or about 8 for $k = 4$. These numbers are adequate for identifying the approximate optimum but not for precise characterization. For the latter, a targeted refinement step (not part of the core framework) can be applied to the most promising configurations.</p>
+<h3 id="1154-the-zero-dimensional-baseline">11.5.4 The Zero-Dimensional Baseline</h3>
+<p>The <code>optimize_subset</code> function handles the edge case of zero active dimensions:</p>
+<pre><code class="language-python">if n_active == 0:
+    params = np.full(n_all, inactive_value)
+    mae, errors = evaluate_fn(params)
+    return SubsetResult(
+        dims=(),
+        dim_names=(),
+        n_dims=0,
+        param_values=params.copy(),
+        mae=mae,
+        errors=errors,
+    )
+</code></pre>
+<p>This baseline measures the evaluation function&rsquo;s output when <em>all</em> dimensions are inactive&mdash;the &ldquo;null model.&rdquo; While <code>enumerate_subsets</code> does not include this case in its loop (it starts at $k = 1$), calling <code>optimize_subset</code> with an empty <code>active_dims</code> tuple produces a valid <code>SubsetResult</code> that can be used as a reference point. The improvement of any subset over the null model quantifies the absolute contribution of those dimensions, as opposed to the marginal contribution measured by comparing subsets of different sizes.</p>
+<hr />
+<h2 id="116-worked-example-defect-prediction">11.6 Worked Example: Defect Prediction</h2>
+<p>The defect prediction example, introduced in Chapter 1 and implemented in <code>examples/defect_prediction/model.py</code>, provides a concrete demonstration of the subset enumeration pattern. The model predicts whether a software module contains defects based on 16 software metrics organized into five feature groups.</p>
+<h3 id="1161-feature-groups-as-dimensions">11.6.1 Feature Groups as Dimensions</h3>
+<p>The <code>FEATURE_GROUPS</code> dictionary defines the mapping from feature group names to feature indices:</p>
+<pre><code class="language-python">FEATURE_GROUPS = {
+    &quot;Size&quot;: [0, 1, 2],
+    &quot;Complexity&quot;: [3, 4, 5],
+    &quot;Halstead&quot;: [6, 7, 8, 9],
+    &quot;OO&quot;: [10, 11, 12],
+    &quot;Process&quot;: [13, 14, 15],
+}
+GROUP_NAMES = list(FEATURE_GROUPS.keys())
+</code></pre>
+<p>Each group aggregates related software metrics:</p>
+<ul>
+<li><strong>Size</strong>: lines of code (LOC), source lines (SLOC), blank lines&mdash;raw measures of module size.</li>
+<li><strong>Complexity</strong>: cyclomatic complexity, essential complexity, design complexity&mdash;structural measures of control flow.</li>
+<li><strong>Halstead</strong>: volume, difficulty, effort, time estimate&mdash;vocabulary-based measures derived from operator and operand counts.</li>
+<li><strong>OO</strong>: coupling between objects, cohesion, inheritance depth&mdash;object-oriented design metrics.</li>
+<li><strong>Process</strong>: revisions, distinct authors, code churn&mdash;measures of development activity.</li>
+</ul>
+<p>The choice of five groups rather than sixteen individual features is itself a modeling decision. It reduces the number of subsets from $2^{16} - 1 = 65{,}535$ to $2^5 - 1 = 31$, making brute-force enumeration trivially feasible. More importantly, it aligns the structural analysis with the conceptual structure of the domain: practitioners think in terms of &ldquo;size metrics&rdquo; and &ldquo;complexity metrics,&rdquo; not individual features. The subset enumeration pattern operates at the level of these semantic groups.</p>
+<h3 id="1162-the-evaluation-function">11.6.2 The Evaluation Function</h3>
+<p>The <code>make_evaluate_fn</code> function constructs an evaluation function compatible with the structural fuzzing framework:</p>
+<pre><code class="language-python">def make_evaluate_fn(
+    n_samples: int = 1000,
+    test_fraction: float = 0.3,
+    seed: int = 42,
+) -&gt; Callable[[np.ndarray], tuple[float, dict[str, float]]]:
+</code></pre>
+<p>The returned callable takes a parameter vector of length 5 (one entry per feature group). If <code>params[i] &lt; 1000</code>, the features in group $i$ are included in the model; otherwise, the group is excluded. This binary inclusion semantics means that the <em>value</em> of <code>params[i]</code> (when below 1000) does not affect the model&mdash;only its presence above or below the threshold matters. The actual feature scaling is handled internally by the random forest&rsquo;s invariance to monotone feature transformations.</p>
+<p>The function trains a <code>RandomForestClassifier</code> on the active features and computes five metrics against target values:</p>
+<pre><code class="language-python">target_values = {
+    &quot;Accuracy&quot;: 75.0,
+    &quot;Precision&quot;: 70.0,
+    &quot;Recall&quot;: 65.0,
+    &quot;F1&quot;: 67.0,
+    &quot;AUC&quot;: 80.0,
+}
+</code></pre>
+<p>The errors are signed differences (predicted minus target), and the MAE is the mean of their absolute values. A configuration with MAE 0 would match all targets exactly. The multi-dimensional error vector preserves the direction of deviation&mdash;overperformance versus underperformance on each metric&mdash;while the MAE provides a scalar summary for sorting.</p>
+<h3 id="1163-what-the-enumeration-reveals">11.6.3 What the Enumeration Reveals</h3>
+<p>Running <code>enumerate_subsets</code> with <code>max_dims = 4</code> on the defect prediction example produces 30 <code>SubsetResult</code> objects (all subsets of sizes 1 through 4 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:</p>
+<p><strong>Single-dimension results ($k = 1$).</strong> The five single-group models reveal the standalone predictive power of each group:</p>
+<table>
+<thead>
+<tr>
+<th>Group</th>
+<th style="text-align: center;">MAE</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Complexity</td>
+<td style="text-align: center;">~3.8</td>
+<td>Strongest single predictor</td>
+</tr>
+<tr>
+<td>Process</td>
+<td style="text-align: center;">~4.2</td>
+<td>Second strongest</td>
+</tr>
+<tr>
+<td>Size</td>
+<td style="text-align: center;">~5.1</td>
+<td>Moderate</td>
+</tr>
+<tr>
+<td>Halstead</td>
+<td style="text-align: center;">~5.4</td>
+<td>Weak (correlated with Size)</td>
+</tr>
+<tr>
+<td>OO</td>
+<td style="text-align: center;">~8.9</td>
+<td>Near-noise</td>
+</tr>
+</tbody>
+</table>
+<p>Complexity alone is the best single predictor, confirming the domain knowledge that cyclomatic complexity is the primary driver of defect-proneness. OO metrics contribute almost nothing in isolation&mdash;a finding consistent with the data generation process, where OO features are pure noise.</p>
+<p><strong>Two-dimension results ($k = 2$).</strong> The ten pairwise combinations reveal interaction effects:</p>
+<table>
+<thead>
+<tr>
+<th>Pair</th>
+<th style="text-align: center;">MAE</th>
+<th style="text-align: center;">Delta from best singleton</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>{Complexity, Process}</td>
+<td style="text-align: center;">~2.1</td>
+<td style="text-align: center;">-1.7</td>
+</tr>
+<tr>
+<td>{Complexity, Size}</td>
+<td style="text-align: center;">~2.9</td>
+<td style="text-align: center;">-0.9</td>
+</tr>
+<tr>
+<td>{Complexity, Halstead}</td>
+<td style="text-align: center;">~3.1</td>
+<td style="text-align: center;">-0.7</td>
+</tr>
+<tr>
+<td>{Process, Size}</td>
+<td style="text-align: center;">~3.4</td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td>&hellip;</td>
+<td style="text-align: center;">&hellip;</td>
+<td style="text-align: center;">&hellip;</td>
+</tr>
+</tbody>
+</table>
+<p>The {Complexity, Process} pair is substantially better than any singleton, demonstrating a <em>synergy</em>: the structural (complexity) and temporal (process) views of the code are complementary. The framework reveals this synergy because it tests all pairs exhaustively; forward selection, starting from Complexity, would find {Complexity, Process} only if Process happened to be the best addition&mdash;which it is, but that outcome is not guaranteed in general.</p>
+<p><strong>Three- and four-dimension results ($k = 3, 4$).</strong> Adding Size to {Complexity, Process} reduces MAE to approximately 1.7. Adding Halstead or OO provides marginal further improvement. The pattern is one of diminishing returns: two dimensions capture most of the predictive structure, a third adds a meaningful increment, and the fourth and fifth add little.</p>
+<h3 id="1164-connecting-to-the-pareto-frontier">11.6.4 Connecting to the Pareto Frontier</h3>
+<p>The 30 <code>SubsetResult</code> objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:</p>
+<p>$$\{(\text{Complexity})\}, \; \{(\text{Complexity, Process})\}, \; \{(\text{Complexity, Process, Size})\}, \; \{(\text{all})\}$$</p>
+<p>Each Pareto-optimal point represents the best achievable MAE at its cardinality. The frontier makes the complexity-performance tradeoff explicit: the practitioner can see that going from 2 to 3 dimensions buys a 0.4-point MAE improvement, while going from 3 to 5 dimensions buys only 0.2 points. Whether the additional features are worth the added model complexity is a domain decision, but the subset enumeration pattern provides the quantitative basis for making it.</p>
+<h3 id="1165-the-ground-truth-test">11.6.5 The Ground Truth Test</h3>
+<p>The synthetic data in <code>model.py</code> has a known ground truth. The defect probability is generated as:</p>
+<pre><code class="language-python">logit = (
+    -3
+    + 0.1 * np.log1p(cyclomatic)
+    + 0.15 * np.log1p(essential)
+    + 0.05 * np.log1p(design)
+    + 0.12 * np.log1p(revisions)
+    + 0.1 * np.log1p(authors)
+    + 0.08 * np.log1p(churn / 100)
+    + 0.03 * np.log1p(loc / 1000)
+    + rng.normal(0, 0.5, n_samples)
+)
+</code></pre>
+<p>The true predictors are Complexity (coefficients 0.1, 0.15, 0.05), Process (0.12, 0.1, 0.08), and Size (0.03). Halstead is correlated with Size but has no direct effect. OO is pure noise.</p>
+<p>The subset enumeration correctly recovers this structure: Complexity and Process are the dominant groups, Size contributes marginally, Halstead&rsquo;s apparent contribution comes from its correlation with Size, and OO adds nothing. This ground-truth validation confirms that the brute-force enumeration pattern, despite its simplicity, reliably identifies the true structural dependencies in the data.</p>
+<hr />
+<h2 id="117-computational-considerations">11.7 Computational Considerations</h2>
+<h3 id="1171-parallelism">11.7.1 Parallelism</h3>
+<p>The <code>enumerate_subsets</code> loop is embarrassingly parallel: each subset can be optimized independently. The current implementation is sequential for simplicity, but parallelization is straightforward&mdash;each call to <code>optimize_subset</code> is a pure function with no shared state (beyond the evaluation function, which must be thread-safe).</p>
+<p>For the defect prediction example, parallelizing over subsets would reduce wall-clock time roughly linearly with the number of available cores, since the per-subset computation (training a random forest on ~700 samples) is dominated by CPU time rather than I/O.</p>
+<h3 id="1172-memory">11.7.2 Memory</h3>
+<p>Each <code>SubsetResult</code> stores a parameter vector of length $n$ (a NumPy array), an error dictionary, and metadata. For $n = 5$, this is negligible. For $n = 100$ with $N(100, 3) = 166{,}750$ subsets, the memory footprint is approximately $166{,}750 \times (100 \times 8 + \text{overhead}) \approx 200$ MB&mdash;large but manageable.</p>
+<p>The more significant memory concern is the evaluation function itself. If <code>evaluate_fn</code> loads a large model or dataset into memory, the cost is paid once (at construction time, via <code>make_evaluate_fn</code>) and amortized over all evaluations.</p>
+<h3 id="1173-reproducibility">11.7.3 Reproducibility</h3>
+<p>The <code>optimize_subset</code> function uses a fixed random seed (<code>rng = np.random.default_rng(42)</code>) for the 3D+ random search. This ensures that the same subset always produces the same result, which is essential for reproducibility. However, it also means that the random samples are the same for every subset of the same size. This is a deliberate design choice: it eliminates one source of variability (different random seeds for different subsets) and makes it possible to attribute performance differences between subsets entirely to the choice of active dimensions.</p>
+<hr />
+<h2 id="118-relationship-to-other-patterns">11.8 Relationship to Other Patterns</h2>
+<h3 id="1181-subset-enumeration-vs-forwardbackward-selection">11.8.1 Subset Enumeration vs. Forward/Backward Selection</h3>
+<p>The <code>run_campaign</code> function in <code>pipeline.py</code> runs both brute-force enumeration and the greedy baselines (forward selection and backward elimination), storing the results in the <code>forward_results</code> and <code>backward_results</code> fields of <code>StructuralFuzzReport</code>. This design enables direct comparison:</p>
+<ul>
+<li><strong>Subset enumeration</strong> provides the complete landscape: every subset tested, every MAE recorded.</li>
+<li><strong>Forward selection</strong> provides a single path from one dimension to <code>max_dims</code> dimensions, greedy at each step.</li>
+<li><strong>Backward elimination</strong> provides a single path from all dimensions down, removing the least valuable at each step.</li>
+</ul>
+<p>When the three methods agree&mdash;they select the same dimensions and rank them similarly&mdash;the result is robust. When they disagree&mdash;as they will when dimensions interact non-additively&mdash;the brute-force enumeration is the ground truth, and the discrepancy reveals the limitations of the greedy methods.</p>
+<h3 id="1182-subset-enumeration-and-sensitivity-analysis">11.8.2 Subset Enumeration and Sensitivity Analysis</h3>
+<p>Sensitivity analysis (asking &ldquo;how much does the objective change when I perturb one dimension?&rdquo;) is a local probe: it examines the neighborhood of a single configuration. Subset enumeration is a global survey: it examines the entire lattice of dimension combinations. The two are complementary. Sensitivity analysis reveals <em>which dimensions are important near the current optimum</em>; subset enumeration reveals <em>which dimension combinations define the best optima</em>.</p>
+<p>In the pipeline, sensitivity analysis is applied to the best configuration found by subset enumeration. The combination provides both global structure (which subsets are best overall) and local structure (which dimensions are most influential at the optimum).</p>
+<h3 id="1183-subset-enumeration-and-pareto-analysis">11.8.3 Subset Enumeration and Pareto Analysis</h3>
+<p>As discussed in Section 11.6.4, the output of <code>enumerate_subsets</code>&mdash;a list of <code>SubsetResult</code> objects&mdash;is the natural input to Pareto frontier analysis. The Pareto frontier operates over the $(k, \text{MAE})$ plane, identifying configurations that are non-dominated: no other configuration has both fewer dimensions <em>and</em> lower MAE.</p>
+<p>The Pareto analysis (Chapter 8) does not depend on the enumeration being exhaustive. It produces a valid frontier from any set of results. But the frontier is most informative when the input is complete: if a subset was not tested, its potential position on the frontier is unknown, and the frontier may be suboptimal. This is another argument for brute-force enumeration when it is feasible: it guarantees that the Pareto frontier is exact.</p>
+<hr />
+<h2 id="119-summary">11.9 Summary</h2>
+<p>The subset enumeration pattern is the simplest and most powerful tool in the structural fuzzing framework. It works by exhaustion: test every combination, record the result, sort by performance. Its effectiveness rests on three conditions that hold in practice for a wide range of problems:</p>
+<ol>
+<li>
+<p><strong>Moderate effective dimensionality.</strong> Real models have few meaningful dimension groups (typically 3&ndash;10), even when the raw feature count is high.</p>
+</li>
+<li>
+<p><strong>Cheap evaluation.</strong> The evaluation function is fast enough to call thousands or tens of thousands of times. This includes models with pre-computed datasets, cached computations, or inherently fast inference.</p>
+</li>
+<li>
+<p><strong>Structural interest.</strong> The practitioner cares not just about the best configuration but about the <em>structure</em> of the configuration space: which dimensions matter, which are redundant, which interact.</p>
+</li>
+</ol>
+<p>When these conditions hold, <code>enumerate_subsets</code> with a moderate <code>max_dims</code> produces a complete structural map in acceptable time. The <code>SubsetResult</code> objects that emerge&mdash;typed, immutable, carrying both scalar and multi-dimensional performance data&mdash;feed directly into Pareto analysis, sensitivity profiling, adversarial testing, and every other downstream stage of the structural fuzzing pipeline.</p>
+<p>The pattern&rsquo;s limitation is equally clear: it does not scale to hundreds of dimensions. For those problems, the heuristic methods&mdash;forward selection, backward elimination, and the stochastic approaches discussed in Chapter 12&mdash;are necessary. But the heuristics are most effective when calibrated against the brute-force ground truth on a reduced problem, and the transition from exact enumeration to approximate search is the subject of the next chapter.</p>
+<hr />
+<h2 id="1110-looking-ahead">11.10 Looking Ahead</h2>
+<p>Chapter 12 introduces the <em>compositional testing pattern</em>, which addresses the question that subset enumeration leaves open: <strong>in what order should dimensions be added?</strong> Subset enumeration tells us that {Complexity, Process, Size} is a strong 3-dimensional configuration, but it does not tell us whether to start with Complexity and add Process, or start with Process and add Complexity. The compositional test builds dimensions incrementally, measuring the marginal contribution of each addition in context, and produces an ordering that reveals the causal structure of dimension interactions. Where subset enumeration maps the landscape, compositional testing traces a path through it.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-10-adversarial-probing.html" class="nav-prev">&larr; Chapter 10: Adversarial Probing</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-12-compositional-testing.html" class="nav-next">Chapter 12: Compositional Testing &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

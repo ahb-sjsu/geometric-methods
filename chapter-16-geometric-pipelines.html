@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 16: Building Geometric Pipelines &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 16: Building Geometric Pipelines from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-16-geometric-pipelines">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 16: Building Geometric Pipelines</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-15-cholesky-parameterization.html" class="nav-prev">&larr; Chapter 15: Cholesky Parameterization for Positive-Definiteness</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-17-scaling.html" class="nav-next">Chapter 17: Scaling to High-Dimensional Spaces &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-16-building-geometric-pipelines">Chapter 16: Building Geometric Pipelines</h1>
+<blockquote>
+<p><em>&ldquo;A complex system that works is invariably found to have evolved from a simple system that worked.&rdquo;</em>
+&mdash; John Gall, <em>Systemantics</em> (1975)</p>
+</blockquote>
+<p>The preceding chapters developed a collection of geometric tools&mdash;subset enumeration, Pareto frontier extraction, sensitivity profiling, the Model Robustness Index, adversarial threshold search&mdash;each addressing a distinct aspect of model validation. Used in isolation, each tool answers a narrow question. Used in sequence, they compose into something qualitatively different: an end-to-end geometric pipeline that maps a model specification to a structured, multi-dimensional validation report.</p>
+<p>This chapter is about that composition. We develop the pipeline pattern as a first-class design concern, examine the <code>run_campaign</code> API that orchestrates all six analysis stages, study the <code>StructuralFuzzReport</code> dataclass that captures structured output, and explore the report generation facilities that transform raw results into human-readable text and publication-ready LaTeX. We close with practical guidance on designing evaluation callbacks, handling errors in long-running campaigns, and configuring the pipeline for different tradeoffs between speed and thoroughness.</p>
+<hr />
+<h2 id="161-the-pipeline-pattern">16.1 The Pipeline Pattern</h2>
+<h3 id="1611-why-composition-matters">16.1.1 Why Composition Matters</h3>
+<p>Each geometric tool from Parts II and III answers one question:</p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Chapter</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Subset enumeration</td>
+<td>11</td>
+<td>Which dimension combinations matter?</td>
+</tr>
+<tr>
+<td>Pareto frontier</td>
+<td>8</td>
+<td>Which configurations are non-dominated tradeoffs?</td>
+</tr>
+<tr>
+<td>Sensitivity profiling</td>
+<td>9</td>
+<td>How much does each dimension contribute?</td>
+</tr>
+<tr>
+<td>Model Robustness Index</td>
+<td>9</td>
+<td>How stable is the best configuration under perturbation?</td>
+</tr>
+<tr>
+<td>Adversarial threshold search</td>
+<td>9</td>
+<td>Where are the exact tipping points?</td>
+</tr>
+<tr>
+<td>Compositional testing</td>
+<td>12</td>
+<td>In what order should dimensions be added?</td>
+</tr>
+</tbody>
+</table>
+<p>The answers to these questions are not independent. The Pareto frontier depends on the subset enumeration results. Sensitivity profiling uses the best configuration found by enumeration as its baseline. The MRI perturbs that same baseline. Adversarial search probes the dimensions that sensitivity profiling identified as critical. Each stage consumes the output of its predecessors and enriches the overall picture.</p>
+<p>This data-flow dependency is what makes a pipeline more than a script that calls six functions in sequence. The pipeline must:</p>
+<ol>
+<li>Thread results from early stages to later stages automatically.</li>
+<li>Present a unified configuration surface so that parameters controlling all six stages can be specified in one place.</li>
+<li>Produce a single structured output that captures all results, rather than scattering them across variables.</li>
+<li>Handle partial failures gracefully&mdash;if adversarial search times out, the subset and Pareto results should still be available.</li>
+</ol>
+<h3 id="1612-the-six-stage-architecture">16.1.2 The Six-Stage Architecture</h3>
+<p>The structural fuzzing pipeline proceeds through six stages, each building on the previous:</p>
+<pre><code>Subset Enumeration
+       |
+       v
+ Pareto Frontier
+       |
+       v
+Sensitivity Profile  &lt;-- uses best configuration from stage 1
+       |
+       v
+  MRI Computation    &lt;-- uses best configuration from stage 1
+       |
+       v
+Adversarial Search   &lt;-- probes each dimension independently
+       |
+       v
+Compositional Test   &lt;-- greedy dimension-addition sequence
+</code></pre>
+<p>The first two stages are tightly coupled: Pareto extraction is a filter over subset results. The middle two stages (sensitivity and MRI) both operate on the best configuration discovered in stage 1 but are independent of each other&mdash;they could, in principle, run in parallel. The final two stages are independent of each other but depend on earlier results for their baseline parameters.</p>
+<p>An optional seventh phase runs forward selection and backward elimination baselines, providing classical feature-selection comparisons against the geometric methods. These baselines serve as a sanity check: if forward selection discovers a configuration that the exhaustive subset enumeration missed, something is wrong with the enumeration parameters.</p>
+<h3 id="1613-data-flow-and-the-evaluation-function">16.1.3 Data Flow and the Evaluation Function</h3>
+<p>A single callable&mdash;the evaluation function&mdash;is the thread that connects all six stages. Every stage calls this function, sometimes hundreds or thousands of times, with different parameter vectors. The function&rsquo;s signature is the contract that binds the pipeline together:</p>
+<pre><code class="language-python">def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    ...
+</code></pre>
+<p>The function takes a parameter vector (one value per dimension) and returns a tuple of <code>(mae, errors)</code> where <code>mae</code> is the aggregate mean absolute error and <code>errors</code> is a dictionary mapping named metrics to their signed deviations from targets. This dual return&mdash;a scalar summary plus a structured breakdown&mdash;enables the pipeline to optimize on the scalar while preserving per-metric detail for reporting.</p>
+<p>The evaluation function is the pipeline&rsquo;s most important abstraction boundary. Everything inside it&mdash;data loading, model training, metric computation&mdash;is domain-specific. Everything outside it&mdash;subset enumeration, Pareto analysis, sensitivity profiling&mdash;is domain-agnostic. The pipeline does not know or care whether the evaluation function trains a random forest, runs a game-theoretic simulation, or queries an external API. It only knows the contract: parameters in, errors out.</p>
+<hr />
+<h2 id="162-the-run_campaign-api">16.2 The <code>run_campaign</code> API</h2>
+<h3 id="1621-function-signature-and-parameters">16.2.1 Function Signature and Parameters</h3>
+<p>The <code>run_campaign</code> function is the pipeline&rsquo;s public entry point. Its signature exposes every tuning knob while providing sensible defaults:</p>
+<pre><code class="language-python">def run_campaign(
+    dim_names: Sequence[str],
+    evaluate_fn: Callable[[np.ndarray], tuple[float, dict[str, float]]],
+    max_subset_dims: int = 4,
+    n_mri_perturbations: int = 300,
+    mri_scale: float = 0.5,
+    mri_weights: tuple[float, float, float] = (0.5, 0.3, 0.2),
+    start_dim: int = 0,
+    candidate_dims: Sequence[int] | None = None,
+    run_baselines: bool = True,
+    adversarial_tolerance: float = 0.5,
+    inactive_value: float = 1e6,
+    n_grid: int = 20,
+    n_random: int = 5000,
+    verbose: bool = True,
+) -&gt; StructuralFuzzReport:
+</code></pre>
+<p>The parameters fall into four groups:</p>
+<p><strong>Problem specification.</strong> <code>dim_names</code> provides human-readable names for each dimension, and <code>evaluate_fn</code> is the evaluation callback described above. These two arguments fully specify the problem.</p>
+<p><strong>Enumeration control.</strong> <code>max_subset_dims</code> caps the largest subset size explored during enumeration. For $n$ dimensions, the number of subsets up to size $k$ is $\sum_{i=1}^{k} \binom{n}{i}$. With $n = 9$ and $k = 4$, this is 255 subsets. With $k = 5$, it rises to 381. The default of 4 balances thoroughness against computation time. The <code>n_grid</code> and <code>n_random</code> parameters control how each subset is optimized: <code>n_grid</code> sets the number of grid points for 1D and 2D optimization, while <code>n_random</code> sets the number of random samples for 3D and higher subsets. The <code>inactive_value</code> (default $10^6$) is the sentinel assigned to deactivated dimensions.</p>
+<p><strong>Robustness parameters.</strong> <code>n_mri_perturbations</code> controls the number of random perturbations sampled for the MRI computation&mdash;more perturbations yield more stable estimates of tail behavior but cost more evaluations. <code>mri_scale</code> sets the log-space perturbation radius, and <code>mri_weights</code> controls the relative importance of mean, 75th-percentile, and 95th-percentile deviations in the composite MRI score. <code>adversarial_tolerance</code> sets the convergence criterion for binary search during adversarial threshold detection.</p>
+<p><strong>Pipeline control.</strong> <code>start_dim</code> and <code>candidate_dims</code> configure the compositional test (which dimension to start from, and which to consider adding). <code>run_baselines</code> toggles the forward/backward selection baselines. <code>verbose</code> controls progress printing.</p>
+<h3 id="1622-stage-execution">16.2.2 Stage Execution</h3>
+<p>The pipeline executes its six stages in a fixed order, with verbose logging at each transition. The implementation in <code>pipeline.py</code> makes the data flow explicit:</p>
+<pre><code class="language-python"># Step 1: Enumerate subsets
+subset_results = enumerate_subsets(
+    dim_names=dim_names_list,
+    evaluate_fn=evaluate_fn,
+    max_dims=max_subset_dims,
+    inactive_value=inactive_value,
+    n_grid=n_grid,
+    n_random=n_random,
+    verbose=verbose,
+)
+
+# Step 2: Pareto frontier
+pareto_results = pareto_frontier(subset_results)
+
+# Step 3: Sensitivity profiling (uses best result's params)
+if subset_results:
+    best_params = subset_results[0].param_values
+else:
+    best_params = np.ones(n_dims)
+
+sensitivity_results = sensitivity_profile(
+    params=best_params,
+    dim_names=dim_names_list,
+    evaluate_fn=evaluate_fn,
+    inactive_value=inactive_value,
+)
+
+# Step 4: MRI
+mri_result = compute_mri(
+    params=best_params,
+    evaluate_fn=evaluate_fn,
+    n_perturbations=n_mri_perturbations,
+    scale=mri_scale,
+    weights=mri_weights,
+)
+</code></pre>
+<p>Notice how <code>best_params</code>&mdash;the parameter vector from the best subset configuration&mdash;flows from stage 1 into stages 3 and 4. This is the critical data dependency. If subset enumeration finds a poor configuration, the sensitivity and robustness analyses will profile the wrong point in parameter space. The pipeline assumes that the best MAE configuration is the right one to probe; for problems where multiple Pareto-optimal configurations deserve individual robustness analysis, the user should run <code>compute_mri</code> and <code>sensitivity_profile</code> separately on each configuration of interest.</p>
+<p>Stages 5 and 6 iterate over dimensions:</p>
+<pre><code class="language-python"># Step 5: Adversarial threshold search
+adversarial_results: list[AdversarialResult] = []
+for i in range(n_dims):
+    adv = find_adversarial_threshold(
+        params=best_params,
+        dim=i,
+        dim_names=dim_names_list,
+        evaluate_fn=evaluate_fn,
+        tolerance=adversarial_tolerance,
+    )
+    adversarial_results.extend(adv)
+
+# Step 6: Compositional test
+composition_result = compositional_test(
+    start_dim=start_dim,
+    candidate_dims=candidate_dims_list,
+    dim_names=dim_names_list,
+    evaluate_fn=evaluate_fn,
+    inactive_value=inactive_value,
+    n_grid=n_grid,
+    n_random=n_random,
+)
+</code></pre>
+<p>The adversarial search examines each dimension independently, searching for threshold values above and below the baseline at which the error exceeds the tolerance. The compositional test builds configurations incrementally, starting from a single dimension and greedily adding the dimension that most reduces MAE at each step. Together, these two stages answer complementary questions: adversarial search asks &ldquo;where does this dimension break?&rdquo;, while compositional testing asks &ldquo;in what order should dimensions be assembled?&rdquo;</p>
+<h3 id="1623-evaluation-budget">16.2.3 Evaluation Budget</h3>
+<p>Understanding the total number of evaluations consumed by a campaign is essential for budgeting computation time. The count depends on configuration:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Stage</th>
+<th style="text-align: left;">Evaluations (approximate)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Subset enumeration</td>
+<td style="text-align: left;">$\sum_{k=1}^{K} \binom{n}{k} \times C(k)$</td>
+</tr>
+<tr>
+<td style="text-align: left;">Pareto frontier</td>
+<td style="text-align: left;">0 (filter only)</td>
+</tr>
+<tr>
+<td style="text-align: left;">Sensitivity profile</td>
+<td style="text-align: left;">$2n$</td>
+</tr>
+<tr>
+<td style="text-align: left;">MRI</td>
+<td style="text-align: left;">$N_{\text{pert}}$</td>
+</tr>
+<tr>
+<td style="text-align: left;">Adversarial search</td>
+<td style="text-align: left;">$n \times 2 \times \lceil\log_2(R)\rceil$</td>
+</tr>
+<tr>
+<td style="text-align: left;">Compositional test</td>
+<td style="text-align: left;">$(n-1) \times C(\cdot)$</td>
+</tr>
+<tr>
+<td style="text-align: left;">Forward selection</td>
+<td style="text-align: left;">up to $K \times n \times C(\cdot)$</td>
+</tr>
+<tr>
+<td style="text-align: left;">Backward elimination</td>
+<td style="text-align: left;">$n \times C(\cdot)$</td>
+</tr>
+</tbody>
+</table>
+<p>Here $C(k)$ is the optimization cost for a $k$-dimensional subset: $n_{\text{grid}}$ for $k = 1$, $n_{\text{grid}}^2$ for $k = 2$, and $n_{\text{random}}$ for $k \geq 3$. $R$ is the search range ratio for adversarial binary search, and $N_{\text{pert}}$ is <code>n_mri_perturbations</code>.</p>
+<p>For a 5-dimensional problem with defaults ($K = 4$, $n_{\text{grid}} = 20$, $n_{\text{random}} = 5000$), the enumeration stage alone requires approximately $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 = 79{,}100$ evaluations. If each evaluation takes 100ms (reasonable for a small random forest), the enumeration stage takes about 2 hours. The MRI adds 300 evaluations (30 seconds), sensitivity adds 10 evaluations (1 second), and adversarial search adds roughly 100 evaluations (10 seconds). Enumeration dominates.</p>
+<p>For a 9-dimensional problem, the evaluation count rises sharply: $\binom{9}{3} = 84$ three-dimensional subsets and $\binom{9}{4} = 126$ four-dimensional subsets, each requiring 5000 random evaluations, push the total past one million. Section 16.6 discusses strategies for managing this cost.</p>
+<hr />
+<h2 id="163-structuralfuzzreport-structured-output">16.3 <code>StructuralFuzzReport</code>: Structured Output</h2>
+<h3 id="1631-the-report-dataclass">16.3.1 The Report Dataclass</h3>
+<p>The pipeline returns a <code>StructuralFuzzReport</code>&mdash;a dataclass that bundles the output of all six stages into a single structured object:</p>
+<pre><code class="language-python">@dataclass
+class StructuralFuzzReport:
+    &quot;&quot;&quot;Complete structural fuzzing campaign report.&quot;&quot;&quot;
+
+    dim_names: list[str]
+    subset_results: list[SubsetResult]
+    pareto_results: list[SubsetResult]
+    sensitivity_results: list[SensitivityResult]
+    mri_result: ModelRobustnessIndex | None
+    adversarial_results: list[AdversarialResult]
+    composition_result: CompositionResult | None
+    forward_results: list[SubsetResult] = field(default_factory=list)
+    backward_results: list[SubsetResult] = field(default_factory=list)
+</code></pre>
+<p>Each field holds a typed result object from the corresponding pipeline stage. The <code>SubsetResult</code> objects in <code>subset_results</code> are sorted by MAE (best first). The <code>pareto_results</code> are a subset of <code>subset_results</code> containing only the Pareto-optimal configurations. The <code>sensitivity_results</code> are sorted by importance rank. The <code>adversarial_results</code> list may contain zero, one, or two entries per dimension (one for each search direction), depending on whether thresholds were found. The <code>forward_results</code> and <code>backward_results</code> are empty lists when <code>run_baselines=False</code>.</p>
+<p>The optional fields (<code>mri_result</code>, <code>composition_result</code>) use <code>None</code> to indicate that the corresponding stage was skipped or failed. This is the pipeline&rsquo;s mechanism for partial results: if the MRI computation encounters a numerical error, the report still contains valid subset, Pareto, and sensitivity results.</p>
+<h3 id="1632-navigating-the-results">16.3.2 Navigating the Results</h3>
+<p>The <code>StructuralFuzzReport</code> is designed for programmatic access. After a campaign completes, the typical analysis workflow extracts specific results:</p>
+<pre><code class="language-python">import structural_fuzzing as sf
+
+report = sf.run_campaign(
+    dim_names=[&quot;Size&quot;, &quot;Complexity&quot;, &quot;Halstead&quot;, &quot;OO&quot;, &quot;Process&quot;],
+    evaluate_fn=evaluate_fn,
+)
+
+# Best overall configuration
+best = report.subset_results[0]
+print(f&quot;Best: {best.dim_names}, MAE={best.mae:.4f}&quot;)
+
+# Pareto-optimal tradeoffs
+for p in report.pareto_results:
+    print(f&quot;  k={p.n_dims}: {p.dim_names} -&gt; MAE={p.mae:.4f}&quot;)
+
+# Most important dimension
+top_dim = report.sensitivity_results[0]
+print(f&quot;Most important: {top_dim.dim_name} (delta={top_dim.delta_mae:.4f})&quot;)
+
+# Robustness
+if report.mri_result is not None:
+    print(f&quot;MRI = {report.mri_result.mri:.4f}&quot;)
+    print(f&quot;Worst-case MAE = {report.mri_result.worst_case_mae:.4f}&quot;)
+
+# Tipping points
+for adv in report.adversarial_results:
+    print(
+        f&quot;  {adv.dim_name} ({adv.direction}): &quot;
+        f&quot;{adv.base_value:.4f} -&gt; {adv.threshold_value:.4f} &quot;
+        f&quot;(ratio={adv.threshold_ratio:.2f}x, flips '{adv.target_flipped}')&quot;
+    )
+</code></pre>
+<p>The report object is also serializable. Because all of its fields are dataclasses with primitive or NumPy-array contents, the report can be pickled for later analysis or converted to JSON for integration with external dashboards.</p>
+<h3 id="1633-the-summary-method">16.3.3 The <code>summary</code> Method</h3>
+<p>For quick inspection, <code>StructuralFuzzReport</code> provides a <code>summary</code> method that delegates to the report formatting system:</p>
+<pre><code class="language-python">report = sf.run_campaign(dim_names=dim_names, evaluate_fn=evaluate_fn)
+print(report.summary())
+</code></pre>
+<p>This produces a structured text report covering all six stages, formatted for terminal display. The implementation is a thin delegation:</p>
+<pre><code class="language-python">def summary(self) -&gt; str:
+    &quot;&quot;&quot;Generate a text summary of the campaign results.&quot;&quot;&quot;
+    from structural_fuzzing.report import format_report
+    return format_report(self)
+</code></pre>
+<p>The lazy import avoids a circular dependency between the pipeline and report modules&mdash;a small but important architectural detail when the report formatter needs to reference pipeline types.</p>
+<hr />
+<h2 id="164-report-generation">16.4 Report Generation</h2>
+<h3 id="1641-text-reports">16.4.1 Text Reports</h3>
+<p>The <code>format_report</code> function transforms a <code>StructuralFuzzReport</code> into a human-readable text summary. The output is organized into sections that mirror the pipeline stages:</p>
+<pre><code class="language-python">def format_report(report: StructuralFuzzReport) -&gt; str:
+    lines: list[str] = []
+    lines.append(&quot;=&quot; * 70)
+    lines.append(&quot;STRUCTURAL FUZZING REPORT&quot;)
+    lines.append(&quot;=&quot; * 70)
+
+    # Overview
+    lines.append(f&quot;\nDimensions: {len(report.dim_names)}&quot;)
+    lines.append(f&quot;Dimension names: {', '.join(report.dim_names)}&quot;)
+    lines.append(f&quot;Total configurations evaluated: {len(report.subset_results)}&quot;)
+
+    # Best configuration
+    if report.subset_results:
+        best = report.subset_results[0]
+        lines.append(&quot;\nBest configuration:&quot;)
+        lines.append(f&quot;  Dimensions: {', '.join(best.dim_names)} (k={best.n_dims})&quot;)
+        lines.append(f&quot;  MAE: {best.mae:.4f}&quot;)
+        lines.append(&quot;  Errors:&quot;)
+        for name, err in sorted(best.errors.items()):
+            lines.append(f&quot;    {name}: {err:+.4f}&quot;)
+    ...
+</code></pre>
+<p>The report includes signed errors for each metric (positive means the model exceeds the target, negative means it falls short), the complete Pareto frontier, the sensitivity ranking with ablation deltas, MRI statistics including tail percentiles, adversarial thresholds with direction and flip information, and the compositional build order.</p>
+<p>The text format is designed for three use cases: terminal inspection during development, inclusion in version-controlled reports (the text diffs cleanly), and automated parsing by downstream tools that can extract specific numbers using simple string matching.</p>
+<h3 id="1642-latex-tables">16.4.2 LaTeX Tables</h3>
+<p>For publication-quality output, <code>format_latex_tables</code> generates ready-to-compile LaTeX table environments:</p>
+<pre><code class="language-python">def format_latex_tables(report: StructuralFuzzReport) -&gt; str:
+    lines: list[str] = []
+
+    # Pareto frontier table
+    lines.append(&quot;% Pareto Frontier&quot;)
+    lines.append(&quot;\\begin{table}[htbp]&quot;)
+    lines.append(&quot;\\centering&quot;)
+    lines.append(&quot;\\caption{Pareto-optimal configurations}&quot;)
+    lines.append(&quot;\\label{tab:pareto}&quot;)
+    lines.append(&quot;\\begin{tabular}{clr}&quot;)
+    lines.append(&quot;\\toprule&quot;)
+    lines.append(&quot;$k$ &amp; Dimensions &amp; MAE \\\\&quot;)
+    lines.append(&quot;\\midrule&quot;)
+    for pr in report.pareto_results:
+        names = &quot;, &quot;.join(pr.dim_names)
+        lines.append(f&quot;{pr.n_dims} &amp; {names} &amp; {pr.mae:.4f} \\\\&quot;)
+    lines.append(&quot;\\bottomrule&quot;)
+    lines.append(&quot;\\end{tabular}&quot;)
+    lines.append(&quot;\\end{table}&quot;)
+    ...
+</code></pre>
+<p>The function generates three tables: Pareto-optimal configurations, sensitivity ranking (with delta-MAE, MAE-with, and MAE-without columns), and MRI statistics. Each table uses <code>booktabs</code> rules (<code>\toprule</code>, <code>\midrule</code>, <code>\bottomrule</code>) and includes <code>\label</code> commands for cross-referencing. The tables are designed to be dropped directly into a LaTeX manuscript with no manual formatting.</p>
+<p>The separation between data (the <code>StructuralFuzzReport</code> dataclass) and presentation (the <code>format_report</code> and <code>format_latex_tables</code> functions) is deliberate. A practitioner who needs a different output format&mdash;HTML, Jupyter notebook cells, a Slack message&mdash;can write a new formatter that consumes the same <code>StructuralFuzzReport</code> object without modifying the pipeline itself.</p>
+<hr />
+<h2 id="165-designing-evaluation-functions">16.5 Designing Evaluation Functions</h2>
+<h3 id="1651-the-contract">16.5.1 The Contract</h3>
+<p>The evaluation function is the bridge between the domain-agnostic pipeline and the domain-specific model. Its contract is simple but demands care:</p>
+<pre><code class="language-python">def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+</code></pre>
+<p><strong>Input:</strong> <code>params</code> is a 1D NumPy array of length $n$ (one entry per dimension). Each entry is either a positive real number (the parameter value for that dimension) or the inactive sentinel value (default $10^6$), indicating that the dimension should be excluded from the model.</p>
+<p><strong>Output:</strong> A tuple of <code>(mae, errors)</code> where <code>mae</code> is a non-negative float (mean absolute error across all target metrics) and <code>errors</code> is a dictionary mapping metric names to signed error values (predicted minus target).</p>
+<p>Three properties are essential for correct pipeline behavior:</p>
+<ol>
+<li><strong>Determinism.</strong> Given the same <code>params</code>, the function must return the same <code>(mae, errors)</code>. Stochastic models should fix their random seed internally.</li>
+<li><strong>Inactive handling.</strong> When <code>params[i] &gt;= inactive_value</code>, the evaluation must exclude dimension $i$ entirely&mdash;not merely set its weight to zero.</li>
+<li><strong>Graceful degradation.</strong> When all dimensions are inactive (every entry is the sentinel), the function should return large errors rather than raising an exception.</li>
+</ol>
+<h3 id="1652-the-defect-prediction-pattern">16.5.2 The Defect Prediction Pattern</h3>
+<p>The defect prediction example in <code>examples/defect_prediction/model.py</code> illustrates the standard pattern. The <code>make_evaluate_fn</code> factory generates a closure that captures the training data and returns a function with the correct signature:</p>
+<pre><code class="language-python">def make_evaluate_fn(
+    n_samples: int = 1000,
+    test_fraction: float = 0.3,
+    seed: int = 42,
+) -&gt; Callable[[np.ndarray], tuple[float, dict[str, float]]]:
+    X, y = generate_defect_data(n_samples=n_samples, seed=seed)
+    # ... train/test split ...
+
+    def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+        # Select features from active groups
+        active_features: list[int] = []
+        for i, indices in enumerate(group_indices):
+            if params[i] &lt; 1000:
+                active_features.extend(indices)
+
+        if not active_features:
+            errors = {name: -val for name, val in target_values.items()}
+            mae = sum(abs(v) for v in errors.values()) / len(errors)
+            return mae, errors
+
+        X_tr = X_train[:, active_features]
+        X_te = X_test[:, active_features]
+
+        rf = RandomForestClassifier(n_estimators=50, random_state=42, n_jobs=1)
+        rf.fit(X_tr, y_train)
+        y_pred = rf.predict(X_te)
+        # ... compute metrics and errors ...
+        return mae, errors
+
+    return evaluate_fn
+</code></pre>
+<p>Several design choices are worth noting:</p>
+<p><strong>Feature groups, not individual features.</strong> The 16 raw features are organized into 5 groups (Size, Complexity, Halstead, OO, Process). Each dimension in the parameter vector controls an entire group. This is the dimension grouping pattern from Chapter 3: the pipeline operates on a manageable 5-dimensional space rather than a 16-dimensional one, with each dimension carrying semantic meaning.</p>
+<p><strong>Inactive threshold.</strong> The function checks <code>params[i] &lt; 1000</code> rather than comparing against the full sentinel value of $10^6$. This is a pragmatic choice: it ensures that any sufficiently large parameter value deactivates the group, avoiding floating-point comparison issues with the exact sentinel.</p>
+<p><strong>Fixed random state.</strong> The <code>RandomForestClassifier</code> uses <code>random_state=42</code>, ensuring deterministic predictions. Without this, repeated evaluations with the same parameters would return different MAE values, confusing the optimization stages.</p>
+<p><strong>Target-relative errors.</strong> Each metric is compared against an explicit target value (e.g., Accuracy target of 75.0). The error dictionary contains signed deviations: positive means the model exceeds the target, negative means it falls short. This convention allows the pipeline to track <em>which</em> targets are met and which are not, rather than collapsing everything into a single pass/fail judgment.</p>
+<h3 id="1653-the-geometric-economics-pattern">16.5.3 The Geometric Economics Pattern</h3>
+<p>The geometric economics example in <code>examples/geometric_economics/model.py</code> shows a different use of the same contract. Here, the parameters are not feature group selectors but variance weights in a Mahalanobis distance computation:</p>
+<pre><code class="language-python">def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    # Build sigma_inv from params: diag(1/params[i])
+    # Large params[i] -&gt; small weight -&gt; dimension less important
+    weights = np.where(params &lt; 1e5, 1.0 / np.maximum(params, 1e-6), 0.0)
+    sigma_inv_local = np.diag(weights)
+
+    errors: dict[str, float] = {}
+    for target in targets:
+        predicted = target.predict_fn(sigma_inv_local)
+        error = predicted - target.empirical
+        errors[target.name] = error
+
+    mae = sum(abs(v) for v in errors.values()) / len(errors)
+    return mae, errors
+</code></pre>
+<p>The parameter vector has nine entries (one per ethical-economic dimension: Consequences, Rights, Fairness, Autonomy, Trust, Social Impact, Virtue/Identity, Legitimacy, Epistemic). Each entry acts as the variance of its dimension in the Mahalanobis metric: a large value means that dimension contributes little to distance computations, effectively downweighting it. Setting a parameter to $10^5$ or above zeroes the corresponding weight, deactivating the dimension entirely.</p>
+<p>This design demonstrates the versatility of the evaluation function contract. The pipeline neither knows nor cares that the defect prediction example trains a classifier while the economics example tunes a distance metric. Both conform to the same signature, and both produce meaningful MAE and error dictionaries that the pipeline can optimize, perturb, and analyze.</p>
+<h3 id="1654-guidelines-for-custom-evaluation-functions">16.5.4 Guidelines for Custom Evaluation Functions</h3>
+<p>When writing a new evaluation function for a domain not covered by the existing examples, follow these guidelines:</p>
+<ol>
+<li>
+<p><strong>Precompute everything possible</strong> in the factory function (<code>make_evaluate_fn</code>). Data loading, preprocessing, and train/test splitting should happen once, not on every evaluation call. The evaluation function will be called thousands of times; a 10ms overhead per call compounds to minutes of wasted time.</p>
+</li>
+<li>
+<p><strong>Choose targets carefully.</strong> The <code>errors</code> dictionary drives the entire analysis. Each entry should correspond to a quantity that has a meaningful target value and a natural scale. Mixing a percentage (0&ndash;100) with a probability (0&ndash;1) in the same error dictionary will skew the MAE toward the larger-scale quantity.</p>
+</li>
+<li>
+<p><strong>Normalize scales.</strong> If different metrics have different natural units, consider normalizing errors as percentages of target: <code>error = (predicted - target) / target * 100</code>. This ensures that all entries in the error dictionary contribute equally to the aggregate MAE.</p>
+</li>
+<li>
+<p><strong>Document the inactive semantics.</strong> Different domains interpret &ldquo;inactive&rdquo; differently. For a feature-group model, inactive means &ldquo;exclude these features.&rdquo; For a Mahalanobis model, inactive means &ldquo;set this variance weight to zero.&rdquo; The pipeline does not enforce any particular interpretation; it only guarantees that inactive dimensions receive the sentinel value.</p>
+</li>
+<li>
+<p><strong>Return finite values.</strong> The pipeline&rsquo;s optimization stages use the MAE for comparison. If the evaluation function returns <code>inf</code> or <code>nan</code>, comparisons become unreliable. When a configuration is degenerate (e.g., all features excluded), return a large but finite MAE.</p>
+</li>
+</ol>
+<hr />
+<h2 id="166-pipeline-configuration-speed-vs-thoroughness">16.6 Pipeline Configuration: Speed vs. Thoroughness</h2>
+<h3 id="1661-the-cost-knobs">16.6.1 The Cost Knobs</h3>
+<p>Three parameters dominate the computation cost of a campaign:</p>
+<ul>
+<li><strong><code>max_subset_dims</code></strong>: Controls the combinatorial explosion. Reducing from 4 to 3 eliminates all 4-dimensional subsets.</li>
+<li><strong><code>n_random</code></strong>: Controls optimization quality for 3D+ subsets. Reducing from 5000 to 1000 makes each subset 5x faster at the cost of potentially missing the optimal parameter values.</li>
+<li><strong><code>n_mri_perturbations</code></strong>: Controls MRI statistical reliability. Reducing from 300 to 100 saves 200 evaluations but increases the variance of the P95 estimate.</li>
+</ul>
+<h3 id="1662-configuration-profiles">16.6.2 Configuration Profiles</h3>
+<p>For different stages of a project, different tradeoffs are appropriate:</p>
+<p><strong>Exploratory profile (fast).</strong> During initial model development, the goal is a quick scan of the dimension landscape. Use <code>max_subset_dims=2</code>, <code>n_random=1000</code>, <code>n_mri_perturbations=100</code>, and <code>run_baselines=False</code>. This explores only 1D and 2D subsets with light optimization, completing in minutes for most problems.</p>
+<pre><code class="language-python">report = sf.run_campaign(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=2,
+    n_random=1000,
+    n_mri_perturbations=100,
+    run_baselines=False,
+)
+</code></pre>
+<p><strong>Standard profile (balanced).</strong> For regular validation runs, the defaults are well-calibrated: <code>max_subset_dims=4</code>, <code>n_random=5000</code>, <code>n_mri_perturbations=300</code>. This explores up to 4D subsets with thorough optimization, completing in 1&ndash;4 hours for a 5&ndash;9 dimensional problem depending on evaluation cost.</p>
+<pre><code class="language-python">report = sf.run_campaign(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+)
+</code></pre>
+<p><strong>Publication profile (thorough).</strong> For final validation before publication, increase the sampling density: <code>max_subset_dims=5</code> (or the full dimension count), <code>n_random=20000</code>, <code>n_mri_perturbations=1000</code>, and <code>n_grid=50</code>. This provides high-confidence results at the cost of significantly longer runtime.</p>
+<pre><code class="language-python">report = sf.run_campaign(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=len(dim_names),
+    n_random=20000,
+    n_mri_perturbations=1000,
+    n_grid=50,
+)
+</code></pre>
+<h3 id="1663-scaling-with-dimensionality">16.6.3 Scaling with Dimensionality</h3>
+<p>The pipeline&rsquo;s cost scales differently in each stage:</p>
+<ul>
+<li>Subset enumeration scales combinatorially: $O\left(\sum_{k=1}^{K} \binom{n}{k}\right)$ subsets, each requiring $O(C(k))$ evaluations.</li>
+<li>Sensitivity profiling scales linearly: $O(n)$ ablation evaluations.</li>
+<li>MRI scales independently of dimensionality: $O(N_{\text{pert}})$ evaluations regardless of $n$.</li>
+<li>Adversarial search scales linearly: $O(n \log R)$ evaluations.</li>
+<li>Compositional testing scales quadratically in the worst case: $O(n^2 \cdot C(\cdot))$ evaluations.</li>
+</ul>
+<p>For problems with $n > 10$, subset enumeration up to $k = 4$ becomes expensive. Three mitigation strategies apply:</p>
+<ol>
+<li>
+<p><strong>Reduce <code>max_subset_dims</code>.</strong> Exploring only 1D and 2D subsets is often sufficient to identify the most important dimensions. Use the sensitivity profile to confirm the ranking.</p>
+</li>
+<li>
+<p><strong>Use forward selection as a proxy.</strong> Forward selection explores the same landscape as subset enumeration but follows a greedy path, evaluating $O(n \cdot K)$ subsets instead of $O(n^K)$. The <code>run_baselines=True</code> option provides this automatically.</p>
+</li>
+<li>
+<p><strong>Domain-informed pruning.</strong> If domain knowledge suggests that certain dimension combinations are irrelevant (e.g., OO metrics never matter without Size metrics), encode this as a custom enumeration rather than using the full exhaustive pipeline. The individual functions (<code>enumerate_subsets</code>, <code>pareto_frontier</code>, etc.) are available for composing custom pipelines.</p>
+</li>
+</ol>
+<hr />
+<h2 id="167-error-handling-and-partial-results">16.7 Error Handling and Partial Results</h2>
+<h3 id="1671-failures-within-the-evaluation-function">16.7.1 Failures Within the Evaluation Function</h3>
+<p>The most common failure mode is an exception inside the evaluation function. A degenerate parameter configuration might cause a singular matrix, a division by zero, or a model that fails to converge. The pipeline does not wrap evaluation calls in blanket try/except blocks&mdash;doing so would mask bugs in the evaluation function. Instead, the evaluation function itself should handle degenerate cases:</p>
+<pre><code class="language-python">def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    active_features = [i for i, p in enumerate(params) if p &lt; 1000]
+
+    if not active_features:
+        # Degenerate: no features selected
+        errors = {name: -val for name, val in target_values.items()}
+        mae = sum(abs(v) for v in errors.values()) / len(errors)
+        return mae, errors
+
+    # Normal evaluation path
+    ...
+</code></pre>
+<p>The key principle is that every possible parameter vector&mdash;including all-inactive, all-extreme, and mixed configurations&mdash;should produce a valid <code>(mae, errors)</code> tuple. This is a stronger requirement than typical function contracts, but it is necessary because the pipeline will exercise the entire parameter space, including corners that normal usage would never reach.</p>
+<h3 id="1672-failures-between-pipeline-stages">16.7.2 Failures Between Pipeline Stages</h3>
+<p>If a pipeline stage fails (e.g., the adversarial search raises an unhandled exception), the entire <code>run_campaign</code> call fails. This is deliberate: the pipeline makes no attempt at partial recovery because the data dependencies between stages make it difficult to reason about which downstream results are still valid.</p>
+<p>For long-running campaigns where partial results are valuable, two approaches are available:</p>
+<p><strong>Manual staging.</strong> Call the individual functions directly, saving intermediate results:</p>
+<pre><code class="language-python">import structural_fuzzing as sf
+
+# Stage 1
+subset_results = sf.enumerate_subsets(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+    max_dims=4,
+)
+
+# Save intermediate result
+import pickle
+with open(&quot;subsets.pkl&quot;, &quot;wb&quot;) as f:
+    pickle.dump(subset_results, f)
+
+# Stage 2
+pareto_results = sf.pareto_frontier(subset_results)
+
+# Stage 3
+best_params = subset_results[0].param_values
+sensitivity_results = sf.sensitivity_profile(
+    params=best_params,
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+)
+
+# Continue with remaining stages...
+</code></pre>
+<p>This approach gives full control over checkpointing and error recovery at the cost of more code.</p>
+<p><strong>Defensive evaluation functions.</strong> Wrap the evaluation function to catch and convert exceptions:</p>
+<pre><code class="language-python">def safe_evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    try:
+        return original_evaluate_fn(params)
+    except Exception:
+        # Return large errors for degenerate configurations
+        return 999.0, {&quot;error&quot;: -999.0}
+</code></pre>
+<p>This keeps the pipeline running but may produce misleading results if exceptions occur frequently. Use with caution and always inspect the error dictionary for sentinel values in the report.</p>
+<h3 id="1673-interpreting-the-mri-under-partial-information">16.7.3 Interpreting the MRI Under Partial Information</h3>
+<p>The MRI is sensitive to the perturbation distribution. If the evaluation function returns unreliable values for certain parameter regions (e.g., near the inactive threshold), the MRI may over-estimate or under-estimate tail risk. Chapter 9 discusses this issue in detail; here the practical advice is: examine the MRI&rsquo;s <code>worst_case_mae</code> field. If it is unreasonably large (orders of magnitude above the baseline MAE), one or more perturbation samples likely hit a degenerate configuration, and the MRI should be recomputed with a smaller <code>mri_scale</code>.</p>
+<hr />
+<h2 id="168-end-to-end-examples">16.8 End-to-End Examples</h2>
+<h3 id="1681-defect-prediction-campaign">16.8.1 Defect Prediction Campaign</h3>
+<p>The defect prediction example demonstrates a complete pipeline run from data generation through report output:</p>
+<pre><code class="language-python">import structural_fuzzing as sf
+from examples.defect_prediction.model import GROUP_NAMES, make_evaluate_fn
+
+# Create evaluation function
+evaluate_fn = make_evaluate_fn(n_samples=1000, seed=42)
+
+# Run full campaign
+report = sf.run_campaign(
+    dim_names=GROUP_NAMES,  # [&quot;Size&quot;, &quot;Complexity&quot;, &quot;Halstead&quot;, &quot;OO&quot;, &quot;Process&quot;]
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=4,
+    n_mri_perturbations=300,
+    verbose=True,
+)
+
+# Print text report
+print(report.summary())
+
+# Generate LaTeX tables for publication
+from structural_fuzzing.report import format_latex_tables
+latex = format_latex_tables(report)
+with open(&quot;defect_tables.tex&quot;, &quot;w&quot;) as f:
+    f.write(latex)
+</code></pre>
+<p>The campaign explores all subsets of up to 4 dimensions from the 5 available (31 subsets total), identifies the Pareto frontier, profiles the sensitivity of each dimension, computes the MRI of the best configuration, searches for adversarial thresholds in each dimension, and tests the greedy dimension-addition order. The output captures everything needed for a validation report: which feature groups matter, how robust the model is, and where its tipping points lie.</p>
+<h3 id="1682-geometric-economics-campaign">16.8.2 Geometric Economics Campaign</h3>
+<p>The economics example operates on a higher-dimensional space (9 dimensions) and uses the evaluation function to tune Mahalanobis distance weights rather than feature-group selections:</p>
+<pre><code class="language-python">import structural_fuzzing as sf
+from examples.geometric_economics.model import DIM_NAMES, make_evaluate_fn
+
+evaluate_fn = make_evaluate_fn()
+
+# Use exploratory profile for 9D space
+report = sf.run_campaign(
+    dim_names=DIM_NAMES,
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=3,       # 9D: limit combinatorial explosion
+    n_random=2000,           # Lighter optimization
+    n_mri_perturbations=200,
+    run_baselines=False,     # Skip baselines for speed
+    verbose=True,
+)
+
+# Examine which ethical dimensions matter most
+print(&quot;\nDimension importance:&quot;)
+for sr in report.sensitivity_results:
+    print(f&quot;  {sr.importance_rank}. {sr.dim_name}: delta={sr.delta_mae:+.4f}&quot;)
+
+# Check for tipping points
+for adv in report.adversarial_results:
+    print(
+        f&quot;  Tipping point in {adv.dim_name}: &quot;
+        f&quot;ratio={adv.threshold_ratio:.2f}x ({adv.direction})&quot;
+    )
+</code></pre>
+<p>The reduced <code>max_subset_dims</code> is critical here: with 9 dimensions, exhaustive enumeration up to size 4 would require $\binom{9}{4} = 126$ four-dimensional subsets, each optimized with 2000 random samples. Limiting to 3D subsets keeps the campaign tractable while still revealing the most important dimension interactions.</p>
+<h3 id="1683-custom-pipeline-with-selective-stages">16.8.3 Custom Pipeline with Selective Stages</h3>
+<p>For situations where the full pipeline is unnecessary or too slow, the public API (Chapter 3 introduced the module structure; the <code>__init__.py</code> exposes all components) supports composing a custom analysis:</p>
+<pre><code class="language-python">import numpy as np
+import structural_fuzzing as sf
+
+dim_names = [&quot;Alpha&quot;, &quot;Beta&quot;, &quot;Gamma&quot;, &quot;Delta&quot;]
+
+def evaluate_fn(params: np.ndarray) -&gt; tuple[float, dict[str, float]]:
+    # Custom model evaluation
+    ...
+    return mae, errors
+
+# Run only subset enumeration and Pareto analysis
+subset_results = sf.enumerate_subsets(
+    dim_names=dim_names,
+    evaluate_fn=evaluate_fn,
+    max_dims=3,
+)
+pareto_results = sf.pareto_frontier(subset_results)
+
+# Run MRI on each Pareto-optimal configuration
+for pr in pareto_results:
+    mri = sf.compute_mri(
+        params=pr.param_values,
+        evaluate_fn=evaluate_fn,
+        n_perturbations=500,
+    )
+    print(f&quot;  k={pr.n_dims} [{', '.join(pr.dim_names)}]: &quot;
+          f&quot;MAE={pr.mae:.4f}, MRI={mri.mri:.4f}&quot;)
+</code></pre>
+<p>This pattern&mdash;enumerate, filter, then probe each survivor&mdash;is more informative than the default pipeline&rsquo;s approach of computing the MRI only for the single best configuration. The tradeoff is that computing the MRI for every Pareto-optimal point multiplies the MRI cost by the size of the Pareto frontier.</p>
+<hr />
+<h2 id="169-the-pipeline-as-a-geometric-object">16.9 The Pipeline as a Geometric Object</h2>
+<h3 id="1691-state-space-of-the-pipeline-itself">16.9.1 State Space of the Pipeline Itself</h3>
+<p>The pipeline has its own configuration space: the vector of all its parameters (<code>max_subset_dims</code>, <code>n_random</code>, <code>n_mri_perturbations</code>, <code>mri_scale</code>, <code>mri_weights</code>, <code>adversarial_tolerance</code>, <code>n_grid</code>). This meta-configuration lives in a space of its own, and the same geometric reasoning that the pipeline applies to models can be applied to the pipeline itself.</p>
+<p>For instance: how sensitive is the pipeline&rsquo;s output to <code>n_random</code>? If increasing <code>n_random</code> from 3000 to 7000 changes the best configuration found, the pipeline was under-sampling at 3000 and the results at that setting are unreliable. If the results are stable, the extra samples are wasted computation. Running the pipeline twice with different <code>n_random</code> values and comparing the Pareto frontiers is a simple convergence check&mdash;and it is, itself, a sensitivity analysis.</p>
+<h3 id="1692-reproducibility">16.9.2 Reproducibility</h3>
+<p>The pipeline does not set global random seeds. The evaluation function is responsible for its own determinism (as discussed in Section 16.5.1), and the pipeline&rsquo;s internal stages use deterministic algorithms where possible. Subset enumeration is exhaustive (no randomness). Pareto extraction is a deterministic filter. Sensitivity profiling evaluates fixed parameter configurations. Only the MRI stage introduces randomness (random perturbation sampling), and its random seed can be controlled through the evaluation function&rsquo;s internal state.</p>
+<p>For bit-reproducible results across runs, ensure that:</p>
+<ol>
+<li>The evaluation function uses a fixed random seed.</li>
+<li>The underlying model (e.g., <code>RandomForestClassifier(random_state=42)</code>) uses a fixed random seed.</li>
+<li>The NumPy random generator used for MRI perturbations is seeded consistently.</li>
+</ol>
+<h3 id="1693-composition-with-external-tools">16.9.3 Composition with External Tools</h3>
+<p>The pipeline produces structured data; what happens to that data next is outside the pipeline&rsquo;s scope but worth considering as a design question. Common downstream integrations include:</p>
+<ul>
+<li>
+<p><strong>Visualization.</strong> Plotting the Pareto frontier (MAE vs. number of dimensions), the sensitivity bar chart, and the MRI perturbation distribution. The <code>StructuralFuzzReport</code> contains all the data needed for these plots; the pipeline does not generate them because plotting libraries are a matter of preference.</p>
+</li>
+<li>
+<p><strong>Regression testing.</strong> Storing the <code>StructuralFuzzReport</code> from each campaign and comparing it against previous runs to detect changes in the Pareto frontier, shifts in the sensitivity ranking, or deterioration of the MRI.</p>
+</li>
+<li>
+<p><strong>Hyperparameter optimization.</strong> Using the pipeline&rsquo;s output as the objective for a higher-level optimizer that searches over model hyperparameters or data preprocessing choices.</p>
+</li>
+</ul>
+<p>Each of these integrations treats the pipeline&rsquo;s output as a first-class object rather than a log file to be parsed&mdash;the benefit of structured output over printf-style reporting.</p>
+<hr />
+<h2 id="1610-looking-ahead">16.10 Looking Ahead</h2>
+<p>This chapter has treated the pipeline as a sequential, single-machine process. For the problems considered in this book&mdash;5 to 15 dimensions, evaluation functions that run in milliseconds to seconds&mdash;this is sufficient. But two pressures push toward more sophisticated execution models.</p>
+<p>First, <strong>scaling to higher dimensions</strong> (Chapter 17) introduces evaluation budgets that exceed what sequential execution can deliver in reasonable time. Distributing subset evaluations across multiple cores or machines, caching evaluation results to avoid redundant computation, and using surrogate models to approximate expensive evaluations are all extensions that preserve the pipeline&rsquo;s logical structure while changing its execution strategy.</p>
+<p>Second, <strong>deploying geometric validation in production</strong> (Chapter 18) requires integrating the pipeline into continuous integration systems, monitoring dashboards, and alerting infrastructure. The pipeline&rsquo;s structured output&mdash;the <code>StructuralFuzzReport</code>&mdash;provides the foundation for these integrations, but the operational concerns (scheduling, retry policies, result storage, alert thresholds) are distinct from the analytical concerns developed in this chapter.</p>
+<p>Chapter 17 takes up the scaling challenge, developing methods for efficient exploration of high-dimensional spaces where exhaustive enumeration is infeasible and the geometric tools from Parts II and III must be adapted to operate under strict computational budgets.</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>The geometric pipeline composes six analysis stages&mdash;subset enumeration, Pareto frontier extraction, sensitivity profiling, MRI computation, adversarial threshold search, and compositional testing&mdash;into a single <code>run_campaign</code> call. The pipeline&rsquo;s power comes from three design choices:</p>
+<ol>
+<li>
+<p><strong>A unified evaluation contract.</strong> The <code>evaluate_fn</code> callback decouples the domain-specific model from the domain-agnostic analysis, enabling the same pipeline to validate a random forest classifier and a game-theoretic distance metric.</p>
+</li>
+<li>
+<p><strong>Structured output.</strong> The <code>StructuralFuzzReport</code> dataclass captures all results in a typed, navigable object that supports programmatic analysis, text reporting, and LaTeX table generation without loss of information.</p>
+</li>
+<li>
+<p><strong>Configurable thoroughness.</strong> The pipeline&rsquo;s parameters (<code>max_subset_dims</code>, <code>n_random</code>, <code>n_mri_perturbations</code>) provide explicit control over the tradeoff between computation time and result quality, enabling exploratory runs during development and publication-quality analyses for final validation.</p>
+</li>
+</ol>
+<p>The pipeline is not the final word on geometric validation&mdash;it is a starting point. The individual components are independently usable, the report format is extensible, and the evaluation function contract is simple enough to implement for any parameterized model. What the pipeline provides is a disciplined default: a sequence of analyses that, taken together, reveal the multi-dimensional structure that scalar metrics systematically hide.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-15-cholesky-parameterization.html" class="nav-prev">&larr; Chapter 15: Cholesky Parameterization for Positive-Definiteness</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-17-scaling.html" class="nav-next">Chapter 17: Scaling to High-Dimensional Spaces &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

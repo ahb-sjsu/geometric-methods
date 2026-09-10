@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 14: Gradient Reversal and Invariance Training &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 14: Gradient Reversal and Invariance Training from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-14-gradient-reversal">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 14: Gradient Reversal and Invariance Training</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-13-group-theoretic-augmentation.html" class="nav-prev">&larr; Chapter 13: Group-Theoretic Data Augmentation</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-15-cholesky-parameterization.html" class="nav-next">Chapter 15: Cholesky Parameterization for Positive-Definiteness &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-14-gradient-reversal-and-invariance-training">Chapter 14: Gradient Reversal and Invariance Training</h1>
+<blockquote>
+<p><em>&ldquo;The encoder that remembers everything is the encoder that has learned nothing.&rdquo;</em>
+&mdash; Paraphrase of a principle from domain adaptation theory</p>
+</blockquote>
+<p>Chapter 9 introduced adversarial robustness testing: probing a model&rsquo;s behavior under perturbation to discover where and how it breaks. That methodology is <em>diagnostic</em>&mdash;it measures fragility after the fact. This chapter introduces a complementary technique that is <em>prescriptive</em>: gradient reversal training, which forces an encoder to become invariant to specified nuisance variables during training itself. Where Chapter 9 asks &ldquo;does the model break when we push it?&rdquo;, this chapter asks &ldquo;can we build a model that <em>cannot</em> encode information we do not want it to have?&rdquo;</p>
+<p>The motivation is immediate and practical. An encoder trained to classify sperm whale coda types from spectrograms will, left to its own devices, happily memorize the recording conditions&mdash;hydrophone frequency response, ambient noise spectrum, ocean reverberation profile&mdash;alongside the biological signal. It achieves excellent accuracy on the training set because the recording conditions are correlated with the deployment location, and the deployment location is correlated with the whale clan. The encoder has learned a shortcut: predict the clan, then predict the coda type. On a new hydrophone, deployed in a new ocean basin, this encoder fails catastrophically, because the shortcut no longer holds.</p>
+<p>This is not a pathology specific to cetacean bioacoustics. It is the central problem of <strong>domain adaptation</strong>, and it arises whenever surface features are correlated with target labels in the training data but not in the deployment environment. The gradient reversal layer, introduced by Ganin and Lempitsky (2015) and developed further by Ganin et al. (2016), provides an elegant solution: attach an adversarial classifier to the encoder&rsquo;s latent representation, train it to predict the nuisance variable (recording conditions, domain identity, speaker identity), and then <em>reverse the gradient</em> flowing back through the encoder, so that the encoder is trained to make the adversarial classifier&rsquo;s job <em>impossible</em>. The result is a representation that is invariant to the nuisance variable by construction.</p>
+<p>We begin with a precise statement of the invariance problem (Section 14.1), develop the gradient reversal layer and its training procedure (Section 14.2), give the geometric interpretation as projection onto the orthogonal complement of a nuisance subspace (Section 14.3), implement the full system in PyTorch (Section 14.4), apply it to cetacean bioacoustics (Section 14.5), connect to the adversarial robustness framework of Chapter 9 (Section 14.6), and close with forward connections to the Cholesky parameterization methods of Chapter 15.</p>
+<hr />
+<h2 id="141-the-invariance-problem">14.1 The Invariance Problem</h2>
+<h3 id="1411-encoders-that-memorize-surface-features">14.1.1 Encoders That Memorize Surface Features</h3>
+<p>Consider an encoder $f_\theta : \mathcal{X} \to \mathcal{Z}$ that maps raw inputs (spectrograms, images, text) to a latent representation $\mathbf{z} = f_\theta(\mathbf{x}) \in \mathbb{R}^d$. A task classifier $g_\phi : \mathcal{Z} \to \mathcal{Y}$ then maps the representation to predictions. The standard training objective minimizes the task loss:</p>
+<p>$$\mathcal{L}_{\text{task}}(\theta, \phi) = \mathbb{E}_{(\mathbf{x}, y) \sim \mathcal{D}}\left[\ell\big(g_\phi(f_\theta(\mathbf{x})), y\big)\right]$$</p>
+<p>This objective says nothing about <em>what</em> the encoder should learn. It only demands that the composition $g_\phi \circ f_\theta$ produce correct predictions. The encoder is free to use any feature of the input that is predictive of the label&mdash;including features that are predictive only because of spurious correlations in the training data.</p>
+<p>Formally, let $s \in \mathcal{S}$ be a <strong>nuisance variable</strong>&mdash;an attribute of the input that we do not want the encoder to depend on. In bioacoustics, $s$ might be the recording device, the ocean basin, or the time of year. In medical imaging, $s$ might be the scanner model or the hospital. In NLP, $s$ might be the author&rsquo;s dialect or the document&rsquo;s formatting.</p>
+<p>The standard training objective places no constraint on the mutual information $I(\mathbf{z}; s)$ between the latent representation and the nuisance variable. If $s$ is correlated with $y$ in the training data, gradient descent will cheerfully exploit that correlation, producing an encoder for which $I(\mathbf{z}; s)$ is high. The encoder has memorized the surface features.</p>
+<h3 id="1412-the-domain-shift-failure-mode">14.1.2 The Domain Shift Failure Mode</h3>
+<p>The consequence of high $I(\mathbf{z}; s)$ is predictable: when the correlation between $s$ and $y$ breaks down&mdash;because the model is deployed on a new domain, a new device, or a new population&mdash;the encoder&rsquo;s predictions degrade. This is <strong>domain shift</strong>, and it is one of the most common failure modes in applied machine learning.</p>
+<p>The structural fuzzing framework of Chapter 9 can <em>detect</em> this failure mode after training. The Decoder Robustness Index (DRI), adapted from the Bond Index, applies parametric acoustic transforms at varying intensities and measures how the decoder&rsquo;s output changes:</p>
+<pre><code class="language-python"># From eris_ketos.decoder_robustness — diagnosis after the fact
+dri = DecoderRobustnessIndex(transforms)
+result = dri.measure(decoder, signals, labels, sr=32000)
+# result.per_transform reveals which transforms cause the most drift
+</code></pre>
+<p>The DRI tells you <em>that</em> the model is sensitive to recording conditions. Gradient reversal tells the model <em>not to be</em>.</p>
+<h3 id="1413-the-invariance-objective">14.1.3 The Invariance Objective</h3>
+<p>The goal is to learn a representation $\mathbf{z} = f_\theta(\mathbf{x})$ such that:</p>
+<ol>
+<li><strong>Task performance</strong>: $\mathbf{z}$ is highly predictive of the target label $y$.</li>
+<li><strong>Nuisance invariance</strong>: $\mathbf{z}$ is <em>not</em> predictive of the nuisance variable $s$.</li>
+</ol>
+<p>In information-theoretic terms, we want to maximize $I(\mathbf{z}; y)$ while minimizing $I(\mathbf{z}; s)$. These objectives are in tension whenever $y$ and $s$ are correlated. The gradient reversal layer resolves this tension through adversarial training.</p>
+<hr />
+<h2 id="142-the-gradient-reversal-layer">14.2 The Gradient Reversal Layer</h2>
+<h3 id="1421-architecture">14.2.1 Architecture</h3>
+<p>The domain-adversarial neural network (DANN) architecture, introduced by Ganin et al. (2016), augments the standard encoder-classifier pair with a <strong>domain discriminator</strong> $h_\psi : \mathcal{Z} \to \mathcal{S}$ that attempts to predict the nuisance variable from the latent representation:</p>
+<pre><code>                          ┌──────────────┐
+                          │ Task Head    │
+                   ┌─────&gt;│ g_φ(z) → y   │
+                   │      └──────────────┘
+┌──────────┐      │
+│ Encoder  │──z──&gt;│
+│ f_θ(x)   │      │      ┌──────────────┐
+└──────────┘      │  GRL  │ Domain Head  │
+                   └──×──&gt;│ h_ψ(z) → s   │
+                          └──────────────┘
+</code></pre>
+<p>The key innovation is the <strong>gradient reversal layer (GRL)</strong>, denoted by the $\times$ symbol in the diagram. During the forward pass, the GRL is the identity function: it passes $\mathbf{z}$ through unchanged. During the backward pass, it <em>negates</em> the gradient:</p>
+<p>$$\text{GRL}(\mathbf{z}) = \mathbf{z} \quad \text{(forward)}$$
+$$\frac{\partial \text{GRL}}{\partial \mathbf{z}} = -\lambda \mathbf{I} \quad \text{(backward)}$$</p>
+<p>where $\lambda > 0$ is a scaling factor that controls the strength of the adversarial signal.</p>
+<h3 id="1422-the-combined-loss">14.2.2 The Combined Loss</h3>
+<p>The full training objective is:</p>
+<p>$$\mathcal{L}(\theta, \phi, \psi) = \mathcal{L}_{\text{task}}(\theta, \phi) - \lambda \, \mathcal{L}_{\text{domain}}(\theta, \psi)$$</p>
+<p>where:
+- $\mathcal{L}_{\text{task}}$ is the standard task loss (e.g., cross-entropy for classification).
+- $\mathcal{L}_{\text{domain}}$ is the domain discriminator&rsquo;s loss (also typically cross-entropy).
+- $\lambda$ controls the tradeoff between task performance and domain invariance.</p>
+<p>The sign convention is critical. The domain discriminator parameters $\psi$ are trained to <em>minimize</em> $\mathcal{L}_{\text{domain}}$&mdash;the discriminator gets better at predicting the nuisance variable. But the encoder parameters $\theta$ receive the <em>negated</em> gradient from $\mathcal{L}_{\text{domain}}$, so they are trained to <em>maximize</em> it&mdash;the encoder gets better at fooling the discriminator.</p>
+<p>This is a minimax game:</p>
+<p>$$\min_{\theta, \phi} \max_\psi \; \mathcal{L}_{\text{task}}(\theta, \phi) - \lambda \, \mathcal{L}_{\text{domain}}(\theta, \psi)$$</p>
+<p>At equilibrium, the domain discriminator performs at chance level: the latent representation contains no information about the nuisance variable, so no classifier can predict it above baseline.</p>
+<h3 id="1423-why-not-just-remove-the-nuisance-variable">14.2.3 Why Not Just Remove the Nuisance Variable?</h3>
+<p>A natural question: why not simply remove the nuisance variable from the input? If recording conditions are the problem, preprocess the audio to normalize them.</p>
+<p>The answer is that nuisance variables are rarely cleanly separable from the signal of interest. A hydrophone&rsquo;s frequency response shapes the spectrogram globally&mdash;it is not a feature you can mask out. Ocean reverberation creates echoes that overlap with the biological signal. Ambient noise occupies the same frequency bands as whale clicks. The nuisance and the signal are <em>entangled</em> in the input, and no preprocessing step can disentangle them without also removing biological information.</p>
+<p>Gradient reversal operates at the representation level, where the entanglement has been partially resolved by the encoder&rsquo;s learned features. The adversarial training forces the encoder to resolve the entanglement <em>further</em>, retaining the biological information while discarding the recording-condition information. This is a strictly more powerful approach than input-level preprocessing, because the encoder can learn nonlinear disentanglements that no fixed preprocessing pipeline can express.</p>
+<hr />
+<h2 id="143-the-geometric-interpretation">14.3 The Geometric Interpretation</h2>
+<h3 id="1431-the-latent-space-as-a-vector-space">14.3.1 The Latent Space as a Vector Space</h3>
+<p>The latent representation $\mathbf{z} \in \mathbb{R}^d$ lives in a $d$-dimensional vector space. Within this space, we can identify two subspaces:</p>
+<ul>
+<li><strong>The task subspace</strong> $\mathcal{V}_{\text{task}} \subseteq \mathbb{R}^d$: the directions along which $\mathbf{z}$ varies in ways that are predictive of $y$.</li>
+<li><strong>The nuisance subspace</strong> $\mathcal{V}_{\text{nuis}} \subseteq \mathbb{R}^d$: the directions along which $\mathbf{z}$ varies in ways that are predictive of $s$.</li>
+</ul>
+<p>If these subspaces are orthogonal ($\mathcal{V}_{\text{task}} \perp \mathcal{V}_{\text{nuis}}$), the invariance problem is trivial: project onto $\mathcal{V}_{\text{task}}$ and discard $\mathcal{V}_{\text{nuis}}$. The difficulty arises when the subspaces overlap&mdash;when some directions in $\mathbb{R}^d$ are simultaneously predictive of both $y$ and $s$. This overlap is precisely the &ldquo;entanglement&rdquo; described in Section 14.2.3.</p>
+<h3 id="1432-gradient-reversal-as-orthogonal-projection">14.3.2 Gradient Reversal as Orthogonal Projection</h3>
+<p>The geometric insight behind gradient reversal is this: the reversed gradient pushes the encoder to produce representations that lie in the <strong>orthogonal complement</strong> of the nuisance subspace.</p>
+<p>Consider the gradient of the domain loss with respect to the encoder&rsquo;s output:</p>
+<p>$$\mathbf{g}_{\text{domain}} = \nabla_{\mathbf{z}} \mathcal{L}_{\text{domain}}$$</p>
+<p>This gradient points in the direction that would make $\mathbf{z}$ <em>more</em> predictive of the nuisance variable $s$. It lies in (or near) $\mathcal{V}_{\text{nuis}}$. The gradient reversal layer negates this:</p>
+<p>$$\mathbf{g}_{\text{reversed}} = -\lambda \, \nabla_{\mathbf{z}} \mathcal{L}_{\text{domain}}$$</p>
+<p>The encoder thus receives a combined gradient signal:</p>
+<p>$$\mathbf{g}_{\text{total}} = \nabla_{\mathbf{z}} \mathcal{L}_{\text{task}} - \lambda \, \nabla_{\mathbf{z}} \mathcal{L}_{\text{domain}}$$</p>
+<p>The first term pulls the representation toward $\mathcal{V}_{\text{task}}$. The second term pushes it away from $\mathcal{V}_{\text{nuis}}$. At convergence, the representation has been projected onto $\mathcal{V}_{\text{task}} \cap \mathcal{V}_{\text{nuis}}^\perp$&mdash;the subspace that is predictive of the task but orthogonal to the nuisance directions.</p>
+<h3 id="1433-connection-to-spd-manifolds">14.3.3 Connection to SPD Manifolds</h3>
+<p>When the features of interest are covariance matrices&mdash;as they are for the SPD spectral analysis of Chapter 4&mdash;the geometry becomes Riemannian rather than Euclidean. Recall from Chapter 4 that frequency-band covariance matrices live on the SPD manifold $\text{SPD}(n)$, with the log-Euclidean metric:</p>
+<p>$$d_{\text{LE}}(\Sigma_1, \Sigma_2) = \|\log(\Sigma_1) - \log(\Sigma_2)\|_F$$</p>
+<p>In this setting, the gradient reversal layer operates on the tangent space of the SPD manifold at the current covariance estimate. The log-Euclidean map sends SPD matrices to symmetric matrices (the tangent space), where the orthogonal complement construction applies directly. The encoder is trained to produce covariance features whose tangent-space coordinates are orthogonal to the nuisance directions.</p>
+<p>Concretely, the <code>SPDManifold.log_map</code> from <code>eris_ketos.spd_spectral</code> maps the covariance matrix to tangent space, the gradient reversal operates in that tangent space, and <code>SPDManifold.exp_map</code> maps back:</p>
+<pre><code class="language-python">from eris_ketos.spd_spectral import SPDManifold
+
+# In tangent space, standard linear operations apply
+log_cov = SPDManifold.log_map(cov_matrix)   # SPD -&gt; symmetric
+# ... gradient reversal operates here, in tangent space ...
+cov_invariant = SPDManifold.exp_map(log_cov) # symmetric -&gt; SPD
+</code></pre>
+<p>This connection is not incidental. The reason gradient reversal generalizes cleanly to non-Euclidean settings is precisely that it operates on gradients&mdash;tangent vectors&mdash;and tangent spaces are always (locally) Euclidean, regardless of the curvature of the ambient manifold.</p>
+<h3 id="1434-the-rank-of-the-nuisance-subspace">14.3.4 The Rank of the Nuisance Subspace</h3>
+<p>An important practical question is: how many dimensions does the nuisance subspace occupy? If the nuisance variable $s$ is low-dimensional (e.g., a binary domain label), the nuisance subspace $\mathcal{V}_{\text{nuis}}$ is typically low-rank, and gradient reversal can eliminate it without significantly reducing the encoder&rsquo;s capacity for the task.</p>
+<p>But if the nuisance variable is high-dimensional (e.g., a full characterization of recording conditions including hydrophone response, noise spectrum, reverberation profile, and depth), $\mathcal{V}_{\text{nuis}}$ may span many directions in $\mathbb{R}^d$, and the orthogonal complement $\mathcal{V}_{\text{nuis}}^\perp$ may have insufficient capacity for the task. In this case, the $\lambda$ parameter mediates a genuine tradeoff: higher $\lambda$ forces stronger invariance at the cost of task performance.</p>
+<p>The structural fuzzing framework provides a direct way to diagnose this tradeoff. After training with gradient reversal, apply the DRI from Chapter 9 to measure residual sensitivity to each nuisance dimension. If the DRI for a particular transform (e.g., <code>amplitude_scale</code> or <code>additive_noise</code>) remains high despite gradient reversal training, the corresponding nuisance direction is entangled with the task subspace in a way that gradient reversal alone cannot resolve.</p>
+<hr />
+<h2 id="144-implementation">14.4 Implementation</h2>
+<h3 id="1441-the-gradient-reversal-layer-in-pytorch">14.4.1 The Gradient Reversal Layer in PyTorch</h3>
+<p>The gradient reversal layer is remarkably simple to implement. The key mechanism is PyTorch&rsquo;s <code>autograd.Function</code>, which allows custom forward and backward behavior:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torch.autograd import Function
+
+
+class GradientReversalFn(Function):
+    &quot;&quot;&quot;Reverses gradients during backpropagation.
+
+    Forward pass: identity.
+    Backward pass: negate and scale by lambda.
+    &quot;&quot;&quot;
+
+    @staticmethod
+    def forward(ctx, x: torch.Tensor, lambda_: float) -&gt; torch.Tensor:
+        ctx.lambda_ = lambda_
+        return x.clone()
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        return -ctx.lambda_ * grad_output, None
+
+
+class GradientReversalLayer(nn.Module):
+    &quot;&quot;&quot;Module wrapper for gradient reversal.
+
+    Args:
+        lambda_: Scaling factor for reversed gradients.
+                 Higher values enforce stronger invariance.
+    &quot;&quot;&quot;
+
+    def __init__(self, lambda_: float = 1.0) -&gt; None:
+        super().__init__()
+        self.lambda_ = lambda_
+
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        return GradientReversalFn.apply(x, self.lambda_)
+
+    def set_lambda(self, lambda_: float) -&gt; None:
+        &quot;&quot;&quot;Update lambda (e.g., on a schedule during training).&quot;&quot;&quot;
+        self.lambda_ = lambda_
+</code></pre>
+<p>The implementation is five lines of computational logic wrapped in PyTorch&rsquo;s autograd machinery. The <code>forward</code> method is the identity (with a <code>clone()</code> to ensure a clean computational graph). The <code>backward</code> method negates the gradient and scales by $\lambda$. That is all gradient reversal <em>is</em>.</p>
+<h3 id="1442-the-domain-adversarial-network">14.4.2 The Domain-Adversarial Network</h3>
+<p>The full architecture composes the encoder, task head, gradient reversal layer, and domain head:</p>
+<pre><code class="language-python">class DomainAdversarialNetwork(nn.Module):
+    &quot;&quot;&quot;Domain-adversarial neural network (DANN) for invariance training.
+
+    Architecture:
+        input -&gt; encoder -&gt; z -&gt; task_head -&gt; task prediction
+                              |
+                              +-&gt; GRL -&gt; domain_head -&gt; domain prediction
+
+    Args:
+        encoder: Feature extractor mapping inputs to latent vectors.
+        task_head: Classifier for the primary task.
+        domain_head: Classifier for the nuisance variable.
+        lambda_: Initial gradient reversal strength.
+    &quot;&quot;&quot;
+
+    def __init__(
+        self,
+        encoder: nn.Module,
+        task_head: nn.Module,
+        domain_head: nn.Module,
+        lambda_: float = 1.0,
+    ) -&gt; None:
+        super().__init__()
+        self.encoder = encoder
+        self.task_head = task_head
+        self.domain_head = domain_head
+        self.grl = GradientReversalLayer(lambda_)
+
+    def forward(
+        self, x: torch.Tensor
+    ) -&gt; tuple[torch.Tensor, torch.Tensor]:
+        &quot;&quot;&quot;Forward pass returning both task and domain predictions.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            Tuple of (task_logits, domain_logits).
+        &quot;&quot;&quot;
+        z = self.encoder(x)
+        task_logits = self.task_head(z)
+        domain_logits = self.domain_head(self.grl(z))
+        return task_logits, domain_logits
+</code></pre>
+<h3 id="1443-the-lambda-schedule">14.4.3 The Lambda Schedule</h3>
+<p>A critical practical detail is the <strong>lambda schedule</strong>. Starting with a large $\lambda$ destabilizes training: the adversarial signal overwhelms the task gradient before the encoder has learned any useful features. Ganin et al. recommend a schedule that ramps $\lambda$ from 0 to its maximum value over the course of training:</p>
+<p>$$\lambda(p) = \frac{2}{1 + \exp(-\gamma \cdot p)} - 1$$</p>
+<p>where $p \in [0, 1]$ is the training progress (fraction of total epochs completed) and $\gamma$ controls the ramp rate. This is a sigmoid schedule: $\lambda(0) \approx 0$, $\lambda(1) \approx 1$.</p>
+<pre><code class="language-python">def lambda_schedule(
+    epoch: int,
+    total_epochs: int,
+    gamma: float = 10.0,
+    max_lambda: float = 1.0,
+) -&gt; float:
+    &quot;&quot;&quot;Sigmoid ramp schedule for gradient reversal strength.
+
+    Starts near zero, ramps to max_lambda over training.
+    Early epochs focus on learning useful features;
+    later epochs enforce invariance.
+
+    Args:
+        epoch: Current epoch (0-indexed).
+        total_epochs: Total number of training epochs.
+        gamma: Ramp steepness (higher = sharper transition).
+        max_lambda: Maximum lambda value at end of training.
+
+    Returns:
+        Lambda value for this epoch.
+    &quot;&quot;&quot;
+    import math
+
+    p = epoch / max(total_epochs - 1, 1)
+    return max_lambda * (2.0 / (1.0 + math.exp(-gamma * p)) - 1.0)
+</code></pre>
+<p>The schedule ensures that the encoder first learns discriminative features for the task (when $\lambda \approx 0$), and only later is forced to discard nuisance information (as $\lambda$ ramps up). Without this schedule, gradient reversal training is notoriously unstable.</p>
+<h3 id="1444-the-training-loop">14.4.4 The Training Loop</h3>
+<p>The training loop for domain-adversarial training is structurally similar to standard supervised training, with two loss terms and a lambda schedule:</p>
+<pre><code class="language-python">def train_dann(
+    model: DomainAdversarialNetwork,
+    train_loader: torch.utils.data.DataLoader,
+    optimizer: torch.optim.Optimizer,
+    task_criterion: nn.Module,
+    domain_criterion: nn.Module,
+    total_epochs: int,
+    gamma: float = 10.0,
+    max_lambda: float = 1.0,
+    device: torch.device = torch.device(&quot;cpu&quot;),
+) -&gt; dict[str, list[float]]:
+    &quot;&quot;&quot;Train a DANN with gradient reversal.
+
+    Each batch yields (inputs, task_labels, domain_labels).
+    The domain_labels encode the nuisance variable (e.g., recording
+    device ID, ocean basin, hydrophone type).
+
+    Returns:
+        Dictionary of training curves (task_loss, domain_loss,
+        domain_accuracy per epoch).
+    &quot;&quot;&quot;
+    history: dict[str, list[float]] = {
+        &quot;task_loss&quot;: [],
+        &quot;domain_loss&quot;: [],
+        &quot;domain_accuracy&quot;: [],
+    }
+
+    for epoch in range(total_epochs):
+        # Update lambda on schedule
+        lam = lambda_schedule(epoch, total_epochs, gamma, max_lambda)
+        model.grl.set_lambda(lam)
+
+        epoch_task_loss = 0.0
+        epoch_domain_loss = 0.0
+        domain_correct = 0
+        domain_total = 0
+
+        model.train()
+        for inputs, task_labels, domain_labels in train_loader:
+            inputs = inputs.to(device)
+            task_labels = task_labels.to(device)
+            domain_labels = domain_labels.to(device)
+
+            task_logits, domain_logits = model(inputs)
+
+            loss_task = task_criterion(task_logits, task_labels)
+            loss_domain = domain_criterion(domain_logits, domain_labels)
+
+            # Combined loss: task + domain (GRL handles sign for encoder)
+            loss = loss_task + loss_domain
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            epoch_task_loss += loss_task.item() * inputs.size(0)
+            epoch_domain_loss += loss_domain.item() * inputs.size(0)
+            domain_correct += (
+                domain_logits.argmax(dim=1) == domain_labels
+            ).sum().item()
+            domain_total += inputs.size(0)
+
+        n = domain_total or 1
+        history[&quot;task_loss&quot;].append(epoch_task_loss / n)
+        history[&quot;domain_loss&quot;].append(epoch_domain_loss / n)
+        history[&quot;domain_accuracy&quot;].append(domain_correct / n)
+
+    return history
+</code></pre>
+<p>Note a subtle but important point in the combined loss: we write <code>loss = loss_task + loss_domain</code>, <em>not</em> <code>loss = loss_task - lambda * loss_domain</code>. The sign reversal is handled by the GRL, which negates the gradient flowing from <code>loss_domain</code> back through the encoder. The domain head&rsquo;s own parameters receive the <em>un-reversed</em> gradient and are trained normally to minimize the domain classification loss. This asymmetry&mdash;the same loss term trains the domain head to succeed and the encoder to make it fail&mdash;is the essence of the adversarial game.</p>
+<h3 id="1445-monitoring-convergence">14.4.5 Monitoring Convergence</h3>
+<p>The diagnostic signature of successful gradient reversal training is:</p>
+<ol>
+<li><strong>Task loss decreases</strong> throughout training (the encoder learns useful features).</li>
+<li><strong>Domain accuracy drops to chance level</strong> as $\lambda$ ramps up (the encoder becomes invariant).</li>
+<li><strong>Domain loss increases</strong> (the domain discriminator cannot predict the nuisance variable).</li>
+</ol>
+<p>If the domain accuracy does not decrease, $\lambda$ is too small or the domain head is too weak. If the task loss increases sharply when $\lambda$ ramps up, the nuisance subspace overlaps significantly with the task subspace, and $\max\_\lambda$ should be reduced. The interplay between these curves provides real-time geometric diagnostics: the system is searching for the orthogonal complement of the nuisance subspace, and the curves tell you whether that complement has sufficient capacity for the task.</p>
+<hr />
+<h2 id="145-application-cetacean-bioacoustics">14.5 Application: Cetacean Bioacoustics</h2>
+<h3 id="1451-the-recording-condition-problem">14.5.1 The Recording Condition Problem</h3>
+<p>Cetacean bioacoustics presents a textbook case for gradient reversal. The field data collection pipeline introduces systematic variation that is correlated with, but not caused by, the biological signal:</p>
+<table>
+<thead>
+<tr>
+<th>Nuisance Factor</th>
+<th>Source</th>
+<th>Effect on Spectrogram</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hydrophone response</td>
+<td>Equipment variation</td>
+<td>Frequency-dependent gain/attenuation</td>
+</tr>
+<tr>
+<td>Ocean depth</td>
+<td>Deployment geometry</td>
+<td>Reverberation pattern, multipath delay</td>
+</tr>
+<tr>
+<td>Ambient noise</td>
+<td>Weather, ship traffic</td>
+<td>Broadband masking, SNR variation</td>
+</tr>
+<tr>
+<td>Recording gain</td>
+<td>Operator settings</td>
+<td>Overall amplitude scaling</td>
+</tr>
+<tr>
+<td>Sample rate</td>
+<td>Equipment generation</td>
+<td>Bandwidth truncation</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>acoustic_transforms</code> module in <code>eris_ketos</code> parameterizes exactly these nuisance factors as intensity-controllable transforms. Chapter 9 used them for post-hoc robustness testing. Here we use the same taxonomy to define the nuisance variable for invariance training.</p>
+<h3 id="1452-architecture-for-invariant-coda-classification">14.5.2 Architecture for Invariant Coda Classification</h3>
+<p>The architecture for invariant coda classification follows the DANN template:</p>
+<pre><code class="language-python">class CodaEncoder(nn.Module):
+    &quot;&quot;&quot;Spectrogram encoder for coda classification.
+
+    Extracts latent features from mel spectrograms. The architecture
+    follows a standard convolutional design, producing a fixed-length
+    feature vector from variable-length inputs via global average pooling.
+    &quot;&quot;&quot;
+
+    def __init__(self, n_mels: int = 128, latent_dim: int = 128) -&gt; None:
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),
+        )
+        self.fc = nn.Linear(128, latent_dim)
+
+    def forward(self, x: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Encode spectrogram to latent vector.
+
+        Args:
+            x: Mel spectrogram, shape [batch, 1, n_mels, n_frames].
+
+        Returns:
+            Latent vector, shape [batch, latent_dim].
+        &quot;&quot;&quot;
+        h = self.conv(x).squeeze(-1).squeeze(-1)
+        return self.fc(h)
+
+
+class CodaTaskHead(nn.Module):
+    &quot;&quot;&quot;Coda type classifier (primary task).&quot;&quot;&quot;
+
+    def __init__(self, latent_dim: int = 128, n_classes: int = 23) -&gt; None:
+        super().__init__()
+        self.head = nn.Sequential(
+            nn.Linear(latent_dim, 64),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(64, n_classes),
+        )
+
+    def forward(self, z: torch.Tensor) -&gt; torch.Tensor:
+        return self.head(z)
+
+
+class RecordingConditionHead(nn.Module):
+    &quot;&quot;&quot;Recording condition discriminator (adversarial head).
+
+    Predicts nuisance label from latent features. Designed to be
+    &quot;strong enough&quot; to detect domain information if present, but
+    not so large that it dominates the encoder's capacity.
+    &quot;&quot;&quot;
+
+    def __init__(
+        self, latent_dim: int = 128, n_conditions: int = 5
+    ) -&gt; None:
+        super().__init__()
+        self.head = nn.Sequential(
+            nn.Linear(latent_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, n_conditions),
+        )
+
+    def forward(self, z: torch.Tensor) -&gt; torch.Tensor:
+        return self.head(z)
+</code></pre>
+<p>The domain head is deliberately smaller than the task head. This is a design choice, not an oversight. A domain head that is too powerful can extract nuisance information from subtle correlations in the latent space that a simpler head would miss, leading to an unstable minimax game. A moderately sized domain head provides a sufficient invariance signal without the pathological dynamics of an overpowered adversary.</p>
+<h3 id="1453-assembling-and-training-the-invariant-classifier">14.5.3 Assembling and Training the Invariant Classifier</h3>
+<pre><code class="language-python">def build_invariant_coda_classifier(
+    n_mels: int = 128,
+    latent_dim: int = 128,
+    n_coda_types: int = 23,
+    n_conditions: int = 5,
+    max_lambda: float = 0.5,
+) -&gt; DomainAdversarialNetwork:
+    &quot;&quot;&quot;Build a DANN for recording-invariant coda classification.
+
+    Args:
+        n_mels: Number of mel frequency bins.
+        latent_dim: Encoder output dimensionality.
+        n_coda_types: Number of coda type classes.
+        n_conditions: Number of recording condition categories.
+        max_lambda: Maximum gradient reversal strength.
+
+    Returns:
+        DomainAdversarialNetwork ready for training.
+    &quot;&quot;&quot;
+    encoder = CodaEncoder(n_mels=n_mels, latent_dim=latent_dim)
+    task_head = CodaTaskHead(latent_dim=latent_dim, n_classes=n_coda_types)
+    domain_head = RecordingConditionHead(
+        latent_dim=latent_dim, n_conditions=n_conditions
+    )
+
+    return DomainAdversarialNetwork(
+        encoder=encoder,
+        task_head=task_head,
+        domain_head=domain_head,
+        lambda_=0.0,  # Starts at zero; ramped by schedule
+    )
+</code></pre>
+<h3 id="1454-integrating-spd-features">14.5.4 Integrating SPD Features</h3>
+<p>The SPD spectral features from Chapter 4 provide a natural complement to the raw spectrogram encoder. The frequency-band covariance matrix captures inter-band correlations&mdash;harmonic relationships, resonance structure&mdash;that the spectrogram encoder might miss. But covariance matrices are particularly susceptible to recording-condition contamination: the hydrophone&rsquo;s frequency response multiplies into every off-diagonal entry.</p>
+<p>Gradient reversal on SPD features requires operating in the tangent space, as described in Section 14.3.3:</p>
+<pre><code class="language-python">from eris_ketos.spd_spectral import SPDManifold, compute_covariance
+
+
+class SPDInvariantEncoder(nn.Module):
+    &quot;&quot;&quot;Encoder that maps SPD covariance features through gradient reversal.
+
+    Operates in the log-Euclidean tangent space where standard linear
+    operations (and therefore gradient reversal) apply correctly.
+    &quot;&quot;&quot;
+
+    def __init__(self, n_bands: int = 16, latent_dim: int = 64) -&gt; None:
+        super().__init__()
+        # Upper triangle of n_bands x n_bands symmetric matrix
+        spd_feature_dim = n_bands * (n_bands + 1) // 2
+        self.encoder = nn.Sequential(
+            nn.Linear(spd_feature_dim, 128),
+            nn.ReLU(),
+            nn.Linear(128, latent_dim),
+        )
+
+    def forward(self, spd_features: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Encode log-Euclidean SPD features.
+
+        Args:
+            spd_features: Upper-triangle features from log(cov),
+                         shape [batch, n_bands*(n_bands+1)/2].
+
+        Returns:
+            Latent vector, shape [batch, latent_dim].
+        &quot;&quot;&quot;
+        return self.encoder(spd_features)
+</code></pre>
+<p>The SPD features arrive already in tangent space (via <code>spd_features_from_spectrogram</code>, which applies the log map and extracts the upper triangle). The gradient reversal layer operates on the encoder&rsquo;s output, which is a standard Euclidean vector. This is the key simplification: by working in the log-Euclidean framework, all the Riemannian geometry is absorbed into the feature extraction step, and the invariance training proceeds in a flat space.</p>
+<h3 id="1455-evaluation-dri-before-and-after-invariance-training">14.5.5 Evaluation: DRI Before and After Invariance Training</h3>
+<p>The diagnostic power of combining gradient reversal (prescriptive) with the DRI (diagnostic) is substantial. After invariance training, we re-run the DRI using the same acoustic transform suite:</p>
+<pre><code class="language-python">from eris_ketos.acoustic_transforms import make_acoustic_transform_suite
+from eris_ketos.decoder_robustness import DecoderRobustnessIndex
+
+transforms = make_acoustic_transform_suite()
+dri = DecoderRobustnessIndex(transforms)
+
+# Measure robustness BEFORE invariance training
+result_before = dri.measure(baseline_decoder, signals, sr=32000)
+
+# Measure robustness AFTER invariance training
+result_after = dri.measure(invariant_decoder, signals, sr=32000)
+
+# Compare per-transform sensitivity
+for name in result_before.per_transform:
+    before = result_before.per_transform[name]
+    after = result_after.per_transform[name]
+    reduction = (before - after) / max(before, 1e-10) * 100
+    print(f&quot;{name:20s}  {before:.3f} -&gt; {after:.3f}  ({reduction:+.1f}%)&quot;)
+</code></pre>
+<p>The expected pattern: transforms that correspond to the recording-condition nuisance variable (amplitude scaling, additive noise, spectral masking) should show large DRI reductions after invariance training. Transforms that correspond to biological signal changes (time stretching, Doppler shift) should show minimal change, because the encoder still needs to encode temporal structure.</p>
+<p>If a recording-condition transform still shows high DRI after invariance training, this is diagnostic: either the domain head was too weak to detect that nuisance factor, or the factor is entangled with the biological signal in a way that gradient reversal at the chosen $\lambda$ cannot disentangle. In either case, the DRI identifies exactly <em>which</em> nuisance factors remain problematic, guiding targeted improvements to the architecture or training procedure.</p>
+<hr />
+<h2 id="146-connection-to-adversarial-robustness-chapter-9">14.6 Connection to Adversarial Robustness (Chapter 9)</h2>
+<h3 id="1461-two-sides-of-the-same-coin">14.6.1 Two Sides of the Same Coin</h3>
+<p>Chapter 9&rsquo;s adversarial robustness testing and this chapter&rsquo;s gradient reversal training are dual perspectives on the same geometric problem. Both concern the relationship between the encoder&rsquo;s latent space and a set of transformations applied to the input:</p>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Ch 9: Adversarial Testing</th>
+<th>Ch 14: Gradient Reversal</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Goal</strong></td>
+<td>Diagnose sensitivity</td>
+<td>Enforce invariance</td>
+</tr>
+<tr>
+<td><strong>When</strong></td>
+<td>After training</td>
+<td>During training</td>
+</tr>
+<tr>
+<td><strong>Mechanism</strong></td>
+<td>Apply transforms, measure output change</td>
+<td>Reverse gradients from nuisance predictor</td>
+</tr>
+<tr>
+<td><strong>Output</strong></td>
+<td>DRI score, sensitivity profile</td>
+<td>Invariant encoder</td>
+</tr>
+<tr>
+<td><strong>Geometry</strong></td>
+<td>Measures distances in output space under perturbation</td>
+<td>Projects representation onto complement of nuisance subspace</td>
+</tr>
+</tbody>
+</table>
+<p>The connection is more than analogical. The DRI&rsquo;s per-transform sensitivity profile (Section 9.4 of Chapter 9) provides exactly the information needed to configure gradient reversal training: transforms with high DRI scores identify the nuisance dimensions that the encoder has memorized, and these dimensions define the nuisance variable $s$ for the domain discriminator.</p>
+<h3 id="1462-the-feedback-loop">14.6.2 The Feedback Loop</h3>
+<p>The ideal workflow composes both methods:</p>
+<ol>
+<li><strong>Baseline training.</strong> Train the encoder with the standard task loss only.</li>
+<li><strong>Diagnostic fuzzing.</strong> Apply the DRI to identify which nuisance factors the encoder is sensitive to. This corresponds to the sensitivity profile from <code>eris_ketos.decoder_robustness</code>:</li>
+</ol>
+<pre><code class="language-python">profile = dri.sensitivity_profile(decoder, signals, sr=32000)
+# profile: {&quot;amplitude_scale&quot;: 0.02, &quot;additive_noise&quot;: 0.31,
+#            &quot;pink_noise&quot;: 0.28, &quot;spectral_mask&quot;: 0.45, ...}
+</code></pre>
+<ol>
+<li><strong>Invariance training.</strong> Attach gradient reversal with domain labels corresponding to the high-sensitivity transforms. Train to invariance.</li>
+<li><strong>Validation fuzzing.</strong> Re-run the DRI to confirm that sensitivity has decreased. Check that task accuracy has not degraded excessively.</li>
+<li><strong>Iterate.</strong> If residual sensitivity remains, adjust $\lambda$, strengthen the domain head, or add additional nuisance labels.</li>
+</ol>
+<p>This loop is the invariance analogue of the &ldquo;fuzz-diagnose-fix-verify&rdquo; cycle in software security. The structural fuzzing framework provides the diagnostic infrastructure; gradient reversal provides the fix.</p>
+<h3 id="1463-the-adversarial-threshold-connection">14.6.3 The Adversarial Threshold Connection</h3>
+<p>Chapter 9 introduced adversarial threshold search: binary search for the minimal transform intensity that flips the decoder&rsquo;s output. The implementation in <code>eris_ketos.decoder_robustness</code> finds the exact tipping point:</p>
+<pre><code class="language-python">threshold = dri.find_adversarial_threshold(
+    decoder, signal, sr, transform, tolerance=0.01
+)
+</code></pre>
+<p>Gradient reversal training should <em>raise</em> these thresholds for nuisance transforms. An encoder invariant to additive noise should require a much higher noise intensity to flip its output than a non-invariant encoder. Tracking adversarial thresholds before and after invariance training provides a precise, per-transform measure of the improvement:</p>
+<p>$$\Delta_{\text{threshold}}(t) = \tau_{\text{after}}(t) - \tau_{\text{before}}(t)$$</p>
+<p>A positive $\Delta_{\text{threshold}}$ for nuisance transform $t$ indicates successful invariance training along that dimension. A near-zero $\Delta_{\text{threshold}}$ indicates failure. This metric is complementary to the DRI: the DRI measures average sensitivity, while the adversarial threshold measures worst-case robustness.</p>
+<hr />
+<h2 id="147-practical-considerations">14.7 Practical Considerations</h2>
+<h3 id="1471-choosing-the-nuisance-variable">14.7.1 Choosing the Nuisance Variable</h3>
+<p>The choice of nuisance variable is a modeling decision with geometric consequences. Define it too narrowly (e.g., invariance to amplitude scaling only), and the encoder remains sensitive to other recording conditions. Define it too broadly (e.g., invariance to &ldquo;everything about the recording&rdquo;), and the nuisance subspace may consume so much of the latent space that task performance collapses.</p>
+<p>The right approach is guided by the DRI&rsquo;s sensitivity profile. Start with the highest-sensitivity transforms and add nuisance dimensions incrementally, checking task accuracy at each step. The <code>is_invariant</code> flag on the <code>AcousticTransform</code> dataclass provides a principled starting taxonomy:</p>
+<pre><code class="language-python">from eris_ketos.acoustic_transforms import make_acoustic_transform_suite
+
+transforms = make_acoustic_transform_suite()
+invariant_transforms = [t for t in transforms if t.is_invariant]
+# ['amplitude_scale', 'time_shift', 'additive_noise', 'pink_noise']
+</code></pre>
+<p>These are the transforms that a correct decoder <em>should</em> be invariant to. They define the initial nuisance variable. If the DRI reveals additional sensitivities (e.g., to <code>multipath_echo</code> or <code>spectral_mask</code>), those can be added to the nuisance set in subsequent training rounds.</p>
+<h3 id="1472-domain-head-capacity">14.7.2 Domain Head Capacity</h3>
+<p>The domain discriminator must be strong enough to detect nuisance information when it is present, but not so strong that the adversarial game becomes unstable. In practice, a two-to-three-layer MLP with hidden dimensions roughly half the encoder&rsquo;s latent dimension works well. If the domain head is too weak, it will appear to converge (high domain accuracy plateau) before gradient reversal training has a chance to enforce invariance. If it is too strong, the minimax game oscillates without converging.</p>
+<p>A useful diagnostic: if domain accuracy oscillates wildly during training rather than smoothly decreasing, the domain head is too powerful relative to $\lambda$. Reduce the domain head&rsquo;s capacity or decrease $\max\_\lambda$.</p>
+<h3 id="1473-multi-source-invariance">14.7.3 Multi-Source Invariance</h3>
+<p>In many practical settings, there are multiple nuisance variables: recording device, ocean basin, season, depth. These can be handled by either:</p>
+<ol>
+<li><strong>Multiple domain heads</strong>, each with its own GRL and nuisance label:</li>
+</ol>
+<pre><code class="language-python">class MultiSourceDANN(nn.Module):
+    &quot;&quot;&quot;DANN with multiple independent domain heads.&quot;&quot;&quot;
+
+    def __init__(
+        self,
+        encoder: nn.Module,
+        task_head: nn.Module,
+        domain_heads: dict[str, nn.Module],
+        lambdas: dict[str, float],
+    ) -&gt; None:
+        super().__init__()
+        self.encoder = encoder
+        self.task_head = task_head
+        self.domain_heads = nn.ModuleDict(domain_heads)
+        self.grls = nn.ModuleDict(
+            {k: GradientReversalLayer(v) for k, v in lambdas.items()}
+        )
+
+    def forward(self, x: torch.Tensor) -&gt; tuple[torch.Tensor, dict]:
+        z = self.encoder(x)
+        task_logits = self.task_head(z)
+        domain_logits = {
+            name: head(self.grls[name](z))
+            for name, head in self.domain_heads.items()
+        }
+        return task_logits, domain_logits
+</code></pre>
+<ol>
+<li><strong>A single domain head</strong> with a concatenated nuisance label. This is simpler but cannot assign different $\lambda$ values to different nuisance factors.</li>
+</ol>
+<p>The multi-head approach is preferable when the nuisance factors have different scales of importance. For cetacean bioacoustics, recording-device invariance might warrant a high $\lambda$ (the model should never depend on the hydrophone), while seasonal invariance might warrant a lower $\lambda$ (some seasonal variation in vocal behavior is genuine and should be preserved).</p>
+<hr />
+<h2 id="148-theoretical-guarantees-and-limitations">14.8 Theoretical Guarantees and Limitations</h2>
+<h3 id="1481-the-ben-david-bound">14.8.1 The Ben-David Bound</h3>
+<p>The theoretical foundation for gradient reversal in domain adaptation is the Ben-David et al. (2010) bound on target-domain error:</p>
+<p>$$\epsilon_T(h) \leq \epsilon_S(h) + d_{\mathcal{H}\Delta\mathcal{H}}(S, T) + C$$</p>
+<p>where $\epsilon_S(h)$ is the source-domain error, $d_{\mathcal{H}\Delta\mathcal{H}}(S, T)$ is the $\mathcal{H}\Delta\mathcal{H}$-divergence between source and target domains, and $C$ is a constant reflecting the best achievable error on both domains simultaneously.</p>
+<p>Gradient reversal minimizes the middle term: by forcing the encoder to produce domain-invariant representations, it drives $d_{\mathcal{H}\Delta\mathcal{H}}(S, T)$ toward zero. But the bound also contains $C$, which reflects the fundamental tradeoff: if the optimal classifier differs between domains, no invariant representation can achieve low error on both. This is the geometric statement that the task and nuisance subspaces overlap.</p>
+<h3 id="1482-when-gradient-reversal-fails">14.8.2 When Gradient Reversal Fails</h3>
+<p>Gradient reversal can fail in three ways:</p>
+<ol>
+<li>
+<p><strong>The nuisance and task subspaces coincide.</strong> If the only features predictive of the task are also predictive of the nuisance variable, enforcing invariance destroys task-relevant information. This is the $C > 0$ case in the Ben-David bound.</p>
+</li>
+<li>
+<p><strong>The domain discriminator is too weak.</strong> If $h_\psi$ cannot detect nuisance information in $\mathbf{z}$, the reversed gradient is noise, and the encoder learns nothing about invariance. This is a practical failure, not a theoretical one.</p>
+</li>
+<li>
+<p><strong>The minimax game does not converge.</strong> Like all adversarial training, gradient reversal can exhibit mode collapse, oscillation, or divergence. The lambda schedule mitigates this but does not eliminate it.</p>
+</li>
+</ol>
+<p>In all three cases, the DRI provides an objective diagnostic. If the DRI for nuisance transforms does not decrease after gradient reversal training, one of these failures has occurred, and the per-transform breakdown indicates which nuisance factors remain problematic.</p>
+<hr />
+<h2 id="149-worked-example-five-hydrophone-experiment">14.9 Worked Example: Five-Hydrophone Experiment</h2>
+<p>To make the preceding theory concrete, consider a controlled experiment with coda recordings from five different hydrophone deployments. The task is to classify coda types (23 classes). The nuisance variable is the hydrophone deployment (5 categories).</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+
+# Simulated data: 2000 spectrograms from 5 hydrophones
+n_samples = 2000
+n_mels = 128
+n_frames = 64
+n_coda_types = 23
+n_hydrophones = 5
+
+torch.manual_seed(42)
+spectrograms = torch.randn(n_samples, 1, n_mels, n_frames)
+coda_labels = torch.randint(0, n_coda_types, (n_samples,))
+hydrophone_labels = torch.randint(0, n_hydrophones, (n_samples,))
+
+dataset = TensorDataset(spectrograms, coda_labels, hydrophone_labels)
+loader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+# Build and train the invariant classifier
+model = build_invariant_coda_classifier(
+    n_mels=n_mels,
+    latent_dim=128,
+    n_coda_types=n_coda_types,
+    n_conditions=n_hydrophones,
+    max_lambda=0.5,
+)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+task_criterion = nn.CrossEntropyLoss()
+domain_criterion = nn.CrossEntropyLoss()
+
+history = train_dann(
+    model=model,
+    train_loader=loader,
+    optimizer=optimizer,
+    task_criterion=task_criterion,
+    domain_criterion=domain_criterion,
+    total_epochs=50,
+    gamma=10.0,
+    max_lambda=0.5,
+)
+
+# Verify: domain accuracy should approach chance (1/5 = 20%)
+print(f&quot;Final domain accuracy: {history['domain_accuracy'][-1]:.1%}&quot;)
+print(f&quot;Chance level: {1/n_hydrophones:.1%}&quot;)
+</code></pre>
+<p>At convergence, the domain accuracy should approach 20% (chance level for 5 hydrophones), indicating that the encoder&rsquo;s latent representation no longer contains hydrophone-discriminative information. The task accuracy may decrease slightly relative to a non-invariant baseline&mdash;this is the price of invariance, and the DRI confirms whether the price was worth paying.</p>
+<hr />
+<h2 id="1410-summary">14.10 Summary</h2>
+<p>The gradient reversal layer is a minimal intervention&mdash;five lines of autograd logic&mdash;with a maximal geometric effect: it projects the encoder&rsquo;s latent representation onto the orthogonal complement of the nuisance subspace, producing representations that are invariant to specified surface features by construction.</p>
+<p>The chapter developed five interconnected ideas:</p>
+<ol>
+<li>
+<p><strong>The invariance problem.</strong> Encoders trained with standard losses memorize surface features (recording conditions, domain identity, equipment characteristics) alongside the signal of interest. This produces models that are accurate in-distribution but fragile under domain shift.</p>
+</li>
+<li>
+<p><strong>The gradient reversal layer.</strong> A domain discriminator predicts the nuisance variable from the latent representation. The GRL negates the gradient flowing from the discriminator back through the encoder, forcing the encoder to make the nuisance variable unpredictable. The combined system solves a minimax game.</p>
+</li>
+<li>
+<p><strong>The geometric interpretation.</strong> Gradient reversal decomposes the latent space into a task subspace and a nuisance subspace, then projects onto the orthogonal complement of the nuisance subspace. On non-Euclidean feature spaces (such as the SPD manifold for spectral covariance), the projection operates in the tangent space via the log-Euclidean map.</p>
+</li>
+<li>
+<p><strong>The cetacean bioacoustics application.</strong> Recording conditions (hydrophone response, ambient noise, ocean reverberation) contaminate spectral features. Gradient reversal forces the encoder to be invariant to these conditions while preserving biological signal&mdash;coda type, rhythmic pattern, spectral content.</p>
+</li>
+<li>
+<p><strong>The feedback loop with adversarial testing.</strong> The DRI from Chapter 9 diagnoses which nuisance factors the encoder is sensitive to; gradient reversal eliminates those sensitivities; the DRI validates the result. The two methods compose into a &ldquo;diagnose-treat-verify&rdquo; pipeline.</p>
+</li>
+</ol>
+<hr />
+<h2 id="1411-forward-connection-chapter-15">14.11 Forward Connection: Chapter 15</h2>
+<p>The invariance enforced by gradient reversal operates in the latent space of encoders, but the <em>metric</em> on that latent space&mdash;the Mahalanobis distance from Chapter 2&mdash;depends on a positive-definite precision matrix $\Sigma^{-1}$. Chapter 15 addresses the fundamental engineering question of how to <em>learn</em> this metric: the Cholesky parameterization $\Sigma^{-1} = LL^\top$ transforms the constrained optimization over SPD matrices into an unconstrained optimization over lower-triangular matrices. The log-diagonal variant removes the last remaining constraint (positive diagonals) and yields a parameterization that is fully unconstrained, numerically stable, and differentiable end-to-end.</p>
+<p>The connection to gradient reversal is direct: the domain discriminator&rsquo;s latent space geometry is shaped by the metric, and the Cholesky parameterization provides the machinery for learning that metric while maintaining positive-definiteness. Chapter 15 develops this parameterization in full and connects it back to the SPD manifold geometry of Chapter 4.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-13-group-theoretic-augmentation.html" class="nav-prev">&larr; Chapter 13: Group-Theoretic Data Augmentation</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-15-cholesky-parameterization.html" class="nav-next">Chapter 15: Cholesky Parameterization for Positive-Definiteness &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

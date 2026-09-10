@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 4: SPD Manifolds and Spectral Geometry &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 4: SPD Manifolds and Spectral Geometry from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-04-spd-manifolds">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 4: SPD Manifolds and Spectral Geometry</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-03-hyperbolic-geometry.html" class="nav-prev">&larr; Chapter 3: Hyperbolic Geometry for Hierarchical Data</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-05-topological-data-analysis.html" class="nav-next">Chapter 5: Topological Data Analysis &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-4-spd-manifolds-and-spectral-geometry">Chapter 4: SPD Manifolds and Spectral Geometry</h1>
+<p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation</em> &mdash; Andrew H. Bond</p>
+<hr />
+<p>In the preceding chapters, we established the vocabulary of manifolds, tangent spaces, and geodesics. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example &mdash; covariance analysis of cetacean vocalizations &mdash; illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.</p>
+<h2 id="41-the-manifold-of-positive-definite-matrices">4.1 The Manifold of Positive Definite Matrices</h2>
+<p><strong>Definition 4.1.</strong> The set of <em>n x n</em> symmetric positive definite matrices is</p>
+<p>$$\text{SPD}(n) = \{S \in \mathbb{R}^{n \times n} : S = S^\top,\; x^\top S x > 0 \;\forall x \neq 0\}.$$</p>
+<p>This set is open in the space of symmetric matrices: every SPD matrix has a neighborhood of SPD matrices around it. It is also a smooth manifold of dimension <em>n(n+1)/2</em>, since a symmetric matrix is determined by its upper triangle.</p>
+<h3 id="why-not-a-vector-space">Why Not a Vector Space?</h3>
+<p>At first glance, SPD(n) looks like it might be a vector subspace of $\mathbb{R}^{n \times n}$. After all, the sum of two SPD matrices is SPD. If $S_1$ and $S_2$ are both symmetric positive definite, then for any $x \neq 0$,</p>
+<p>$$x^\top(S_1 + S_2)x = x^\top S_1 x + x^\top S_2 x > 0.$$</p>
+<p>However, SPD(n) fails the scalar multiplication axiom. Multiplying an SPD matrix by $-1$ produces a negative definite matrix, which is not in SPD(n). More subtly, even restricting to positive scalars does not resolve the problem, because a vector space requires closure under <em>all</em> scalars, including zero (the zero matrix is not positive definite). Therefore SPD(n) is not a vector space.</p>
+<h3 id="why-not-just-use-euclidean-distance">Why Not Just Use Euclidean Distance?</h3>
+<p>One might try to measure distances between SPD matrices using the Frobenius norm:</p>
+<p>$$d_F(S_1, S_2) = \|S_1 - S_2\|_F = \sqrt{\sum_{i,j}(S_1 - S_2)_{ij}^2}.$$</p>
+<p>This is a perfectly valid metric in the mathematical sense, but it has a serious practical defect: it treats SPD matrices as if they were arbitrary points in $\mathbb{R}^{n \times n}$, ignoring the constraint that they must remain positive definite. Consider two covariance matrices that differ primarily in one eigenvalue &mdash; one might have eigenvalues $(10, 1, 0.01)$ and another $(10, 1, 100)$. The Frobenius distance between them is dominated by the large eigenvalue change, but the <em>geometric</em> significance of moving an eigenvalue from $0.01$ to $100$ (a $10{,}000$-fold change in one variance direction) is much greater than Frobenius distance suggests.</p>
+<p>More concretely, the Frobenius norm assigns equal weight to a change from $0.001$ to $0.002$ and a change from $1000.001$ to $1000.002$, even though the former represents a doubling of a variance component while the latter is negligible. For covariance matrices, ratios matter more than differences.</p>
+<p>This motivates the use of Riemannian geometry. By equipping SPD(n) with a Riemannian metric that respects its curvature, we obtain distance functions and averaging operations that are invariant to the kinds of transformations that arise naturally in statistical settings.</p>
+<h3 id="tangent-space-structure">Tangent Space Structure</h3>
+<p>At any point $S \in \text{SPD}(n)$, the tangent space $T_S\text{SPD}(n)$ is the set of all <em>n x n</em> symmetric matrices &mdash; there is no positive definiteness constraint on tangent vectors, only symmetry. This is a vector space of dimension <em>n(n+1)/2</em>. The Riemannian metric at each point defines an inner product on this tangent space, and different choices of inner product yield different Riemannian geometries on SPD(n).</p>
+<h2 id="42-the-log-euclidean-metric">4.2 The Log-Euclidean Metric</h2>
+<p>Among the several Riemannian metrics on SPD(n), the <em>log-Euclidean metric</em> offers the best balance of mathematical rigor and computational efficiency. It was introduced by Arsigny et al. (2006) and has since become a standard tool in diffusion tensor imaging, brain-computer interfaces, and covariance-based classification.</p>
+<p><strong>Definition 4.2.</strong> The <em>log-Euclidean distance</em> between two SPD matrices $S_1, S_2 \in \text{SPD}(n)$ is</p>
+<p>$$d_{LE}(S_1, S_2) = \|\log(S_1) - \log(S_2)\|_F$$</p>
+<p>where $\log(\cdot)$ denotes the matrix logarithm and $\|\cdot\|_F$ is the Frobenius norm.</p>
+<p><strong>Proposition 4.1.</strong> $d_{LE}$ is a proper metric on SPD(n). That is, it satisfies non-negativity, identity of indiscernibles, symmetry, and the triangle inequality.</p>
+<p><em>Proof sketch.</em> The matrix logarithm is a diffeomorphism from SPD(n) to the space Sym(n) of all <em>n x n</em> symmetric matrices. Since the Frobenius norm is a metric on Sym(n), composing with the diffeomorphism $\log$ yields a metric on SPD(n). $\square$</p>
+<p>The key insight is that the logarithm &ldquo;unfolds&rdquo; the curved SPD manifold into the flat vector space of symmetric matrices, where ordinary Euclidean geometry applies. This is analogous to how the logarithm maps the positive reals $(0, \infty)$ &mdash; which have a multiplicative structure &mdash; onto all of $\mathbb{R}$, where addition is the natural operation.</p>
+<h3 id="computing-the-matrix-logarithm">Computing the Matrix Logarithm</h3>
+<p>The matrix logarithm of an SPD matrix is computed via eigendecomposition. If $S = U \Lambda U^\top$ where $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$ with all $\lambda_i > 0$, then</p>
+<p>$$\log(S) = U \cdot \text{diag}(\log \lambda_1, \ldots, \log \lambda_n) \cdot U^\top.$$</p>
+<p>This is well-defined precisely because the eigenvalues of an SPD matrix are strictly positive, so their logarithms exist. The computational cost is dominated by the eigendecomposition, which is $O(n^3)$.</p>
+<p>The following implementation from the <code>eris-ketos</code> project encapsulates this operation as a method on an <code>SPDManifold</code> class:</p>
+<pre><code class="language-python">class SPDManifold:
+    &quot;&quot;&quot;Operations on the manifold of Symmetric Positive Definite matrices.&quot;&quot;&quot;
+
+    @staticmethod
+    def log_map(S: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Log-Euclidean map: SPD matrix -&gt; symmetric matrix (tangent space).
+
+        Computes log(S) via eigendecomposition: log(S) = U·diag(log(λ))·U^T
+        &quot;&quot;&quot;
+        eigvals, eigvecs = torch.linalg.eigh(S)
+        eigvals = eigvals.clamp_min(1e-10)
+        return eigvecs @ torch.diag_embed(eigvals.log()) @ eigvecs.transpose(-2, -1)
+</code></pre>
+<p>Note the <code>clamp_min(1e-10)</code> guard: in finite-precision arithmetic, eigenvalues can drift to zero or below due to numerical error, and $\log(0)$ is undefined. Clamping to a small positive constant prevents this without meaningfully affecting the result, since an eigenvalue of $10^{-10}$ already represents a direction of negligible variance. The use of <code>torch.linalg.eigh</code> (rather than <code>torch.linalg.eig</code>) exploits the symmetry of $S$ for a faster and more numerically stable decomposition.</p>
+<h3 id="the-exponential-map">The Exponential Map</h3>
+<p>The inverse operation &mdash; the matrix exponential &mdash; maps from the tangent space (symmetric matrices) back to SPD(n):</p>
+<p>$$\exp(X) = U \cdot \text{diag}(e^{\mu_1}, \ldots, e^{\mu_n}) \cdot U^\top$$</p>
+<p>where $X = U \cdot \text{diag}(\mu_1, \ldots, \mu_n) \cdot U^\top$ is the eigendecomposition of the symmetric matrix $X$.</p>
+<pre><code class="language-python">    @staticmethod
+    def exp_map(X: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Exp map: symmetric matrix (tangent space) -&gt; SPD matrix.&quot;&quot;&quot;
+        eigvals, eigvecs = torch.linalg.eigh(X)
+        return eigvecs @ torch.diag_embed(eigvals.exp()) @ eigvecs.transpose(-2, -1)
+</code></pre>
+<p>The exponential of any symmetric matrix is guaranteed to be SPD (since $e^{\mu_i} > 0$ for all real $\mu_i$), so the exp map always lands in SPD(n). Together, the log and exp maps form a diffeomorphism between SPD(n) and Sym(n), which is the foundation of the log-Euclidean framework.</p>
+<h3 id="log-euclidean-distance-implementation">Log-Euclidean Distance Implementation</h3>
+<p>With the log map in hand, the distance computation is straightforward:</p>
+<pre><code class="language-python">    @staticmethod
+    def distance(S1: torch.Tensor, S2: torch.Tensor) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Log-Euclidean distance between SPD matrices.
+
+        d(S1, S2) = ||log(S1) - log(S2)||_F
+        &quot;&quot;&quot;
+        log_diff = SPDManifold.log_map(S1) - SPDManifold.log_map(S2)
+        return torch.norm(log_diff.flatten(-2), dim=-1)
+</code></pre>
+<p>The <code>flatten(-2)</code> call reshapes the <em>n x n</em> matrix into a vector of length $n^2$ before computing the norm. The <code>dim=-1</code> argument computes the norm along the last dimension, enabling batched computation. This entire operation supports arbitrary batch dimensions via PyTorch&rsquo;s broadcasting, so one can compute distances between batches of SPD matrices without explicit loops.</p>
+<h3 id="comparison-log-euclidean-vs-frobenius">Comparison: Log-Euclidean vs. Frobenius</h3>
+<p>To build intuition for why the log-Euclidean metric is more discriminative, consider two $2 \times 2$ covariance matrices:</p>
+<p>$$S_1 = \begin{pmatrix} 1 & 0 \\ 0 & 0.01 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 1 & 0 \\ 0 & 100 \end{pmatrix}.$$</p>
+<p>The Frobenius distance is $\|S_1 - S_2\|_F = \sqrt{(0.01 - 100)^2} = 99.99$. Now consider:</p>
+<p>$$S_3 = \begin{pmatrix} 1 & 0 \\ 0 & 10000 \end{pmatrix}.$$</p>
+<p>The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though both pairs differ by a factor of $10{,}000$ in one eigenvalue.</p>
+<p>The log-Euclidean distances tell a different story. We have $\log(\lambda)$ values of $\log(0.01) \approx -4.6$, $\log(100) \approx 4.6$, and $\log(10000) \approx 9.2$. So $d_{LE}(S_1, S_2) \approx |{-4.6} - 4.6| = 9.2$ and $d_{LE}(S_2, S_3) \approx |4.6 - 9.2| = 4.6$. The log-Euclidean metric correctly reports that the multiplicative change from $S_2$ to $S_3$ (a factor of 100) is smaller than the change from $S_1$ to $S_2$ (a factor of 10,000). This scale-sensitivity is essential when eigenvalues span many orders of magnitude, as they do in covariance matrices from real-world signals.</p>
+<h2 id="43-the-frechet-mean-on-spdn">4.3 The Frechet Mean on SPD(n)</h2>
+<p>Given a collection of SPD matrices $S_1, \ldots, S_k$, we often need their &ldquo;average.&rdquo; The ordinary arithmetic mean $(S_1 + \cdots + S_k)/k$ is SPD (since SPD matrices are closed under addition and positive scalar multiplication), but it is not the correct notion of center on the Riemannian manifold. The arithmetic mean minimizes $\sum_i \|S_i - M\|_F^2$, which uses the flat Euclidean distance, not the manifold distance.</p>
+<p><strong>Definition 4.3.</strong> The <em>Frechet mean</em> (or <em>Karcher mean</em>) of SPD matrices $S_1, \ldots, S_k$ with weights $w_1, \ldots, w_k$ is</p>
+<p>$$\bar{S} = \arg\min_{M \in \text{SPD}(n)} \sum_{i=1}^{k} w_i \, d(S_i, M)^2$$</p>
+<p>where $d$ is the chosen Riemannian distance.</p>
+<p>For the affine-invariant metric, computing the Frechet mean requires an iterative algorithm. A major advantage of the log-Euclidean metric is that the Frechet mean has a <em>closed-form solution</em>:</p>
+<p>$$\bar{S}_{LE} = \exp\!\left(\sum_{i=1}^{k} w_i \log(S_i)\right).$$</p>
+<p>This is simply the exponential of the weighted average in the tangent space. The proof is immediate: $\log$ is an isometry from $(SPD(n), d_{LE})$ to $(\text{Sym}(n), \|\cdot\|_F)$, and the Frechet mean under the Frobenius norm is the arithmetic mean.</p>
+<pre><code class="language-python">    @staticmethod
+    def frechet_mean(
+        matrices: torch.Tensor,
+        weights: torch.Tensor | None = None,
+    ) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Log-Euclidean Frechet mean of SPD matrices.
+
+        mean = exp(weighted_mean(log(S_i)))
+
+        Args:
+            matrices: Batch of SPD matrices, shape [n, d, d].
+            weights: Optional weights, shape [n]. Defaults to uniform.
+        &quot;&quot;&quot;
+        logs = SPDManifold.log_map(matrices)
+        if weights is not None:
+            w = weights / weights.sum()
+            mean_log = (logs * w.view(-1, 1, 1)).sum(dim=0)
+        else:
+            mean_log = logs.mean(dim=0)
+        return SPDManifold.exp_map(mean_log)
+</code></pre>
+<p>The implementation normalizes the weights to sum to one, broadcasts them across the matrix dimensions with <code>w.view(-1, 1, 1)</code>, and computes the weighted sum in log-space. The final <code>exp_map</code> call projects back onto the SPD manifold.</p>
+<p><strong>Example 4.1.</strong> <em>Consider two 2x2 covariance matrices representing &ldquo;narrow-band&rdquo; and &ldquo;broad-band&rdquo; spectral patterns:</em></p>
+<p>$$S_1 = \begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 4 & 0 \\ 0 & 4 \end{pmatrix}.$$</p>
+<p><em>The arithmetic mean is $\frac{1}{2}(S_1 + S_2) = \begin{pmatrix} 2.5 & 0.25 \\ 0.25 & 2.5 \end{pmatrix}$, which has eigenvalues $2.75$ and $2.25$. The log-Euclidean Frechet mean $\exp(\frac{1}{2}(\log(S_1) + \log(S_2)))$ yields a different matrix &mdash; one that better interpolates the geometric structure of the two covariances. The difference is most pronounced when the constituent matrices have eigenvalues spanning several orders of magnitude.</em></p>
+<h2 id="44-frequency-band-covariance-extraction">4.4 Frequency-Band Covariance Extraction</h2>
+<p>We now connect the abstract SPD machinery to concrete signal processing. Given a spectrogram &mdash; a time-frequency representation of an audio signal &mdash; we construct an SPD covariance matrix that encodes how frequency bands co-vary over time.</p>
+<h3 id="from-spectrograms-to-covariance-matrices">From Spectrograms to Covariance Matrices</h3>
+<p>A mel spectrogram is a matrix $\mathbf{X} \in \mathbb{R}^{n_\text{mels} \times n_\text{frames}}$ where each row represents energy in a mel-scaled frequency bin and each column represents a time frame. Typical values are $n_\text{mels} = 128$ and $n_\text{frames}$ depends on the signal duration.</p>
+<p>Working with the full $128 \times 128$ covariance matrix is impractical: it has $128 \times 129 / 2 = 8{,}256$ free parameters, and eigendecomposition would be expensive at every step. Instead, we reduce dimensionality by grouping mel bins into $n_\text{bands}$ frequency bands.</p>
+<p><strong>Algorithm 4.1</strong> (Frequency-band covariance extraction)<strong>.</strong></p>
+<ol>
+<li>
+<p><strong>Band averaging.</strong> Partition the $n_\text{mels}$ mel bins into $n_\text{bands}$ contiguous groups of equal size. Average within each group to obtain a reduced representation $\mathbf{B} \in \mathbb{R}^{n_\text{bands} \times n_\text{frames}}$.</p>
+</li>
+<li>
+<p><strong>Centering.</strong> Subtract the temporal mean from each band: $\tilde{\mathbf{B}} = \mathbf{B} - \bar{\mathbf{B}}$, where $\bar{B}_i = \frac{1}{n_\text{frames}} \sum_t B_{it}$.</p>
+</li>
+<li>
+<p><strong>Covariance computation.</strong> Compute the sample covariance:
+$$\mathbf{C} = \frac{\tilde{\mathbf{B}} \tilde{\mathbf{B}}^\top}{n_\text{frames} - 1}.$$</p>
+</li>
+<li>
+<p><strong>L2 regularization.</strong> Add $\epsilon \mathbf{I}$ to guarantee positive definiteness:
+$$\mathbf{C}_\text{reg} = \mathbf{C} + \epsilon \mathbf{I}, \quad \epsilon = 10^{-4}.$$</p>
+</li>
+</ol>
+<p>The regularization in step 4 is essential. The raw covariance matrix can be positive <em>semi</em>-definite (with zero eigenvalues) when $n_\text{frames} < n_\text{bands}$ or when frequency bands are linearly dependent. Adding $\epsilon \mathbf{I}$ shifts all eigenvalues by $\epsilon$, ensuring strict positive definiteness without materially altering the covariance structure.</p>
+<pre><code class="language-python">def compute_covariance(
+    spectrogram: np.ndarray,
+    n_bands: int = 16,
+    regularize: float = 1e-4,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Compute frequency-band covariance matrix from a spectrogram.
+
+    Groups mel bins into n_bands equal-sized bands, then computes the
+    covariance across time for each band pair.
+    &quot;&quot;&quot;
+    n_mels, n_frames = spectrogram.shape
+    band_size = n_mels // n_bands
+    usable = n_bands * band_size
+
+    # Group mel bins into bands by averaging
+    bands = spectrogram[:usable, :].reshape(n_bands, band_size, n_frames).mean(axis=1)
+
+    # Center and compute covariance
+    centered = bands - bands.mean(axis=1, keepdims=True)
+    cov = centered @ centered.T / max(n_frames - 1, 1)
+
+    # Regularize for PD guarantee
+    cov += regularize * np.eye(n_bands)
+    return cov
+</code></pre>
+<p>Several implementation details deserve comment. The <code>reshape</code> and <code>mean</code> pattern for band averaging is an efficient alternative to explicit loops: <code>spectrogram[:usable, :].reshape(n_bands, band_size, n_frames)</code> creates a 3D tensor where the first axis indexes bands, the second indexes mel bins within each band, and the third indexes time frames. Averaging along <code>axis=1</code> collapses the within-band dimension. The <code>max(n_frames - 1, 1)</code> guard in the covariance denominator prevents division by zero when a window contains a single frame.</p>
+<h3 id="upper-triangle-feature-extraction">Upper Triangle Feature Extraction</h3>
+<p>For many downstream tasks (classification, clustering, regression), we need a fixed-length feature vector rather than a matrix. Since the log-covariance matrix $\log(\mathbf{C})$ is symmetric, it is fully determined by its upper triangle. For $n_\text{bands}$ bands, this yields</p>
+<p>$$d = \frac{n_\text{bands}(n_\text{bands} + 1)}{2}$$</p>
+<p>features. With $n_\text{bands} = 16$, this gives $d = 136$ features.</p>
+<pre><code class="language-python">def spd_features_from_spectrogram(
+    spectrogram: np.ndarray,
+    n_bands: int = 16,
+    regularize: float = 1e-4,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Extract SPD manifold features from a spectrogram.
+
+    Computes the covariance matrix, applies the log-Euclidean map, and
+    extracts the upper triangle as a feature vector.
+    &quot;&quot;&quot;
+    cov = compute_covariance(spectrogram, n_bands=n_bands, regularize=regularize)
+
+    # Log-Euclidean map via eigendecomposition
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    eigvals = np.maximum(eigvals, 1e-10)
+    log_cov = eigvecs @ np.diag(np.log(eigvals)) @ eigvecs.T
+
+    # Upper triangle
+    idx = np.triu_indices(n_bands)
+    return log_cov[idx].astype(np.float32)
+</code></pre>
+<p>The feature vector consists of:
+- <strong>Diagonal elements</strong> $(\log(\mathbf{C}))_{ii}$: the log-variance of each frequency band. These capture how much energy fluctuation occurs in each band over time.
+- <strong>Off-diagonal elements</strong> $(\log(\mathbf{C}))_{ij}$ for $i < j$: the log-domain cross-band correlations. These encode how frequency bands co-vary &mdash; whether they tend to increase and decrease together (positive), move inversely (negative), or behave independently (near zero).</p>
+<p>The off-diagonal elements are precisely what makes SPD features more informative than per-band energy statistics. A flat spectrogram representation captures the energy in each band independently but discards information about <em>relationships</em> between bands. The covariance matrix retains this information, and the log map ensures that distances between covariance matrices respect the manifold geometry.</p>
+<h2 id="45-spectral-trajectory-analysis">4.5 Spectral Trajectory Analysis</h2>
+<p>The covariance extraction described above produces a single SPD matrix summarizing an entire signal. But many signals of interest have time-varying spectral structure. A spoken vowel transitions into a consonant; a musical note evolves from attack to sustain to decay; a whale vocalization may shift its spectral content within a single click or across a coda sequence. To capture this temporal evolution, we extend the single-covariance analysis to a <em>trajectory</em> on the SPD manifold.</p>
+<h3 id="sliding-window-covariance">Sliding Window Covariance</h3>
+<p>The idea is simple: slide a window across the spectrogram and compute a covariance matrix at each position. This produces a sequence of SPD matrices $\mathbf{C}_1, \mathbf{C}_2, \ldots, \mathbf{C}_T$, one per window position, which traces a path on the SPD manifold.</p>
+<p><strong>Definition 4.4.</strong> A <em>spectral trajectory</em> is a sequence of SPD covariance matrices $(\mathbf{C}_t)_{t=1}^T$ computed from overlapping windows of a spectrogram, together with the associated timestamps.</p>
+<p>The trajectory captures how the second-order spectral structure evolves over time. If the covariance is constant (the signal is stationary), the trajectory collapses to a single point. If the signal undergoes a smooth spectral transition, the trajectory traces a smooth curve on SPD(n). If the signal changes abruptly, the trajectory exhibits discontinuities.</p>
+<pre><code class="language-python">@dataclass
+class SpectralTrajectory:
+    &quot;&quot;&quot;Trajectory of SPD covariance matrices across time windows.&quot;&quot;&quot;
+    matrices: np.ndarray       # shape [n_windows, n_bands, n_bands]
+    timestamps: np.ndarray     # center time of each window in seconds
+    geodesic_deviation: float  # how far trajectory deviates from geodesic
+
+
+def compute_spectral_trajectory(
+    spectrogram: np.ndarray,
+    n_bands: int = 16,
+    window_frames: int = 32,
+    hop_frames: int = 16,
+    sr: int = 32000,
+    hop_length: int = 512,
+    regularize: float = 1e-4,
+) -&gt; SpectralTrajectory:
+    &quot;&quot;&quot;Compute time-varying SPD covariance trajectory.&quot;&quot;&quot;
+    n_mels, n_frames = spectrogram.shape
+    matrices = []
+    timestamps = []
+
+    for start in range(0, n_frames - window_frames + 1, hop_frames):
+        window = spectrogram[:, start : start + window_frames]
+        cov = compute_covariance(window, n_bands=n_bands, regularize=regularize)
+        matrices.append(cov)
+        center_frame = start + window_frames // 2
+        timestamps.append(center_frame * hop_length / sr)
+
+    if len(matrices) &lt; 2:
+        return SpectralTrajectory(
+            matrices=np.array(matrices),
+            timestamps=np.array(timestamps),
+            geodesic_deviation=0.0,
+        )
+
+    mat_array = np.array(matrices)
+    ts_array = np.array(timestamps)
+
+    # Compute geodesic deviation
+    mat_torch = torch.tensor(mat_array, dtype=torch.float32)
+    total_dist = 0.0
+    geodesic_dist = float(SPDManifold.distance(mat_torch[0], mat_torch[-1]))
+    for i in range(len(mat_torch) - 1):
+        total_dist += float(SPDManifold.distance(mat_torch[i], mat_torch[i + 1]))
+
+    deviation = (total_dist - geodesic_dist) / max(geodesic_dist, 1e-10)
+
+    return SpectralTrajectory(
+        matrices=mat_array,
+        timestamps=ts_array,
+        geodesic_deviation=deviation,
+    )
+</code></pre>
+<p>The implementation iterates over the spectrogram with a sliding window of <code>window_frames</code> frames and a hop size of <code>hop_frames</code> frames. At each position, it computes the covariance matrix using the same <code>compute_covariance</code> function described in Section 4.4. Timestamps are computed from the center of each window using the sample rate and STFT hop length.</p>
+<h3 id="the-geodesic-deviation-metric">The Geodesic Deviation Metric</h3>
+<p>The most informative summary statistic of a spectral trajectory is its <em>geodesic deviation</em>: how much the actual path on the SPD manifold deviates from the shortest possible path (the geodesic) between its endpoints.</p>
+<p><strong>Definition 4.5.</strong> Given a spectral trajectory $\mathbf{C}_1, \ldots, \mathbf{C}_T$, the <em>geodesic deviation</em> is</p>
+<p>$$\delta = \frac{L_\text{path} - d_\text{geo}}{d_\text{geo}}$$</p>
+<p>where $L_\text{path} = \sum_{t=1}^{T-1} d_{LE}(\mathbf{C}_t, \mathbf{C}_{t+1})$ is the total path length (sum of consecutive log-Euclidean distances) and $d_\text{geo} = d_{LE}(\mathbf{C}_1, \mathbf{C}_T)$ is the geodesic distance between endpoints.</p>
+<p>By the triangle inequality, $L_\text{path} \geq d_\text{geo}$, so $\delta \geq 0$. Equality $\delta = 0$ holds if and only if the trajectory follows a geodesic &mdash; all the $\mathbf{C}_t$ lie on the shortest path between $\mathbf{C}_1$ and $\mathbf{C}_T$.</p>
+<p><strong>Interpretation.</strong> The geodesic deviation quantifies the &ldquo;straightness&rdquo; of the spectral evolution on the manifold:</p>
+<ul>
+<li>$\delta \approx 0$: The spectral covariance evolves smoothly and monotonically from one state to another. In acoustic terms, this is analogous to a <em>diphthong</em> &mdash; a smooth vowel transition.</li>
+<li>$\delta \gg 0$: The covariance evolution is non-monotonic, wandering or oscillating on the manifold. This suggests a more complex spectral structure, possibly involving multiple distinct spectral states.</li>
+</ul>
+<p>In the log-Euclidean framework, geodesics have a particularly simple form. Since the log map is an isometry to flat space, a geodesic from $S_0$ to $S_1$ is</p>
+<p>$$\gamma(t) = \exp\!\left((1-t)\log(S_0) + t\log(S_1)\right), \quad t \in [0, 1].$$</p>
+<p>This is simply linear interpolation in log-space, followed by exponentiation back to SPD(n). The geodesic deviation measures how far the actual trajectory departs from this linear interpolation.</p>
+<h2 id="46-application-acoustic-signal-analysis">4.6 Application: Acoustic Signal Analysis</h2>
+<p>To ground these abstractions in a concrete application, we examine how SPD manifold methods apply to the analysis of cetacean vocalizations, specifically sperm whale (<em>Physeter macrocephalus</em>) clicks and codas.</p>
+<h3 id="spectral-structure-of-whale-clicks">Spectral Structure of Whale Clicks</h3>
+<p>Sperm whale clicks are broadband, impulsive signals produced in the nasal complex. Despite their apparent simplicity, recent work by Begus et al. (<em>Open Mind</em>, 2025) has shown that sperm whale codas exhibit spectral structure analogous to human vowel formants. Specifically, the frequency-band correlations in whale clicks &mdash; the off-diagonal elements of the covariance matrix &mdash; reflect harmonic and resonance patterns that are remarkably similar to the formant structure of human speech.</p>
+<p>This discovery makes SPD analysis particularly appropriate: the key discriminative information lies not in the energy of individual frequency bands (which flat spectrogram methods capture well) but in the <em>correlations between bands</em> (which only covariance-based methods capture). When two frequency bands consistently co-vary &mdash; rising and falling in energy together &mdash; this indicates a common underlying physical mechanism, such as a resonance in the vocal tract (for humans) or the nasal complex (for sperm whales).</p>
+<h3 id="why-spd-distance-outperforms-flat-distance">Why SPD Distance Outperforms Flat Distance</h3>
+<p>Consider two whale clicks, $A$ and $B$, with similar overall spectral energy distributions but different cross-frequency correlation patterns. Click $A$ might have strong correlation between bands 3 and 7 (suggesting a harmonic relationship at those frequencies), while click $B$ has independent energy in those same bands.</p>
+<p>The flat spectrogram distance $\|X_A - X_B\|_F$ computes the sum of squared differences in energy at each time-frequency bin. If the total energy profiles are similar, this distance will be small, even though the correlation structure is completely different.</p>
+<p>The SPD distance $d_{LE}(\mathbf{C}_A, \mathbf{C}_B)$ operates on the covariance matrices, where the cross-frequency correlations are explicitly encoded in the off-diagonal elements. The log map amplifies differences in the eigenstructure of the covariance matrices. If click $A$ has a strong eigenvalue corresponding to the correlated band-3/band-7 direction while click $B$ does not, this difference is captured as a large displacement in log-space, yielding a large SPD distance.</p>
+<h3 id="practical-pipeline">Practical Pipeline</h3>
+<p>A complete analysis pipeline for acoustic SPD features proceeds as follows:</p>
+<ol>
+<li>
+<p><strong>Preprocessing.</strong> Compute a mel spectrogram from the raw audio waveform using standard parameters (e.g., 128 mel bins, 512-sample hop length, 2048-sample FFT window). Apply log-scaling: $X \leftarrow \log(X + \epsilon)$.</p>
+</li>
+<li>
+<p><strong>Covariance extraction.</strong> Apply <code>compute_covariance</code> with $n_\text{bands} = 16$ to obtain a $16 \times 16$ SPD matrix. This reduces the 128-dimensional mel representation to a 16-dimensional band representation while preserving cross-frequency correlations.</p>
+</li>
+<li>
+<p><strong>Feature extraction.</strong> Apply <code>spd_features_from_spectrogram</code> to obtain a 136-dimensional feature vector (the upper triangle of the $16 \times 16$ log-covariance matrix).</p>
+</li>
+<li>
+<p><strong>Trajectory analysis.</strong> For signals with temporal structure (e.g., a sequence of clicks in a coda), apply <code>compute_spectral_trajectory</code> with appropriate window and hop parameters. The resulting geodesic deviation quantifies how the spectral structure evolves over time.</p>
+</li>
+<li>
+<p><strong>Downstream tasks.</strong> Use the SPD features and/or trajectory statistics as inputs to classifiers, clustering algorithms, or other models. The log-Euclidean features live in a flat vector space, so standard machine learning methods (SVM, random forests, neural networks) can be applied directly.</p>
+</li>
+</ol>
+<h3 id="choosing-parameters">Choosing Parameters</h3>
+<p>The main parameters governing the covariance extraction are:</p>
+<ul>
+<li>
+<p><strong>$n_\text{bands}$</strong>: Controls the trade-off between spectral resolution and statistical reliability. More bands yield a higher-dimensional covariance matrix that captures finer-grained spectral relationships, but requires more temporal frames for reliable estimation. A rule of thumb is $n_\text{frames} \geq 3 \cdot n_\text{bands}$ for the sample covariance to be well-conditioned. The default of 16 bands (yielding a $16 \times 16$ covariance matrix and 136 features) works well for signals with at least 50 time frames.</p>
+</li>
+<li>
+<p><strong>$\epsilon$ (regularization)</strong>: Must be large enough to prevent numerical issues in the eigendecomposition but small enough not to dominate the covariance structure. The default $\epsilon = 10^{-4}$ is appropriate when spectrogram values are in the range $[0, 1]$ or $[-1, 1]$. For log-scaled spectrograms with values in $[-10, 0]$, covariance entries are on the order of $1$ to $10$, so $10^{-4}$ is safely negligible.</p>
+</li>
+<li>
+<p><strong>Window and hop sizes</strong> (for trajectory analysis): The window must be large enough to estimate a reliable covariance matrix ($\geq 3 \cdot n_\text{bands}$ frames, as above) and small enough to capture temporal variation. The hop size controls temporal resolution versus computational cost.</p>
+</li>
+</ul>
+<h2 id="47-connections-and-extensions">4.7 Connections and Extensions</h2>
+<h3 id="relationship-to-other-spd-metrics">Relationship to Other SPD Metrics</h3>
+<p>The log-Euclidean metric is one of several Riemannian metrics on SPD(n). The most commonly discussed alternatives are:</p>
+<ul>
+<li>
+<p><strong>Affine-invariant metric</strong>: $d_{AI}(S_1, S_2) = \|\log(S_1^{-1/2} S_2 S_1^{-1/2})\|_F$. This is invariant under congruence transformations $S \mapsto A S A^\top$ and is the &ldquo;natural&rdquo; Riemannian metric on SPD(n). However, computing the Frechet mean requires iterative optimization, making it more expensive.</p>
+</li>
+<li>
+<p><strong>Bures-Wasserstein metric</strong>: Related to optimal transport between Gaussian distributions. The distance $d_{BW}(S_1, S_2) = \text{tr}(S_1) + \text{tr}(S_2) - 2\text{tr}(S_1^{1/2} S_2 S_1^{1/2})^{1/2}$ arises in quantum information theory and has connections to the Wasserstein-2 distance.</p>
+</li>
+<li>
+<p><strong>Power-Euclidean metrics</strong>: $d_\alpha(S_1, S_2) = \frac{1}{\alpha}\|S_1^\alpha - S_2^\alpha\|_F$ for $\alpha \in (0, 1]$. The log-Euclidean metric is the limit as $\alpha \to 0$.</p>
+</li>
+</ul>
+<p>The log-Euclidean metric is preferred in computational settings for three reasons: (1) the Frechet mean is closed-form, (2) the log map provides a global diffeomorphism to a vector space where standard algorithms apply, and (3) it is computationally no more expensive than Frobenius distance (one eigendecomposition per matrix).</p>
+<h3 id="diffusion-tensor-imaging">Diffusion Tensor Imaging</h3>
+<p>The SPD manifold framework was originally developed for diffusion tensor imaging (DTI) in neuroimaging, where each voxel in a brain scan is represented by a $3 \times 3$ SPD matrix describing the local diffusion of water molecules. The same mathematical machinery described in this chapter &mdash; log-Euclidean distances, Frechet means, trajectory analysis &mdash; applies directly to DTI data, with &ldquo;frequency bands&rdquo; replaced by &ldquo;diffusion directions.&rdquo;</p>
+<h3 id="covariance-descriptors-in-computer-vision">Covariance Descriptors in Computer Vision</h3>
+<p>In computer vision, <em>region covariance descriptors</em> summarize image regions by the covariance of pixel features (position, intensity, gradient magnitude, gradient orientation). These descriptors are SPD matrices, and log-Euclidean methods have been used for texture classification, pedestrian detection, and visual tracking. The frequency-band covariance extraction described here is the acoustic analogue of the visual region covariance descriptor.</p>
+<h3 id="information-geometry">Information Geometry</h3>
+<p>The SPD manifold has deep connections to information geometry, the study of statistical models as Riemannian manifolds. A multivariate Gaussian distribution $\mathcal{N}(\mu, \Sigma)$ is parameterized by its mean $\mu$ and covariance $\Sigma \in \text{SPD}(n)$. The Fisher information metric on the space of Gaussians induces a Riemannian metric on SPD(n) that is closely related to the affine-invariant metric. The log-Euclidean metric can be seen as a computationally convenient approximation to this Fisher metric.</p>
+<h2 id="exercises">Exercises</h2>
+<p><strong>4.1.</strong> Prove that SPD(n) is an open subset of the vector space of $n \times n$ symmetric matrices. (<em>Hint</em>: use the continuity of eigenvalues as functions of matrix entries.)</p>
+<p><strong>4.2.</strong> Show that the arithmetic mean of two SPD matrices $\frac{1}{2}(S_1 + S_2)$ is always SPD, but it does not minimize $d_{LE}(S_1, M)^2 + d_{LE}(S_2, M)^2$ over $M \in \text{SPD}(n)$ in general.</p>
+<p><strong>4.3.</strong> Implement a function that computes the geodesic $\gamma(t) = \exp((1-t)\log(S_0) + t\log(S_1))$ for $t \in [0, 1]$ and verify numerically that $d_{LE}(S_0, \gamma(t)) = t \cdot d_{LE}(S_0, S_1)$ for several values of $t$.</p>
+<p><strong>4.4.</strong> Consider a spectrogram with $n_\text{mels} = 128$ and $n_\text{frames} = 20$. With $n_\text{bands} = 16$, the covariance matrix is $16 \times 16$, requiring estimation of $16 \times 17 / 2 = 136$ free parameters from 20 observations. Discuss the statistical reliability of this estimate and the role of regularization.</p>
+<p><strong>4.5.</strong> A spectral trajectory has geodesic deviation $\delta = 0.05$. Another has $\delta = 2.3$. Without seeing the spectrograms, what can you infer about the spectral evolution in each case? Propose a hypothesis about what kinds of acoustic signals might produce each pattern.</p>
+<p><strong>4.6.</strong> The <code>compute_covariance</code> implementation uses band averaging (mean within each band) for dimensionality reduction. An alternative is band max-pooling. Discuss the trade-offs: what spectral information does each approach preserve or discard? Implement both and compare the resulting SPD distances on synthetic spectrograms.</p>
+<p><strong>4.7.</strong> Show that the geodesic deviation $\delta$ is invariant under reparameterization of the trajectory (i.e., it depends on the sequence of matrices but not on the timestamps). Is this a desirable property for acoustic analysis? Why or why not?</p>
+<h2 id="notes-and-references">Notes and References</h2>
+<p>The log-Euclidean framework for SPD matrices was introduced by Arsigny, Fillard, Pennec, and Ayache, &ldquo;Log-Euclidean metrics for fast and simple calculus on diffusion tensors,&rdquo; <em>Magnetic Resonance in Medicine</em> 56(2), 2006. The affine-invariant metric dates to Pennec, Fillard, and Ayache, &ldquo;A Riemannian framework for tensor computing,&rdquo; <em>International Journal of Computer Vision</em> 66(1), 2006.</p>
+<p>For covariance descriptors in computer vision, see Tuzel, Porikli, and Meer, &ldquo;Region covariance: A fast descriptor for detection and classification,&rdquo; <em>ECCV</em> 2006. The application to brain-computer interfaces is surveyed in Barachant, Bonnet, Congedo, and Jutten, &ldquo;Riemannian geometry applied to BCI classification,&rdquo; <em>LVA/ICA</em> 2010.</p>
+<p>The discovery of vowel-like spectral structure in sperm whale clicks is reported in Begus, Leban, Silov, Gero, and Sprague, &ldquo;Vowels and diphthongs in sperm whale vocalization,&rdquo; <em>Open Mind</em> 9, 2025. The SPD manifold analysis of cetacean codas using the methods described in this chapter is implemented in the <code>eris-ketos</code> package (Bond, 2026).</p>
+<p>The connection between SPD geometry and information geometry is developed in Amari, <em>Information Geometry and Its Applications</em>, Springer, 2016. For optimal transport on SPD matrices, see Bhatia, Jain, and Lim, &ldquo;On the Bures-Wasserstein distance between positive definite matrices,&rdquo; <em>Expositiones Mathematicae</em> 37(2), 2019.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-03-hyperbolic-geometry.html" class="nav-prev">&larr; Chapter 3: Hyperbolic Geometry for Hierarchical Data</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-05-topological-data-analysis.html" class="nav-next">Chapter 5: Topological Data Analysis &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

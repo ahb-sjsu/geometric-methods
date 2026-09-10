@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 15: Cholesky Parameterization for Positive-Definiteness &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 15: Cholesky Parameterization for Positive-Definiteness from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-15-cholesky-parameterization">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 15: Cholesky Parameterization for Positive-Definiteness</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-14-gradient-reversal.html" class="nav-prev">&larr; Chapter 14: Gradient Reversal and Invariance Training</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-16-geometric-pipelines.html" class="nav-next">Chapter 16: Building Geometric Pipelines &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-15-cholesky-parameterization-for-positive-definiteness">Chapter 15: Cholesky Parameterization for Positive-Definiteness</h1>
+<p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation</em> &mdash; Andrew H. Bond</p>
+<hr />
+<blockquote>
+<p><em>&ldquo;The art of parameterization is the art of turning constrained problems into unconstrained ones.&rdquo;</em></p>
+</blockquote>
+<p>In Chapter 2, we introduced the Mahalanobis distance and the precision matrix $\Sigma^{-1}$ that gives it shape. In Chapter 4, we developed the geometry of the SPD manifold on which covariance matrices live. Both chapters deferred a central engineering question: when you need to <em>optimize</em> a covariance or precision matrix &mdash; when the metric itself is a learnable parameter &mdash; how do you ensure that the result is always symmetric and positive definite?</p>
+<p>This chapter answers that question in full. The Cholesky factorization $\Sigma = LL^\top$ transforms the constrained optimization over SPD matrices into an unconstrained optimization over lower-triangular matrices. The log-diagonal variant, where the diagonal of $L$ is parameterized in log-space, removes the last remaining constraint (positive diagonals) and yields a parameterization that is fully unconstrained, numerically stable, and differentiable end-to-end. These properties make it the default choice for covariance learning in modern computational modeling, from behavioral economics calibration to deep metric learning.</p>
+<p>We develop the theory, connect it to the SPD manifold geometry of Chapter 4, implement it in both NumPy and PyTorch, and show how it applies to the Mahalanobis distance learning problem introduced in Chapter 2. We close with the diagonal-only simplification used throughout the structural fuzzing framework and a synthesis that connects the parameterization patterns of Part III back to the geometric foundations of Part I.</p>
+<hr />
+<h2 id="151-the-positive-definiteness-constraint">15.1 The Positive-Definiteness Constraint</h2>
+<h3 id="1511-why-unconstrained-optimization-fails">15.1.1 Why Unconstrained Optimization Fails</h3>
+<p>Suppose you want to learn a $9 \times 9$ covariance matrix $\Sigma$ that makes your model&rsquo;s predictions match empirical data. The naive approach is to treat the 81 entries of $\Sigma$ as free parameters and run gradient descent. This fails for three reasons.</p>
+<p><strong>Symmetry violation.</strong> An unconstrained update to an arbitrary $9 \times 9$ matrix will not preserve $\Sigma = \Sigma^\top$. You can enforce symmetry by parameterizing only the upper triangle and mirroring it, reducing the parameter count from 81 to $9 \times 10 / 2 = 45$. But this is the easy constraint.</p>
+<p><strong>Positive-definiteness violation.</strong> Even if $\Sigma$ starts SPD, a gradient step can push an eigenvalue through zero, producing a matrix that is positive <em>semi</em>-definite or indefinite. When this happens, the Mahalanobis distance $d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top \Sigma^{-1} (\mathbf{a} - \mathbf{b})}$ involves the inverse of a singular or indefinite matrix, which is either undefined or yields imaginary distances. The optimizer has left the feasible set, and no amount of step-size tuning guarantees it will stay inside.</p>
+<p><strong>Projected gradient methods are fragile.</strong> One could project back onto the SPD cone after each gradient step &mdash; compute the eigendecomposition, clamp negative eigenvalues to some $\epsilon > 0$, and reconstruct the matrix. This works but is expensive ($O(n^3)$ per projection), introduces discontinuities in the optimization landscape at the boundary of the SPD cone, and can cause the optimizer to &ldquo;chatter&rdquo; along the boundary rather than converging smoothly.</p>
+<p>The right solution is to choose a parameterization that makes the constraint <em>impossible to violate</em>, so the optimizer never needs to worry about it. This is the Cholesky factorization.</p>
+<h3 id="1512-the-spd-cone">15.1.2 The SPD Cone</h3>
+<p>The set of $n \times n$ SPD matrices forms an open convex cone in the $n(n+1)/2$-dimensional space of symmetric matrices (Chapter 4, Definition 4.1). Its boundary consists of positive <em>semi</em>-definite matrices &mdash; those with at least one zero eigenvalue. The Cholesky factorization provides a bijection between the interior of this cone and the set of lower-triangular matrices with positive diagonals, mapping the curved boundary of the SPD cone to the simple constraint &ldquo;diagonal entries positive.&rdquo;</p>
+<hr />
+<h2 id="152-the-cholesky-factorization">15.2 The Cholesky Factorization</h2>
+<h3 id="1521-statement-and-uniqueness">15.2.1 Statement and Uniqueness</h3>
+<p><strong>Theorem 15.1</strong> (Cholesky factorization). <em>Every symmetric positive definite matrix $M \in \text{SPD}(n)$ has a unique decomposition</em></p>
+<p>$$M = LL^\top$$</p>
+<p><em>where $L$ is lower triangular with strictly positive diagonal entries.</em></p>
+<p>The proof proceeds by induction on $n$, partitioning $M$ into a leading $(n-1) \times (n-1)$ block (which is SPD by the property that every leading principal submatrix of an SPD matrix is SPD) and applying the inductive hypothesis. The details are standard; see the Notes and References.</p>
+<p><strong>Parameter count.</strong> The Cholesky factor $L$ has $n$ diagonal entries and $n(n-1)/2$ off-diagonal entries in the lower triangle, for a total of $n(n+1)/2$ free parameters &mdash; exactly the number of degrees of freedom in a symmetric matrix.</p>
+<h3 id="1522-the-converse-from-math28-to-spd">15.2.2 The Converse: From $L$ to SPD</h3>
+<p>The factorization&rsquo;s power for optimization comes from the converse direction. Given <em>any</em> lower-triangular matrix $L$ with strictly positive diagonal entries, the product $M = LL^\top$ is automatically:</p>
+<ol>
+<li><strong>Symmetric</strong>: $(LL^\top)^\top = (L^\top)^\top L^\top = LL^\top$.</li>
+<li><strong>Positive definite</strong>: for any $\mathbf{x} \neq 0$, $\mathbf{x}^\top LL^\top \mathbf{x} = \|L^\top \mathbf{x}\|^2 > 0$, since $L$ is invertible (positive diagonal implies nonzero determinant, so $L^\top \mathbf{x} \neq 0$).</li>
+</ol>
+<p>This means we can parameterize our optimization over the entries of $L$ rather than the entries of $M$. The off-diagonal entries of $L$ are completely unconstrained &mdash; they can be any real numbers. The only constraint is that the diagonal entries must be positive.</p>
+<hr />
+<h2 id="153-log-diagonal-cholesky-parameterization">15.3 Log-Diagonal Cholesky Parameterization</h2>
+<h3 id="1531-removing-the-last-constraint">15.3.1 Removing the Last Constraint</h3>
+<p>The diagonal entries $\ell_{ii}$ of $L$ must be strictly positive. We remove this constraint by parameterizing them in log-space. Define</p>
+<p>$$\ell_{ii} = \exp(\theta_i), \quad \theta_i \in \mathbb{R}.$$</p>
+<p>Since $\exp(\cdot) : \mathbb{R} \to (0, \infty)$ is a bijection, every real value of $\theta_i$ produces a valid positive diagonal entry. The full parameterization is now:</p>
+<ul>
+<li><strong>Diagonal parameters</strong> $\theta_1, \ldots, \theta_n \in \mathbb{R}$ (unconstrained)</li>
+<li><strong>Off-diagonal parameters</strong> $\ell_{ij}$ for $i > j$ (unconstrained)</li>
+</ul>
+<p>Total: $n(n+1)/2$ unconstrained real parameters that bijectively correspond to the set of $n \times n$ SPD matrices. An optimizer can take gradient steps of any magnitude in any direction without ever leaving the feasible set.</p>
+<h3 id="1532-why-log-space-for-the-diagonal">15.3.2 Why Log-Space for the Diagonal</h3>
+<p>The log-space parameterization is not merely a convenience for enforcing positivity. It provides three additional benefits.</p>
+<p><strong>Uniform sensitivity across scales.</strong> As discussed in Chapter 2 (Section 2.4), the gradient of a loss with respect to $\theta_i = \log(\ell_{ii})$ has more uniform magnitude across the parameter range than the gradient with respect to $\ell_{ii}$ directly. If $\mathcal{L}$ is the loss, then</p>
+<p>$$\frac{\partial \mathcal{L}}{\partial \theta_i} = \frac{\partial \mathcal{L}}{\partial \ell_{ii}} \cdot \ell_{ii}$$</p>
+<p>The multiplicative factor $\ell_{ii}$ compensates for the tendency of $\partial \mathcal{L} / \partial \ell_{ii}$ to shrink as $\ell_{ii}$ grows, producing gradient steps that correspond to <em>proportional</em> changes in $\ell_{ii}$ regardless of its current magnitude. A step of $\Delta\theta = 0.1$ changes $\ell_{ii}$ by approximately 10% whether $\ell_{ii}$ is 0.01 or 100.</p>
+<p><strong>Natural initialization.</strong> Setting all $\theta_i = 0$ yields $\ell_{ii} = 1$ for all $i$. If the off-diagonal entries are also initialized to zero, then $L = I$ and $M = LL^\top = I$, the identity matrix. This is the natural &ldquo;no information&rdquo; starting point: all dimensions are independent with unit variance. The optimizer then learns how to deviate from this baseline.</p>
+<p><strong>Connection to the SPD manifold.</strong> The log-diagonal parameterization has a natural relationship to the log-Euclidean metric on SPD(n) developed in Chapter 4. Recall that the log-Euclidean distance is $d_{LE}(S_1, S_2) = \|\log(S_1) - \log(S_2)\|_F$, where $\log$ is the matrix logarithm. For diagonal SPD matrices, the matrix logarithm reduces to the elementwise logarithm of the diagonal, and the log-Euclidean distance reduces to the Euclidean distance between the log-diagonals. The log-diagonal Cholesky parameterization thus inherits the desirable scale-equivariance of the log-Euclidean framework for the diagonal portion of the matrix.</p>
+<h3 id="1533-the-complete-parameterization-map">15.3.3 The Complete Parameterization Map</h3>
+<p>We can now write the complete map from unconstrained parameters to SPD matrix. Let $\boldsymbol{\phi} \in \mathbb{R}^{n(n+1)/2}$ be the parameter vector, partitioned as:</p>
+<p>$$\boldsymbol{\phi} = (\theta_1, \ldots, \theta_n, \ell_{21}, \ell_{31}, \ell_{32}, \ell_{41}, \ldots, \ell_{n,n-1})$$</p>
+<p>The map $f : \mathbb{R}^{n(n+1)/2} \to \text{SPD}(n)$ is:</p>
+<ol>
+<li>Construct $L$ with $L_{ii} = \exp(\theta_i)$ and $L_{ij} = \ell_{ij}$ for $i > j$.</li>
+<li>Return $M = LL^\top$.</li>
+</ol>
+<p>This map is smooth (infinitely differentiable), surjective onto SPD(n), and has a smooth inverse (the Cholesky decomposition followed by taking the log of the diagonal). It is therefore a diffeomorphism between $\mathbb{R}^{n(n+1)/2}$ and SPD(n), which means gradient-based optimization in parameter space $\mathbb{R}^{n(n+1)/2}$ corresponds to smooth navigation of the SPD manifold.</p>
+<hr />
+<h2 id="154-implementation-numpy">15.4 Implementation: NumPy</h2>
+<p>The <code>eris-econ</code> calibration module implements Cholesky parameterization for learning the precision matrix $\Sigma^{-1}$ from observed economic choices. The core routine reconstructs the precision matrix from a flat parameter vector:</p>
+<pre><code class="language-python">import numpy as np
+from scipy.optimize import minimize
+
+
+def cholesky_params_to_precision(params: np.ndarray, n: int) -&gt; np.ndarray:
+    &quot;&quot;&quot;Convert unconstrained parameters to a positive-definite precision matrix.
+
+    The first n entries are log-diagonal values (exponentiated to ensure
+    positivity). The remaining n*(n-1)/2 entries are the off-diagonal
+    elements of the lower-triangular Cholesky factor L.
+
+    Returns Sigma^{-1} = L @ L.T, which is guaranteed SPD.
+    &quot;&quot;&quot;
+    L = np.zeros((n, n))
+
+    # Diagonal: exponentiate for positivity
+    for i in range(n):
+        L[i, i] = np.exp(params[i])
+
+    # Off-diagonal (lower triangle): unconstrained
+    idx = n
+    for i in range(1, n):
+        for j in range(i):
+            L[i, j] = params[idx]
+            idx += 1
+
+    return L @ L.T
+</code></pre>
+<p>The function unpacks the flat array in a specific order: the first $n$ entries are log-diagonal values, and the remaining entries fill the lower triangle column by column. The <code>np.exp</code> call on the diagonal is the only nonlinearity &mdash; everything else is linear.</p>
+<p>The calibration loop wraps this in an objective function and calls L-BFGS-B:</p>
+<pre><code class="language-python">def calibrate_precision(
+    evaluate_fn,
+    n_dims: int,
+    n_restarts: int = 10,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Learn the precision matrix that minimizes a loss function.
+
+    Uses Cholesky parameterization to ensure positive-definiteness
+    at every step, with multiple random restarts for global search.
+    &quot;&quot;&quot;
+    n_params = n_dims * (n_dims + 1) // 2
+    best_loss = float(&quot;inf&quot;)
+    best_precision = None
+    rng = np.random.default_rng(42)
+
+    for _ in range(n_restarts):
+        # Initialize near identity: log-diagonal ~ 0, off-diagonal ~ 0
+        x0 = rng.normal(0, 0.1, n_params)
+
+        def objective(params):
+            sigma_inv = cholesky_params_to_precision(params, n_dims)
+            return evaluate_fn(sigma_inv)
+
+        result = minimize(objective, x0, method=&quot;L-BFGS-B&quot;)
+
+        if result.fun &lt; best_loss:
+            best_loss = result.fun
+            best_precision = cholesky_params_to_precision(result.x, n_dims)
+
+    return best_precision
+</code></pre>
+<p>The initial parameters are drawn from $\mathcal{N}(0, 0.1)$, which corresponds to Cholesky factors near the identity: the diagonal entries are $\exp(\theta_i)$ where $\theta_i \sim \mathcal{N}(0, 0.1)$, so they cluster around 1.0, and the off-diagonal entries are small, producing weak cross-dimensional coupling. Multiple restarts are essential because the loss landscape over Cholesky parameters is generally non-convex &mdash; a fact that reflects the non-Euclidean geometry of the SPD manifold explored in Chapter 4.</p>
+<p>In the <code>eris-econ</code> calibration module (<code>calibration.py</code>), this parameterization appears in the <code>estimate_sigma</code> function, which learns the precision matrix from observed economic choices using a softmax likelihood model. The key inner function <code>_unpack_cholesky</code> mirrors the structure above:</p>
+<pre><code class="language-python">def _unpack_cholesky(params: np.ndarray) -&gt; np.ndarray:
+    &quot;&quot;&quot;Reconstruct Sigma^{-1} from Cholesky factor parameters.&quot;&quot;&quot;
+    L = np.zeros((N_DIMS, N_DIMS))
+    idx = 0
+    for i in range(N_DIMS):
+        for j in range(i + 1):
+            L[i, j] = params[idx]
+            idx += 1
+    # Ensure positive diagonal
+    for i in range(N_DIMS):
+        L[i, i] = np.exp(L[i, i])
+    return L @ L.T  # Sigma^{-1} = L L^T
+</code></pre>
+<p>Note the difference in packing order: here the parameters are packed row-by-row through the lower triangle (including the diagonal), with the diagonal entries treated as log-values after extraction. The specific packing order is a convention choice; what matters is consistency between packing and unpacking.</p>
+<hr />
+<h2 id="155-implementation-pytorch">15.5 Implementation: PyTorch</h2>
+<p>For deep learning applications where end-to-end gradient computation is required, the Cholesky parameterization integrates naturally with PyTorch&rsquo;s autograd. The key is to store the unconstrained parameters as <code>nn.Parameter</code> objects and reconstruct the SPD matrix in the forward pass:</p>
+<pre><code class="language-python">import torch
+import torch.nn as nn
+
+
+class CholeskyPrecision(nn.Module):
+    &quot;&quot;&quot;Learnable precision matrix via log-diagonal Cholesky parameterization.
+
+    Stores n*(n+1)/2 unconstrained parameters. The forward() method
+    returns a guaranteed-SPD precision matrix Sigma^{-1} = L @ L.T.
+    &quot;&quot;&quot;
+
+    def __init__(self, n: int):
+        super().__init__()
+        self.n = n
+        n_params = n * (n + 1) // 2
+
+        # Initialize near identity
+        init = torch.zeros(n_params)
+        # Log-diagonal entries are the first n values; init to 0 -&gt; exp(0) = 1
+        self.raw_params = nn.Parameter(init)
+
+        # Precompute indices for lower-triangular unpacking
+        rows, cols = torch.tril_indices(n, n)
+        self.register_buffer(&quot;tril_rows&quot;, rows)
+        self.register_buffer(&quot;tril_cols&quot;, cols)
+        diag_mask = rows == cols
+        self.register_buffer(&quot;diag_mask&quot;, diag_mask)
+
+    def forward(self) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Reconstruct the precision matrix from unconstrained parameters.&quot;&quot;&quot;
+        L = torch.zeros(self.n, self.n, dtype=self.raw_params.dtype,
+                        device=self.raw_params.device)
+
+        # Fill lower triangle
+        values = self.raw_params.clone()
+        # Exponentiate diagonal entries for positivity
+        values[self.diag_mask] = values[self.diag_mask].exp()
+        L[self.tril_rows, self.tril_cols] = values
+
+        return L @ L.T
+
+    def cholesky_factor(self) -&gt; torch.Tensor:
+        &quot;&quot;&quot;Return the Cholesky factor L itself (useful for determinants).&quot;&quot;&quot;
+        L = torch.zeros(self.n, self.n, dtype=self.raw_params.dtype,
+                        device=self.raw_params.device)
+        values = self.raw_params.clone()
+        values[self.diag_mask] = values[self.diag_mask].exp()
+        L[self.tril_rows, self.tril_cols] = values
+        return L
+</code></pre>
+<p>Several design choices deserve comment.</p>
+<p><strong>Index precomputation.</strong> The <code>tril_indices</code> and <code>diag_mask</code> buffers are computed once at initialization and reused on every forward pass. This avoids repeated index computation during training.</p>
+<p><strong>Gradient flow.</strong> Because <code>exp</code> and matrix multiplication are both differentiable, gradients flow from any loss computed on the precision matrix back through $LL^\top$, through the exponentiation of the diagonal, and into the raw parameters. PyTorch&rsquo;s autograd handles the chain rule automatically. There are no discontinuities or projections that could interrupt gradient flow.</p>
+<p><strong>Determinant computation.</strong> The log-determinant of $M = LL^\top$ is $\log \det(M) = 2 \sum_i \log(\ell_{ii}) = 2 \sum_i \theta_i$, which is trivially cheap to compute from the raw parameters. This is important for Gaussian likelihood objectives, where $\log \det(\Sigma^{-1})$ appears as a normalizing constant.</p>
+<p>A training loop for metric learning instantiates <code>CholeskyPrecision(n_dims)</code>, calls <code>model()</code> in the forward pass to get the SPD precision matrix, computes the Mahalanobis distance $\sqrt{\boldsymbol{\delta}^\top \Sigma^{-1}\boldsymbol{\delta}}$ (with a <code>clamp_min(1e-8)</code> before the square root to prevent gradient explosion near zero), and backpropagates through the entire chain. PyTorch&rsquo;s autograd handles the derivatives through the exponentiation and matrix multiplication automatically.</p>
+<hr />
+<h2 id="156-gradient-flow-through-the-cholesky-parameterization">15.6 Gradient Flow Through the Cholesky Parameterization</h2>
+<p>Understanding the gradient structure helps diagnose training dynamics and motivates initialization strategies.</p>
+<h3 id="1561-the-jacobian">15.6.1 The Jacobian</h3>
+<p>Let $M = LL^\top$ where $L$ is lower triangular with positive diagonal. We want the Jacobian $\partial M_{ij} / \partial L_{kl}$ (where $k \geq l$). Since $M_{ij} = \sum_r L_{ir}L_{jr}$, the derivative is:</p>
+<p>$$\frac{\partial M_{ij}}{\partial L_{kl}} = \delta_{ik}L_{jl} + \delta_{jk}L_{il}$$</p>
+<p>where $\delta$ is the Kronecker delta. For diagonal entries of $L$ (where we actually optimize $\theta_k = \log L_{kk}$), the chain rule gives:</p>
+<p>$$\frac{\partial M_{ij}}{\partial \theta_k} = \frac{\partial M_{ij}}{\partial L_{kk}} \cdot L_{kk} = (\delta_{ik}L_{jk} + \delta_{jk}L_{ik}) \cdot L_{kk}$$</p>
+<p>This Jacobian has two important properties.</p>
+<p><strong>Sparsity.</strong> Each entry $L_{kl}$ affects only the entries $M_{ij}$ where $i = k$ or $j = k$. This means the Jacobian is sparse, and gradient computation through the Cholesky parameterization is efficient.</p>
+<p><strong>Scale coupling.</strong> The factor $L_{kk}$ in the chain rule for diagonal parameters means that the gradient with respect to $\theta_k$ is proportional to $L_{kk}$ itself. Large diagonal entries amplify gradients; small ones suppress them. The log-space parameterization compensates for this scaling effect, producing more uniform gradient magnitudes across the diagonal &mdash; a critical property for stable optimization.</p>
+<h3 id="1562-conditioning-and-numerical-stability">15.6.2 Conditioning and Numerical Stability</h3>
+<p>The condition number of $M = LL^\top$ is $\kappa(M) = \kappa(L)^2$. If $L$ has a large ratio between its largest and smallest diagonal entries, $M$ will be poorly conditioned, and numerical errors in the gradient computation will be amplified.</p>
+<p>In practice, this means the log-diagonal parameters $\theta_i$ should be bounded to prevent extreme values. A range of $\theta_i \in [-5, 5]$ constrains the diagonal to $[\exp(-5), \exp(5)] \approx [0.007, 148]$, keeping the condition number of $L$ below $\exp(10) \approx 22{,}000$ &mdash; well within the range of stable double-precision arithmetic. For L-BFGS-B, these bounds are passed directly via the <code>bounds</code> parameter. For PyTorch, parameter clamping after each optimizer step achieves the same effect.</p>
+<hr />
+<h2 id="157-connection-to-mahalanobis-distance-learning">15.7 Connection to Mahalanobis Distance Learning</h2>
+<h3 id="1571-learning-math114-via-cholesky">15.7.1 Learning $\Sigma^{-1}$ via Cholesky</h3>
+<p>Chapter 2 introduced the Mahalanobis distance</p>
+<p>$$d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top \Sigma^{-1} (\mathbf{a} - \mathbf{b})}$$</p>
+<p>and showed that the precision matrix $\Sigma^{-1}$ acts as an attention mechanism, assigning importance weights to each dimension and pair of dimensions. The Cholesky parameterization provides the missing link: a practical method for <em>learning</em> this attention mechanism from data.</p>
+<p>The connection is direct. We parameterize $\Sigma^{-1} = LL^\top$ where $L$ is the log-diagonal Cholesky factor. The Mahalanobis distance becomes:</p>
+<p>$$d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top LL^\top (\mathbf{a} - \mathbf{b})} = \|L^\top(\mathbf{a} - \mathbf{b})\|_2$$</p>
+<p>This last form is revealing. The Mahalanobis distance is simply the Euclidean distance after the linear transformation $\mathbf{x} \mapsto L^\top \mathbf{x}$. Learning $\Sigma^{-1}$ is equivalent to learning a linear embedding: the Cholesky factor $L^\top$ maps from the original space to a &ldquo;whitened&rdquo; space where Euclidean distance is the correct metric. This connects metric learning to the broader family of linear embedding methods, including PCA, LDA, and the linear layers of neural networks.</p>
+<h3 id="1572-the-softmax-likelihood">15.7.2 The Softmax Likelihood</h3>
+<p>In the <code>eris-econ</code> framework, the precision matrix is learned from observed choices using a softmax likelihood model. Given an observed choice where an agent at state $\mathbf{s}$ chose option $\mathbf{c}$ over alternatives $\mathbf{r}_1, \ldots, \mathbf{r}_k$, the likelihood is:</p>
+<p>$$P(\text{choose } \mathbf{c}) = \frac{\exp(-d_M^2(\mathbf{s}, \mathbf{c}))}{\exp(-d_M^2(\mathbf{s}, \mathbf{c})) + \sum_j \exp(-d_M^2(\mathbf{s}, \mathbf{r}_j))}$$</p>
+<p>The squared Mahalanobis distance acts as a &ldquo;cost&rdquo; &mdash; lower cost means higher probability of being chosen. The negative log-likelihood is:</p>
+<p>$$\text{NLL} = d_M^2(\mathbf{s}, \mathbf{c}) + \log\left(\exp(-d_M^2(\mathbf{s}, \mathbf{c})) + \sum_j \exp(-d_M^2(\mathbf{s}, \mathbf{r}_j))\right)$$</p>
+<p>With the Cholesky parameterization, $d_M^2(\mathbf{s}, \mathbf{c}) = \|L^\top(\mathbf{c} - \mathbf{s})\|^2$, and the entire NLL is differentiable with respect to the entries of $L$. This is the objective minimized in <code>calibration.py</code>:</p>
+<pre><code class="language-python">def neg_log_likelihood(params: np.ndarray) -&gt; float:
+    &quot;&quot;&quot;Negative log-likelihood of observed choices.&quot;&quot;&quot;
+    sigma_inv = _unpack_cholesky(params)
+    nll = 0.0
+
+    for obs in observations:
+        delta_chosen = obs.chosen - obs.start
+        cost_chosen = float(delta_chosen @ sigma_inv @ delta_chosen)
+
+        costs = [cost_chosen]
+        for alt in obs.rejected:
+            delta_alt = alt - obs.start
+            costs.append(float(delta_alt @ sigma_inv @ delta_alt))
+
+        # Log-sum-exp for numerical stability
+        min_cost = min(costs)
+        log_denom = min_cost + np.log(
+            sum(np.exp(-(c - min_cost)) for c in costs)
+        )
+        nll += (cost_chosen - min_cost) + log_denom
+
+    # L2 regularization on parameters
+    nll += regularization * np.sum(params**2)
+    return nll
+</code></pre>
+<p>The log-sum-exp trick (subtracting <code>min_cost</code> before exponentiating) prevents numerical overflow. The L2 regularization on the raw Cholesky parameters penalizes deviation from the identity, acting as a prior that the metric should not be too different from the Euclidean metric unless the data strongly supports it.</p>
+<h3 id="1573-from-precision-to-covariance-and-back">15.7.3 From Precision to Covariance and Back</h3>
+<p>The <code>eris-econ</code> framework parameterizes the <em>precision</em> matrix $\Sigma^{-1} = LL^\top$ rather than the <em>covariance</em> matrix $\Sigma$, because the Mahalanobis distance uses $\Sigma^{-1}$ directly. If you need $\Sigma$ (for example, to sample from a Gaussian or to inspect the learned variances), you invert:</p>
+<p>$$\Sigma = (\Sigma^{-1})^{-1} = (LL^\top)^{-1} = (L^\top)^{-1}L^{-1} = (L^{-1})^\top L^{-1}$$</p>
+<p>Since $L$ is triangular, its inverse $L^{-1}$ can be computed in $O(n^2)$ by back-substitution, which is cheaper than the general $O(n^3)$ matrix inversion. Alternatively, one can parameterize $\Sigma = LL^\top$ directly and compute $\Sigma^{-1}$ when needed &mdash; the choice depends on which matrix appears more often in the computation.</p>
+<p>In the <code>eris-econ</code> <code>estimate_sigma</code> function, the final step recovers $\Sigma$ from the learned $\Sigma^{-1}$:</p>
+<pre><code class="language-python">sigma_inv = _unpack_cholesky(result.x)
+# Recover Sigma from Sigma^{-1}, with regularization for stability
+sigma = np.linalg.inv(sigma_inv + 1e-10 * np.eye(N_DIMS))
+</code></pre>
+<p>The small regularization $10^{-10} \cdot I$ guards against numerical singularity in the inversion, though the Cholesky parameterization already ensures $\Sigma^{-1}$ is positive definite.</p>
+<hr />
+<h2 id="158-the-diagonal-only-simplification">15.8 The Diagonal-Only Simplification</h2>
+<h3 id="1581-when-full-covariance-is-too-expensive">15.8.1 When Full Covariance Is Too Expensive</h3>
+<p>The full Cholesky parameterization has $n(n+1)/2$ free parameters. For the 9-dimensional ethical-economic space used in <code>eris-econ</code>, this is $9 \times 10 / 2 = 45$ parameters. When the training signal is limited &mdash; the <code>eris-econ</code> model has 16 prediction targets &mdash; fitting 45 parameters risks overfitting: the precision matrix may learn spurious cross-dimensional correlations that capture noise rather than structure.</p>
+<p>The remedy is to restrict $\Sigma^{-1}$ (and therefore $L$) to be diagonal:</p>
+<p>$$L = \text{diag}(\ell_1, \ldots, \ell_n), \quad \Sigma^{-1} = LL^\top = \text{diag}(\ell_1^2, \ldots, \ell_n^2)$$</p>
+<p>This reduces the parameter count from $n(n+1)/2$ to $n$ &mdash; from 45 to 9 for the <code>eris-econ</code> model. Each parameter has a direct interpretation: $\ell_i^2 = 1/\sigma_i^2$ is the precision (inverse variance) for dimension $i$. The Cholesky factorization becomes trivial (just square roots of the diagonal), and the log-diagonal parameterization reduces to:</p>
+<p>$$\sigma_i^{-2} = \exp(2\theta_i), \quad \text{or equivalently,} \quad \sigma_i^2 = \exp(-2\theta_i)$$</p>
+<p>In the <code>calibration_v2.py</code> module, this is implemented even more directly by parameterizing the log-variance:</p>
+<pre><code class="language-python">def _softmax_nll(
+    log_diag: np.ndarray,
+    observations: list[ObservedChoice],
+    regularization: float = 0.01,
+) -&gt; float:
+    &quot;&quot;&quot;Softmax negative log-likelihood for diagonal sigma.&quot;&quot;&quot;
+    sigma_diag = np.exp(log_diag)
+    sigma_inv_diag = 1.0 / sigma_diag
+    nll = 0.0
+
+    for obs in observations:
+        delta_chosen = obs.chosen - obs.start
+        cost_chosen = float(np.sum(sigma_inv_diag * delta_chosen ** 2))
+
+        costs = [cost_chosen]
+        for alt in obs.rejected:
+            delta_alt = alt - obs.start
+            costs.append(float(np.sum(sigma_inv_diag * delta_alt ** 2)))
+
+        min_cost = min(costs)
+        log_denom = min_cost + np.log(
+            sum(np.exp(-(c - min_cost)) for c in costs)
+        )
+        nll += (cost_chosen - min_cost) + log_denom
+
+    nll += regularization * np.sum(log_diag ** 2)
+    return nll
+</code></pre>
+<p>Here <code>log_diag[i]</code> is $\log(\sigma_i^2)$, and <code>sigma_inv_diag[i]</code> $= 1/\sigma_i^2$ is the precision weight for dimension $i$. The squared Mahalanobis distance simplifies to the weighted sum of squared differences: $d_M^2 = \sum_i (a_i - b_i)^2 / \sigma_i^2$, which avoids the matrix multiplication entirely.</p>
+<h3 id="1582-the-structural-fuzzing-connection">15.8.2 The Structural Fuzzing Connection</h3>
+<p>The diagonal parameterization is exactly what the structural fuzzing framework uses when searching over dimension subsets. In <code>structural_fuzz.py</code>, inactive dimensions receive variance $10^6$ (effectively zero precision weight), and active dimensions are optimized over a log-spaced grid:</p>
+<pre><code class="language-python"># From _optimize_subset: log-spaced variance grid
+var_values = np.logspace(-2, 2, n_grid)  # 0.01 to 100
+
+# 1D grid search over variance for the active dimension
+for v in var_values:
+    sigma_diag = np.full(N_DIMS, inactive_var)   # 1e6 for inactive
+    sigma_diag[active_dims[0]] = v               # optimize this one
+    sigma = np.diag(sigma_diag)
+    mae, errors = _eval(sigma)
+</code></pre>
+<p>This is a grid-search version of diagonal Cholesky optimization. The log-spacing of <code>var_values</code> mirrors the log-diagonal parameterization: uniform steps in $\log(\sigma^2)$ correspond to multiplicatively uniform steps in $\sigma^2$, ensuring equal coverage across the [0.01, 100] range.</p>
+<p>For 3D and higher subsets, the grid is too large and random search in log-space replaces it:</p>
+<pre><code class="language-python"># Random search in log-space for 3D+ subsets
+rng = np.random.default_rng(42)
+for _ in range(n_samples):
+    sigma_diag = np.full(N_DIMS, inactive_var)
+    for d in active_dims:
+        sigma_diag[d] = 10 ** rng.uniform(-2, 2)  # log-uniform in [0.01, 100]
+    sigma = np.diag(sigma_diag)
+    mae, errors = _eval(sigma)
+</code></pre>
+<p>The structural fuzzing campaign over dimension subsets (Chapter 2, Section 2.6) is therefore a combinatorial search over the <em>sparsity pattern</em> of a diagonal precision matrix, combined with log-space optimization of the nonzero entries. Each subset corresponds to a particular mask on the diagonal of $\Sigma^{-1}$, and the framework asks: which mask and scale combination best explains the empirical data?</p>
+<h3 id="1583-when-to-use-full-vs-diagonal">15.8.3 When to Use Full vs. Diagonal</h3>
+<p>The choice between full and diagonal covariance is a bias-variance tradeoff:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Parameterization</th>
+<th style="text-align: center;">Parameters</th>
+<th style="text-align: left;">Captures</th>
+<th style="text-align: left;">Risk</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Full Cholesky</td>
+<td style="text-align: center;">$n(n+1)/2$</td>
+<td style="text-align: left;">Cross-dimensional correlations</td>
+<td style="text-align: left;">Overfitting with limited data</td>
+</tr>
+<tr>
+<td style="text-align: left;">Block-diagonal</td>
+<td style="text-align: center;">$\sum_b n_b(n_b+1)/2$</td>
+<td style="text-align: left;">Within-group correlations</td>
+<td style="text-align: left;">Misses between-group structure</td>
+</tr>
+<tr>
+<td style="text-align: left;">Diagonal</td>
+<td style="text-align: center;">$n$</td>
+<td style="text-align: left;">Per-dimension scales</td>
+<td style="text-align: left;">Misses all correlations</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Use full Cholesky</strong> when you have abundant training signal (many more targets than $n(n+1)/2$ parameters) and domain knowledge suggests important cross-dimensional correlations. For example, in brain-computer interfaces, the correlation structure between EEG channels is critical for classification, and full SPD covariance matrices significantly outperform diagonal ones (Barachant et al., 2010).</p>
+<p><strong>Use block-diagonal</strong> when dimensions naturally cluster into groups with strong internal coupling but weak between-group interactions. In the <code>eris-econ</code> model, one might group the transferable dimensions (Consequences, Rights, Autonomy) into one block and the evaluative dimensions (Social Impact, Virtue, Legitimacy, Epistemic) into another, allowing correlations within each group while assuming independence between groups.</p>
+<p><strong>Use diagonal</strong> when the target-to-parameter ratio is low, or when interpretability is paramount. The structural fuzzing framework uses diagonal parameterization because (a) the 16 prediction targets do not reliably constrain 45 parameters, and (b) the ablation and sensitivity analyses are most interpretable when each parameter controls exactly one dimension.</p>
+<h3 id="1584-cross-validation-and-bootstrap-analysis">15.8.4 Cross-Validation and Bootstrap Analysis</h3>
+<p>The <code>calibration_v2.py</code> module includes two tools for assessing the reliability of the diagonal parameterization:</p>
+<p><strong>Cross-validation</strong> selects the regularization strength. The targets are partitioned into $k$ folds; the diagonal precision is fitted on $k-1$ folds and evaluated on the held-out fold. The regularization $\lambda$ that minimizes the cross-validated negative log-likelihood is chosen. The <code>cross_validate</code> function in <code>calibration_v2.py</code> implements this, sweeping over regularization values $[0.001, 0.005, 0.01, 0.05, 0.1, 0.5]$ and returning the best.</p>
+<p><strong>Bootstrap confidence intervals</strong> quantify parameter uncertainty. The training data is resampled with replacement $B$ times; the diagonal precision is fitted to each bootstrap sample; and the distribution of the resulting parameters reveals which dimensions are reliably important and which are unstable. In the <code>eris-econ</code> joint calibration, bootstrap analysis reveals that Consequences ($d_1$), Fairness ($d_3$), and Privacy/Trust ($d_5$) consistently receive high precision across bootstrap samples, while Autonomy ($d_4$) and Legitimacy ($d_8$) are unstable &mdash; wide confidence intervals indicate the data does not strongly constrain their contribution. This aligns with the structural fuzzing results: the Pareto frontier of dimension subsets is dominated by configurations containing Consequences and Fairness.</p>
+<hr />
+<h2 id="159-advanced-topics">15.9 Advanced Topics</h2>
+<h3 id="1591-the-cholesky-parameterization-and-riemannian-optimization">15.9.1 The Cholesky Parameterization and Riemannian Optimization</h3>
+<p>The Cholesky parameterization provides an alternative to explicit Riemannian optimization on the SPD manifold (Chapter 4). Instead of computing the Riemannian gradient and exponential map at each step (which requires eigendecompositions), we work in the flat parameter space of Cholesky entries and let the nonlinear map $L \mapsto LL^\top$ implicitly handle the manifold geometry. This is computationally cheaper per step, though the induced metric on the parameter space is not the Euclidean metric, so standard optimizers like Adam or L-BFGS are not doing true Riemannian descent. In practice, the Cholesky approach works well for most applications; explicit Riemannian methods become advantageous when $n > 50$ or the condition number is extreme.</p>
+<h3 id="1592-determinant-and-log-likelihood">15.9.2 Determinant and Log-Likelihood</h3>
+<p>Many probabilistic models involve the log-determinant of the precision or covariance matrix. For a multivariate Gaussian, the log-likelihood of observing $\mathbf{x}$ given mean $\boldsymbol{\mu}$ and precision $\Lambda = \Sigma^{-1}$ is:</p>
+<p>$$\log p(\mathbf{x}) = \frac{1}{2}\log\det(\Lambda) - \frac{1}{2}(\mathbf{x} - \boldsymbol{\mu})^\top \Lambda (\mathbf{x} - \boldsymbol{\mu}) - \frac{n}{2}\log(2\pi)$$</p>
+<p>With the Cholesky parameterization $\Lambda = LL^\top$, the log-determinant is:</p>
+<p>$$\log\det(\Lambda) = \log\det(LL^\top) = 2\log\det(L) = 2\sum_{i=1}^{n}\log L_{ii} = 2\sum_{i=1}^{n}\theta_i$$</p>
+<p>This is a linear function of the log-diagonal parameters &mdash; no eigendecomposition or matrix factorization required. It is the cheapest possible determinant computation, and it is numerically exact (no floating-point accumulation from multiplying many eigenvalues).</p>
+<hr />
+<h2 id="1510-synthesis-from-parameterization-patterns-to-geometric-framework">15.10 Synthesis: From Parameterization Patterns to Geometric Framework</h2>
+<p>This chapter completes the core parameterization toolkit of Part III. Let us step back and trace the thread that connects the patterns developed in Chapters 12&ndash;15 to the geometric framework established in Part I.</p>
+<h3 id="the-central-theme">The Central Theme</h3>
+<p>Part I established that computational models live in multi-dimensional spaces, and that the geometry of those spaces &mdash; distances, directions, curvatures &mdash; carries information that scalar summaries destroy. Part II developed algorithms for navigating and analyzing those spaces. Part III has addressed a different question: how do you <em>construct</em> and <em>learn</em> the geometric structures themselves?</p>
+<p>The Cholesky parameterization is the final piece of this construction. Consider the full pipeline:</p>
+<ol>
+<li>
+<p><strong>Chapter 2</strong> introduced the Mahalanobis distance and showed that the precision matrix $\Sigma^{-1}$ encodes the geometry of the evaluation space &mdash; which dimensions matter, how they are coupled, and what &ldquo;distance&rdquo; means in context.</p>
+</li>
+<li>
+<p><strong>Chapter 4</strong> placed covariance matrices on the SPD manifold and showed that the correct distance between two covariance structures is not the Frobenius norm but the log-Euclidean metric, which respects the multiplicative structure of eigenvalues.</p>
+</li>
+<li>
+<p><strong>This chapter</strong> provided the engineering bridge: the log-diagonal Cholesky factorization turns the constrained optimization over the SPD manifold into an unconstrained optimization in $\mathbb{R}^{n(n+1)/2}$, where standard optimizers can operate without ever producing an invalid (non-SPD) result.</p>
+</li>
+</ol>
+<p>Together, these three chapters form a complete recipe for <em>learning the geometry of a problem from data</em>. The SPD manifold tells you the shape of the space you are searching in. The Cholesky parameterization tells you how to navigate that space efficiently. The Mahalanobis distance tells you how to use the result.</p>
+<h3 id="the-diagonal-hierarchy">The Diagonal Hierarchy</h3>
+<p>A recurring pattern in this book is the progression from full generality to practical simplification:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Level</th>
+<th style="text-align: left;">Object</th>
+<th style="text-align: center;">Parameters</th>
+<th style="text-align: left;">Captures</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Full SPD</td>
+<td style="text-align: left;">$\Sigma^{-1} = LL^\top$, $L$ unrestricted</td>
+<td style="text-align: center;">$n(n+1)/2$</td>
+<td style="text-align: left;">All cross-dimensional structure</td>
+</tr>
+<tr>
+<td style="text-align: left;">Block-diagonal</td>
+<td style="text-align: left;">$\Sigma^{-1}$ block-diagonal</td>
+<td style="text-align: center;">$\sum n_b(n_b+1)/2$</td>
+<td style="text-align: left;">Within-group structure</td>
+</tr>
+<tr>
+<td style="text-align: left;">Diagonal</td>
+<td style="text-align: left;">$\Sigma^{-1} = \text{diag}(w_1, \ldots, w_n)$</td>
+<td style="text-align: center;">$n$</td>
+<td style="text-align: left;">Per-dimension scaling</td>
+</tr>
+<tr>
+<td style="text-align: left;">Sparse subset</td>
+<td style="text-align: left;">Diagonal with some $w_i = 0$</td>
+<td style="text-align: center;">$k < n$</td>
+<td style="text-align: left;">Active dimension selection</td>
+</tr>
+<tr>
+<td style="text-align: left;">Scalar</td>
+<td style="text-align: left;">$\Sigma^{-1} = \alpha I$</td>
+<td style="text-align: center;">1</td>
+<td style="text-align: left;">Uniform scaling (Euclidean)</td>
+</tr>
+</tbody>
+</table>
+<p>The structural fuzzing framework operates primarily at the &ldquo;sparse subset&rdquo; level, searching over which dimensions to include and at what scale. The <code>eris-econ</code> calibration operates at the &ldquo;diagonal&rdquo; level, learning per-dimension variances with regularization. The full Cholesky parameterization waits in reserve for problems with enough data and enough cross-dimensional structure to justify its $n(n+1)/2$ parameters.</p>
+<p>This hierarchy mirrors the bias-variance tradeoff that pervades statistical learning. Moving up the hierarchy (toward full SPD) reduces bias &mdash; the model can represent richer geometric structure &mdash; but increases variance, because more parameters must be estimated from the same data. Moving down (toward scalar) increases bias but reduces variance. The right level depends on the ratio of training signal to parameter count, and on domain knowledge about the importance of cross-dimensional coupling.</p>
+<h3 id="connecting-back-to-geometry">Connecting Back to Geometry</h3>
+<p>The Cholesky parameterization is not merely a computational trick. It reveals something fundamental about the relationship between optimization and geometry. The SPD manifold is curved &mdash; it is not a flat vector space. Optimizing over it with flat-space methods (unconstrained gradient descent on the raw matrix entries) fails because flat-space steps leave the manifold. The Cholesky parameterization provides a <em>global chart</em> for the manifold: a single coordinate system that covers the entire SPD cone, in which the curvature is absorbed into the nonlinear map $L \mapsto LL^\top$. This is the same strategy used throughout differential geometry &mdash; find coordinates that make the problem tractable, even if the coordinates themselves introduce nonlinearity.</p>
+<p>Chapter 4 used a different chart: the matrix logarithm, which maps SPD(n) to the flat space of symmetric matrices. The log map is an isometry under the log-Euclidean metric, making it ideal for distance computation and averaging. The Cholesky map is not an isometry under any standard metric, but it has the compensating advantage of being algebraically simple (just matrix multiplication) and parameterically efficient (no eigendecomposition required). In practice, the two charts serve complementary purposes: log-Euclidean for analysis and distance computation, Cholesky for optimization and learning.</p>
+<p>This duality &mdash; between the analytical elegance of log-Euclidean geometry and the practical efficiency of Cholesky parameterization &mdash; is a microcosm of the broader theme of this book. Geometry provides the conceptual framework and the correctness guarantees. Engineering provides the efficient implementations. The best computational models use both: geometric insight to formulate the right problem, and careful parameterization to solve it at scale.</p>
+<hr />
+<h2 id="exercises">Exercises</h2>
+<p><strong>15.1.</strong> Implement <code>cholesky_params_to_precision</code> for $n = 3$ and verify that the output is always SPD by checking: (a) symmetry, (b) all eigenvalues positive, for 1000 random parameter vectors drawn from $\mathcal{N}(0, 1)$.</p>
+<p><strong>15.2.</strong> Starting from the identity ($\theta_i = 0$, off-diagonals $= 0$), compute the gradient of $\text{tr}(\Sigma^{-1}A)$ with respect to the Cholesky parameters, where $A$ is a fixed symmetric matrix. Verify your analytical gradient against finite differences.</p>
+<p><strong>15.3.</strong> Compare the convergence of L-BFGS-B on a toy metric learning problem using three parameterizations: (a) raw symmetric matrix entries with eigenvalue projection, (b) full Cholesky with positive-diagonal enforcement via absolute value, (c) log-diagonal Cholesky. Measure wall-clock time and final loss across 50 random initializations.</p>
+<p><strong>15.4.</strong> For the 9-dimensional <code>eris-econ</code> space, compute the ratio of parameters to targets for full Cholesky (45 parameters, 16 targets) and diagonal (9 parameters, 16 targets). Using AIC or BIC, determine which parameterization is preferred for this problem.</p>
+<p><strong>15.5.</strong> Implement block-diagonal Cholesky parameterization with two blocks: transferable dimensions {Consequences, Rights, Autonomy} and evaluative dimensions {Privacy/Trust, Social Impact, Virtue/Identity, Legitimacy, Epistemic}. Compare its AIC to the full and diagonal parameterizations on the <code>eris-econ</code> calibration problem.</p>
+<p><strong>15.6.</strong> The geodesic on SPD(n) under the log-Euclidean metric is $\gamma(t) = \exp((1-t)\log(S_0) + t\log(S_1))$. Show that the Cholesky factorization of $\gamma(t)$ is <em>not</em> in general a linear interpolation of the Cholesky factors of $S_0$ and $S_1$. Under what conditions does linear interpolation of Cholesky factors approximate the geodesic?</p>
+<p><strong>15.7.</strong> Extend the <code>CholeskyPrecision</code> PyTorch module to output both $\Sigma^{-1}$ and $\log\det(\Sigma^{-1})$ in a single forward pass, sharing the Cholesky factor computation. Use this to implement a full Gaussian negative log-likelihood loss.</p>
+<hr />
+<h2 id="notes-and-references">Notes and References</h2>
+<p>The Cholesky factorization is named for Andre-Louis Cholesky (1875&ndash;1918), a French military officer and geodesist who developed the method for solving systems of linear equations arising in geodetic survey computations. The factorization was published posthumously by Benoit in <em>Bulletin geodesique</em> 2, 1924.</p>
+<p>The use of Cholesky parameterization for constrained covariance estimation is standard in the statistics literature. See Pinheiro and Bates, &ldquo;Unconstrained parameterizations for variance-covariance matrices,&rdquo; <em>Statistics and Computing</em> 6(3), 1996, for an early systematic treatment. The log-diagonal variant is discussed in the context of variational inference by Kingma and Welling, &ldquo;Auto-encoding variational Bayes,&rdquo; <em>ICLR</em> 2014, where it parameterizes the approximate posterior&rsquo;s covariance.</p>
+<p>For Riemannian optimization on SPD manifolds, see Bonnabel, &ldquo;Stochastic gradient descent on Riemannian manifolds,&rdquo; <em>IEEE Transactions on Automatic Control</em> 58(9), 2013; and Absil, Mahony, and Sepulchre, <em>Optimization Algorithms on Matrix Manifolds</em>, Princeton University Press, 2008.</p>
+<p>The connection between metric learning and linear embeddings is developed in Weinberger and Saul, &ldquo;Distance metric learning for large margin nearest neighbor classification,&rdquo; <em>JMLR</em> 10, 2009. The softmax likelihood for choice modeling has its roots in McFadden&rsquo;s random utility framework: McFadden, &ldquo;Conditional logit analysis of qualitative choice behavior,&rdquo; in <em>Frontiers in Econometrics</em>, Academic Press, 1974.</p>
+<p>The <code>eris-econ</code> implementation of Cholesky-parameterized calibration and the structural fuzzing framework&rsquo;s diagonal optimization are described in Bond (2026). The cross-validation and bootstrap methods for covariance estimation follow the treatments in Hastie, Tibshirani, and Friedman, <em>The Elements of Statistical Learning</em>, Springer, 2009, Chapter 7.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-14-gradient-reversal.html" class="nav-prev">&larr; Chapter 14: Gradient Reversal and Invariance Training</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-16-geometric-pipelines.html" class="nav-next">Chapter 16: Building Geometric Pipelines &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

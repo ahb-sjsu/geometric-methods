@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 5: Topological Data Analysis &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 5: Topological Data Analysis from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-05-topological-data-analysis">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 5: Topological Data Analysis</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-04-spd-manifolds.html" class="nav-prev">&larr; Chapter 4: SPD Manifolds and Spectral Geometry</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-06-pathfinding-on-manifolds.html" class="nav-next">Chapter 6: Pathfinding on Manifolds &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-5-topological-data-analysis">Chapter 5: Topological Data Analysis</h1>
+<p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation</em> — Andrew H. Bond</p>
+<hr />
+<h2 id="51-beyond-distance-shape">5.1 Beyond Distance: Shape</h2>
+<p>The preceding chapters built a toolkit around distance. We measured how far apart points lie in Euclidean space, computed geodesics on curved manifolds, and used metric structure to define neighborhoods, clusters, and decision boundaries. Distance is powerful, but it answers only one question: <em>how far?</em> There is a deeper question that distance alone cannot answer: <em>what shape?</em></p>
+<p>Consider three point clouds in the plane. The first is a tight ball of points. The second is an elongated ellipse. The third is a ring. A nearest-neighbor classifier treats all three as collections of pairwise distances. A Gaussian mixture model fits covariance ellipses. Neither representation notices the hole in the middle of the ring — the topological feature that distinguishes it from a filled disk, no matter how you stretch, bend, or compress it. Topology is the mathematics of properties preserved under continuous deformation: stretching and bending are allowed, but tearing and gluing are not. A coffee cup and a donut are topologically equivalent (both have one hole), but a sphere and a donut are not.</p>
+<p>Topological data analysis (TDA) brings this perspective to finite point clouds. The central insight is that data has <em>shape</em>, and that shape carries information. Clusters are zero-dimensional topology (connected components). Loops are one-dimensional topology (cycles). Voids are two-dimensional topology (cavities). These features are invariant to the continuous deformations that plague distance-based methods: nonlinear scaling, monotonic warping, sensor drift, and moderate noise all change distances but preserve topology.</p>
+<p>This invariance is not merely aesthetic. In applications where the generative process produces structured geometry — oscillatory systems, recurrent dynamics, hierarchical organization — the topological features of the data encode the structure of the process itself. A periodic signal traces a loop. A quasiperiodic signal traces a torus. A chaotic attractor produces a characteristic tangle of components and cycles that distinguishes it from stochastic noise. TDA extracts these features in a principled, stable, and computable way.</p>
+<p>This chapter develops the TDA pipeline from first principles. We begin with a technique for lifting one-dimensional time series into higher-dimensional point clouds where topological structure becomes visible (Section 5.2). We then define persistent homology, the central algebraic tool that tracks topological features across scales (Section 5.3), and its standard visualization, the persistence diagram (Section 5.4). Section 5.5 addresses the practical problem of converting persistence diagrams into fixed-length feature vectors suitable for downstream machine learning. Finally, Section 5.6 applies the full pipeline to cetacean bioacoustics, where topological features of vocal dynamics distinguish social groups that are indistinguishable by spectral analysis alone.</p>
+<hr />
+<h2 id="52-takens-time-delay-embedding">5.2 Takens&rsquo; Time-Delay Embedding</h2>
+<p>Many real-world systems are dynamical: they evolve in time according to deterministic or stochastic rules operating on a high-dimensional state space. We rarely observe the full state. A single sensor — a microphone, a temperature probe, a stock price — gives us a one-dimensional projection of a multi-dimensional trajectory. The question is whether we can recover the geometry of the underlying attractor from this single scalar time series.</p>
+<p>Takens&rsquo; embedding theorem (1981) answers affirmatively. Given a scalar time series $x(t)$ sampled from a smooth dynamical system whose attractor has box-counting dimension $m$, we construct delay vectors:</p>
+<p>$$\mathbf{v}(t) = \bigl[x(t),\; x(t + \tau),\; x(t + 2\tau),\; \ldots,\; x(t + (d-1)\tau)\bigr]$$</p>
+<p>where $\tau$ is the time delay and $d$ is the embedding dimension. Takens&rsquo; theorem states that for generic $\tau$ and $d \geq 2m + 1$, the map from the original attractor to the delay-coordinate reconstruction is a diffeomorphism — a smooth, invertible map with smooth inverse. In particular, it preserves the topology of the attractor: connected components, loops, and voids in the original state space appear as connected components, loops, and voids in the reconstruction.</p>
+<p>The requirement $d \geq 2m + 1$ is the delay-coordinate analogue of the Whitney embedding theorem, which guarantees that a $k$-dimensional manifold can be embedded in $\mathbb{R}^{2k+1}$ without self-intersections. In practice, we rarely know $m$ in advance. Setting $d = 3$ is a common starting point for systems suspected to have low-dimensional attractors (many physical oscillators have $m \leq 1$, so $d = 3 \geq 2(1) + 1$ suffices). The delay $\tau$ should be chosen large enough that successive coordinates carry independent information — a common heuristic is the first minimum of the mutual information function — but not so large that the trajectory decorrelates entirely.</p>
+<p>The following implementation constructs delay vectors from a one-dimensional signal:</p>
+<pre><code class="language-python">def time_delay_embedding(
+    signal: np.ndarray,
+    delay: int = 10,
+    dim: int = 3,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Takens' time-delay embedding: reconstruct attractor from 1D series.
+
+    Given a signal x(t), constructs vectors:
+        v(t) = [x(t), x(t + τ), x(t + 2τ), ..., x(t + (d-1)τ)]
+
+    By Takens' theorem, for generic τ and d ≥ 2m+1 (m = attractor dimension),
+    this reconstructs the topology of the original dynamical system.
+
+    Args:
+        signal: 1D time series (audio samples or inter-click intervals).
+        delay: Time delay τ in samples.
+        dim: Embedding dimension d.
+
+    Returns:
+        Point cloud in R^dim, shape [n_points, dim].
+    &quot;&quot;&quot;
+    n = len(signal) - (dim - 1) * delay
+    if n &lt;= 0:
+        return np.zeros((1, dim))
+
+    embedded = np.empty((n, dim))
+    for d in range(dim):
+        embedded[:, d] = signal[d * delay : d * delay + n]
+
+    return embedded
+</code></pre>
+<p>The output is a point cloud of $n = N - (d-1)\tau$ points in $\mathbb{R}^d$, where $N$ is the length of the original signal. Each point is a window of $d$ samples spaced $\tau$ apart. For a pure sinusoid $x(t) = \sin(\omega t)$ with appropriate $\tau$, the two-dimensional embedding traces an ellipse — a topological circle. With $d = 3$ and suitable $\tau$, it traces a helix that, projected appropriately, reveals the same circular topology. More complex signals produce more complex point clouds, but the topological features of the underlying dynamical system are faithfully preserved.</p>
+<p><strong>Computational tractability.</strong> Persistent homology algorithms have superlinear complexity in the number of points (roughly $O(n^3)$ for the Vietoris-Rips complex, though efficient implementations do better in practice). For long time series, the embedded point cloud may contain tens or hundreds of thousands of points, making direct computation infeasible. Random subsampling provides a practical solution:</p>
+<pre><code class="language-python">def subsample_cloud(
+    cloud: np.ndarray,
+    max_points: int = 1000,
+    seed: int | None = None,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Subsample a point cloud for computational tractability.
+
+    Args:
+        cloud: Point cloud, shape [n, d].
+        max_points: Maximum number of points to keep.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Subsampled cloud, shape [min(n, max_points), d].
+    &quot;&quot;&quot;
+    if len(cloud) &lt;= max_points:
+        return cloud
+    rng = np.random.RandomState(seed)
+    idx = rng.choice(len(cloud), max_points, replace=False)
+    return cloud[idx]
+</code></pre>
+<p>This is justified by the stability of persistent homology: if the subsampled cloud is a sufficiently dense sample of the underlying manifold, its persistent homology approximates that of the full cloud (the Niyogi-Smale-Weinberger theorem makes this precise for manifolds with bounded curvature and reach). In practice, <code>max_points</code> between 500 and 2000 provides a good balance between computational cost and topological fidelity for most applications.</p>
+<hr />
+<h2 id="53-persistent-homology">5.3 Persistent Homology</h2>
+<p>We now have a point cloud in $\mathbb{R}^d$. We want to extract its topological features — but a finite set of discrete points has no interesting topology in itself. Every point is an isolated connected component; there are no loops or voids. The key idea of persistent homology is to <em>thicken</em> the points and observe how topology changes as the thickening grows.</p>
+<h3 id="531-the-vietoris-rips-complex">5.3.1 The Vietoris-Rips Complex</h3>
+<p>Fix a distance threshold $\varepsilon \geq 0$. The <strong>Vietoris-Rips complex</strong> $\mathrm{VR}(X, \varepsilon)$ is the simplicial complex whose $k$-simplices are subsets of $k+1$ points that are pairwise within distance $\varepsilon$:</p>
+<ul>
+<li>At $\varepsilon = 0$: every point is an isolated vertex. There are $n$ connected components, no edges, no triangles.</li>
+<li>At small $\varepsilon$: nearby points connect via edges. Some components merge. Perhaps a few triangles form.</li>
+<li>At moderate $\varepsilon$: clusters consolidate, cycles appear as rings of edges form around &ldquo;holes&rdquo; in the point cloud.</li>
+<li>At large $\varepsilon$: nearly everything is connected. Cycles get &ldquo;filled in&rdquo; by triangles. The complex approaches a single blob with trivial topology.</li>
+</ul>
+<p>As $\varepsilon$ increases from $0$ to $\infty$, we obtain a nested sequence of simplicial complexes — a <strong>filtration</strong>:</p>
+<p>$$\mathrm{VR}(X, 0) \subseteq \mathrm{VR}(X, \varepsilon_1) \subseteq \mathrm{VR}(X, \varepsilon_2) \subseteq \cdots$$</p>
+<p>Persistent homology tracks the homology groups of these complexes across the filtration. Each topological feature has a <strong>birth</strong> time (the $\varepsilon$ at which it first appears) and a <strong>death</strong> time (the $\varepsilon$ at which it disappears). The <strong>persistence</strong> of a feature is the difference:</p>
+<p>$$\text{persistence} = \text{death} - \text{birth}$$</p>
+<h3 id="532-homology-dimensions">5.3.2 Homology Dimensions</h3>
+<p>Homology decomposes into dimensions, each capturing a different type of topological feature:</p>
+<p><strong>$H_0$ — Connected components.</strong> Every point is born as its own connected component at $\varepsilon = 0$. A component dies when it merges with an older component (by convention, the younger component dies). Long-lived $H_0$ features correspond to well-separated clusters. If the data has $k$ natural clusters at widely different inter-cluster distances, we expect $k$ long-lived $H_0$ features and many short-lived ones (within-cluster mergers).</p>
+<p><strong>$H_1$ — One-dimensional loops.</strong> A loop is born when a cycle of edges forms that does not bound a filled-in region (a triangle or higher simplex). It dies when triangles fill in the cycle, collapsing the loop. Long-lived $H_1$ features correspond to robust circular or ring-like structures in the data — precisely the kind of structure produced by periodic or quasiperiodic dynamics in the Takens embedding.</p>
+<p><strong>$H_2$ — Two-dimensional voids.</strong> A void is born when a shell of triangles encloses an empty region and dies when tetrahedra fill it in. Long-lived $H_2$ features indicate spherical or toroidal cavities. These are less common in typical data analysis but important in materials science and molecular topology.</p>
+<p>Higher homology dimensions follow the same pattern, but computation becomes expensive and the features are rarely interpretable in data analysis contexts. For most applications, $H_0$ and $H_1$ suffice.</p>
+<h3 id="533-persistence-as-signal-vs-noise">5.3.3 Persistence as Signal vs. Noise</h3>
+<p>The fundamental heuristic of persistent homology is:</p>
+<blockquote>
+<p><strong>Long persistence = genuine topological feature. Short persistence = noise.</strong></p>
+</blockquote>
+<p>A feature that persists across a wide range of scales reflects real structure in the data-generating process. A feature that appears and vanishes almost immediately is an artifact of the particular sample — slightly different noise would produce a different short-lived feature. This heuristic is formalized by the <strong>stability theorem</strong> (Cohen-Steiner, Edelsbrunner, and Harer, 2007): small perturbations of the input produce small perturbations of the persistence diagram, measured in the bottleneck or Wasserstein distance. Features with persistence smaller than the perturbation magnitude are unstable; features with persistence much larger than the perturbation are robust.</p>
+<hr />
+<h2 id="54-persistence-diagrams">5.4 Persistence Diagrams</h2>
+<p>The standard visualization of persistent homology is the <strong>persistence diagram</strong>: a scatter plot in which each topological feature is represented as a point $(b, d)$ where $b$ is the birth time and $d$ is the death time. Since $d \geq b$ by definition, all points lie on or above the diagonal $d = b$.</p>
+<p>The distance from a point to the diagonal is $\frac{d - b}{\sqrt{2}}$, proportional to the persistence. Points clustered near the diagonal represent short-lived, noisy features. Points far from the diagonal represent long-lived, significant features. Reading a persistence diagram amounts to identifying the off-diagonal points and interpreting their birth and death scales.</p>
+<p><strong>Example: Two clusters and a loop.</strong> Consider a point cloud consisting of two circular clusters separated by a gap. The $H_0$ persistence diagram will show many points near the diagonal (individual points merging within each cluster) and one point far from the diagonal (the two clusters merging at the inter-cluster distance). The $H_1$ persistence diagram will show two points moderately far from the diagonal (the two circular holes, one per cluster), dying when triangles fill them in.</p>
+<p><strong>Infinite features.</strong> By convention, one $H_0$ feature (the last surviving connected component) has $d = \infty$. It represents the single connected component that all others eventually merge into. Features with infinite death are often excluded from summary statistics, as they carry no discriminative information.</p>
+<p><strong>Stability.</strong> The stability theorem guarantees that if we perturb the input point cloud by at most $\delta$ in the Hausdorff distance, the persistence diagram changes by at most $\delta$ in the bottleneck distance. This means that persistence diagrams are robust descriptors: small noise produces small changes, and the large-persistence features are the most stable.</p>
+<hr />
+<h2 id="55-feature-extraction-from-persistence">5.5 Feature Extraction from Persistence</h2>
+<p>Persistence diagrams are mathematically elegant but awkward as input to standard machine learning pipelines. They are multisets of variable cardinality — different point clouds produce diagrams with different numbers of points. We need a fixed-length vector representation.</p>
+<p>Several approaches exist: persistence landscapes (Bubenik, 2015), persistence images (Adams et al., 2017), and summary statistics. For computational efficiency and interpretability, we use a summary statistics approach that extracts eight features per homology dimension, capturing the essential distributional information of the persistence diagram.</p>
+<p>Given a persistence diagram $\{(b_i, d_i)\}_{i=1}^n$ with finite features (excluding infinite-death features), define the lifetime of each feature as $\ell_i = d_i - b_i$. The eight features are:</p>
+<table>
+<thead>
+<tr>
+<th>Index</th>
+<th>Feature</th>
+<th>Formula</th>
+<th>Interpretation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>Count</td>
+<td>$n$</td>
+<td>Number of finite topological features</td>
+</tr>
+<tr>
+<td>1</td>
+<td>Mean lifetime</td>
+<td>$\bar{\ell} = \frac{1}{n}\sum_i \ell_i$</td>
+<td>Average persistence</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Std lifetime</td>
+<td>$\sigma_\ell$</td>
+<td>Spread of persistence values</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Max lifetime</td>
+<td>$\max_i \ell_i$</td>
+<td>Most persistent (dominant) feature</td>
+</tr>
+<tr>
+<td>4</td>
+<td>75th percentile</td>
+<td>$Q_{75}(\ell)$</td>
+<td>Robust measure of typical persistence</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Mean birth time</td>
+<td>$\frac{1}{n}\sum_i b_i$</td>
+<td>Average scale at which features appear</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Total persistence</td>
+<td>$\sum_i \ell_i^2$</td>
+<td>$L^2$ norm of the persistence landscape</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Normalized persistence</td>
+<td>$\frac{\sqrt{\sum_i \ell_i^2}}{n}$</td>
+<td>Average energy per feature</td>
+</tr>
+</tbody>
+</table>
+<p>The implementation:</p>
+<pre><code class="language-python">def _diagram_features(dgm: np.ndarray) -&gt; np.ndarray:
+    &quot;&quot;&quot;Extract summary statistics from a single persistence diagram.
+
+    Returns 8 features:
+        0: count — number of finite features
+        1: mean_lifetime
+        2: std_lifetime
+        3: max_lifetime — most persistent feature
+        4: p75_lifetime — 75th percentile
+        5: mean_birth
+        6: total_persistence — sum of squared lifetimes (L2 norm)
+        7: normalized_persistence — total / count
+
+    Args:
+        dgm: Persistence diagram, shape [n, 2] with (birth, death).
+
+    Returns:
+        Feature vector, shape [8].
+    &quot;&quot;&quot;
+    if len(dgm) == 0:
+        return np.zeros(8, dtype=np.float32)
+
+    finite_mask = np.isfinite(dgm[:, 1])
+    finite = dgm[finite_mask]
+
+    if len(finite) == 0:
+        return np.zeros(8, dtype=np.float32)
+
+    lifetimes = finite[:, 1] - finite[:, 0]
+    n = len(lifetimes)
+    total = float(np.sum(lifetimes**2))
+
+    return np.array(
+        [
+            n,
+            lifetimes.mean(),
+            lifetimes.std() if n &gt; 1 else 0.0,
+            lifetimes.max(),
+            np.percentile(lifetimes, 75),
+            finite[:, 0].mean(),
+            total,
+            np.sqrt(total) / (n + 1e-10),
+        ],
+        dtype=np.float32,
+    )
+</code></pre>
+<p>Several design choices deserve comment. First, we filter to finite features (line <code>finite_mask = np.isfinite(dgm[:, 1])</code>) because the infinite-death feature in $H_0$ carries no discriminative information. Second, we use the squared-lifetime sum for total persistence rather than the linear sum, giving greater weight to the most persistent features and aligning with the $L^2$ stability results for persistence landscapes. Third, the normalized persistence divides by the count, giving a per-feature energy that is comparable across diagrams of different sizes.</p>
+<p>The full feature vector concatenates across homology dimensions:</p>
+<pre><code class="language-python">def tda_feature_vector(
+    result: PersistenceResult,
+) -&gt; np.ndarray:
+    &quot;&quot;&quot;Extract a fixed-length feature vector from persistence diagrams.
+
+    Concatenates 8 summary statistics per homology dimension, yielding
+    8 * (max_dim + 1) features total.
+
+    Args:
+        result: Output of compute_persistence().
+
+    Returns:
+        Feature vector, shape [8 * (max_dim + 1)].
+    &quot;&quot;&quot;
+    features = []
+    for d in range(result.max_dim + 1):
+        if d &lt; len(result.diagrams):
+            features.append(_diagram_features(result.diagrams[d]))
+        else:
+            features.append(np.zeros(8, dtype=np.float32))
+
+    return np.concatenate(features)
+</code></pre>
+<p>With <code>max_homology_dim=1</code> (computing $H_0$ and $H_1$), this yields a 16-dimensional feature vector: 8 features for connected components and 8 features for loops. This compact representation retains enough topological information to distinguish qualitatively different point cloud shapes while being directly compatible with any classifier, regression model, or distance computation that expects fixed-length vectors.</p>
+<hr />
+<h2 id="56-the-full-pipeline-from-signal-to-topology">5.6 The Full Pipeline: From Signal to Topology</h2>
+<p>The complete TDA pipeline chains the components developed in the preceding sections. Given a raw one-dimensional signal, we:</p>
+<ol>
+<li><strong>Embed</strong> the signal into $\mathbb{R}^d$ via Takens&rsquo; time-delay embedding.</li>
+<li><strong>Subsample</strong> the resulting point cloud for computational tractability.</li>
+<li><strong>Normalize</strong> to zero mean and unit variance per coordinate, ensuring the Rips filtration operates on a standardized scale.</li>
+<li><strong>Compute</strong> the Vietoris-Rips persistent homology via the Ripser algorithm (Bauer, 2021), an optimized implementation that exploits the apparent pairs optimization and implicit representation of the boundary matrix.</li>
+<li><strong>Extract</strong> a fixed-length feature vector from the resulting persistence diagrams.</li>
+</ol>
+<p>The following function implements steps 1 through 4, returning a <code>PersistenceResult</code> that bundles the persistence diagrams with the point cloud and metadata:</p>
+<pre><code class="language-python">@dataclass
+class PersistenceResult:
+    &quot;&quot;&quot;Result of a persistent homology computation.
+
+    Attributes:
+        diagrams: List of persistence diagrams, one per homology dimension.
+                  Each diagram is an array of shape [n_features, 2] with
+                  columns (birth, death).
+        cloud: The point cloud used for computation.
+        max_dim: Maximum homology dimension computed.
+    &quot;&quot;&quot;
+
+    diagrams: list[np.ndarray]
+    cloud: np.ndarray
+    max_dim: int
+
+
+def compute_persistence(
+    signal: np.ndarray,
+    delay: int = 10,
+    dim: int = 3,
+    max_points: int = 1000,
+    max_homology_dim: int = 1,
+    thresh: float = 2.0,
+    seed: int | None = None,
+) -&gt; PersistenceResult:
+    &quot;&quot;&quot;Compute persistent homology from an audio signal.
+
+    Pipeline:
+        1. Time-delay embed the signal into R^dim
+        2. Subsample for tractability
+        3. Normalize to zero mean, unit variance
+        4. Compute Vietoris-Rips persistence via ripser
+
+    Args:
+        signal: 1D audio signal or inter-click interval sequence.
+        delay: Time delay for embedding.
+        dim: Embedding dimension.
+        max_points: Maximum points after subsampling.
+        max_homology_dim: Maximum homology dimension (0=components, 1=loops).
+        thresh: Maximum filtration value for Rips complex.
+        seed: Random seed for subsampling.
+
+    Returns:
+        PersistenceResult with diagrams and metadata.
+
+    Raises:
+        ImportError: If ripser is not installed.
+    &quot;&quot;&quot;
+    try:
+        from ripser import ripser
+    except ImportError as e:
+        raise ImportError(
+            &quot;ripser is required for TDA. &quot;
+            &quot;Install with: pip install eris-ketos[tda]&quot;
+        ) from e
+
+    cloud = time_delay_embedding(signal, delay=delay, dim=dim)
+    cloud = subsample_cloud(cloud, max_points=max_points, seed=seed)
+
+    # Normalize
+    std = cloud.std(axis=0)
+    std[std &lt; 1e-10] = 1.0
+    cloud = (cloud - cloud.mean(axis=0)) / std
+
+    result = ripser(cloud, maxdim=max_homology_dim, thresh=thresh)
+
+    return PersistenceResult(
+        diagrams=result[&quot;dgms&quot;],
+        cloud=cloud,
+        max_dim=max_homology_dim,
+    )
+</code></pre>
+<p>The <code>thresh</code> parameter limits the maximum filtration value. Setting <code>thresh=2.0</code> on normalized data means we track features born and dying within two standard deviations of the mean — capturing the main topological structure while avoiding the expensive computation of features at extreme scales that are almost certainly noise.</p>
+<p>A typical end-to-end invocation:</p>
+<pre><code class="language-python">import numpy as np
+from eris_ketos.tda_clicks import compute_persistence, tda_feature_vector
+
+# Generate a test signal: sine wave (periodic attractor → circle → H1 feature)
+t = np.linspace(0, 2 * np.pi * 5, 5000)
+signal = np.sin(t).astype(np.float32)
+
+# Compute persistence
+result = compute_persistence(signal, delay=50, dim=2, max_points=500)
+
+# The sine wave's delay embedding is a circle.
+# H1 should contain at least one persistent loop.
+h1_diagram = result.diagrams[1]
+finite_h1 = h1_diagram[np.isfinite(h1_diagram[:, 1])]
+print(f&quot;H1 features: {len(finite_h1)}&quot;)
+print(f&quot;Most persistent loop lifetime: &quot;
+      f&quot;{(finite_h1[:, 1] - finite_h1[:, 0]).max():.3f}&quot;)
+
+# Extract fixed-length features
+features = tda_feature_vector(result)
+print(f&quot;Feature vector shape: {features.shape}&quot;)  # (16,)
+</code></pre>
+<p>This example makes the Takens theorem concrete. A sine wave $x(t) = \sin(\omega t)$ embedded with $d = 2$ produces points $(\sin(\omega t), \sin(\omega(t + \tau)))$, which trace an ellipse in $\mathbb{R}^2$ — a topological circle. The persistence computation detects this circle as a long-lived $H_1$ feature: a loop that is born when edges connect points around the ellipse and dies only when triangles fill in the interior at a much larger scale. The persistence (death minus birth) of this loop is large, reflecting the genuine circular topology of the embedding. Short-lived $H_1$ features, born and dying at similar scales, reflect the finite sampling density rather than genuine topology.</p>
+<hr />
+<h2 id="57-application-cetacean-click-dynamics">5.7 Application: Cetacean Click Dynamics</h2>
+<p>We now apply the full TDA pipeline to a problem where topological analysis reveals structure invisible to conventional methods: the classification of sperm whale vocalizations.</p>
+<h3 id="571-background">5.7.1 Background</h3>
+<p>Sperm whales (<em>Physeter macrocephalus</em>) communicate through stereotyped sequences of broadband clicks called <em>codas</em>. Recent research has revealed that these codas possess a combinatorial phonetic system with rhythm, tempo, rubato, and ornamentation combining hierarchically — far more structured than simple click counting would suggest (Sharma et al., <em>Nature Communications</em>, 2024). Different social units (clans) use distinct coda repertoires, and the temporal micro-structure of clicks within a coda carries clan-specific signatures.</p>
+<p>Standard approaches analyze codas through their spectral content (frequency-domain features) or inter-click interval (ICI) histograms. These methods capture <em>what</em> the whale produces (which frequencies, which intervals) but not <em>how</em> the production unfolds over time. Two codas with identical ICI histograms but different ordering — say, accelerating versus decelerating rhythm — are indistinguishable spectrally but dynamically distinct.</p>
+<h3 id="572-topological-approach">5.7.2 Topological Approach</h3>
+<p>TDA captures the <em>dynamics</em> of click production by treating the ICI sequence as a time series and applying the Takens-persistence pipeline:</p>
+<ol>
+<li>
+<p><strong>Extract ICI sequence.</strong> Given a coda with click onset times $t_1, t_2, \ldots, t_k$, compute the inter-click intervals $\Delta_i = t_{i+1} - t_i$. This is a short one-dimensional time series (typically 3&ndash;20 values for sperm whale codas, longer for click trains of other species).</p>
+</li>
+<li>
+<p><strong>Time-delay embed.</strong> Apply Takens embedding with appropriate $\tau$ and $d$. For short ICI sequences, $d = 2$ or $d = 3$ and $\tau = 1$ (consecutive ICIs) is common. For longer click trains or continuous audio, higher $\tau$ and subsampling are needed.</p>
+</li>
+<li>
+<p><strong>Compute persistent homology.</strong> The Vietoris-Rips persistence of the embedded cloud captures:</p>
+</li>
+<li><strong>$H_0$ (components):</strong> Distinct clusters in the ICI attractor. A coda type with two characteristic rhythms (e.g., fast clicks followed by slow clicks) produces two well-separated clusters in the embedding, visible as a long-lived $H_0$ feature.</li>
+<li>
+<p><strong>$H_1$ (loops):</strong> Cyclic patterns in the ICI dynamics. A click train with repeating rhythmic motifs traces a loop in the delay embedding, detected as a persistent $H_1$ feature. The persistence of the loop reflects the regularity of the repetition — highly stereotyped rhythm produces a clean, long-lived loop, while variable rhythm produces a noisier, shorter-lived loop.</p>
+</li>
+<li>
+<p><strong>Extract features and classify.</strong> The 16-dimensional TDA feature vector (8 per homology dimension) feeds into a standard classifier. Because the features are topological invariants, they are insensitive to the absolute timing scale of the clicks — a slow rendition and a fast rendition of the same rhythmic pattern produce the same topology — while remaining sensitive to the structural organization.</p>
+</li>
+</ol>
+<h3 id="573-what-tda-captures-that-spectral-methods-miss">5.7.3 What TDA Captures That Spectral Methods Miss</h3>
+<p>The power of the topological approach is best understood through contrast with spectral methods.</p>
+<p><strong>Spectral features</strong> (Fourier coefficients, mel-frequency cepstral coefficients, spectral centroid) characterize the <em>frequency content</em> of individual clicks. They answer: what does each click sound like? Two clicks from different species that happen to have similar spectral envelopes will produce similar spectral features. More fundamentally, spectral features are <em>local</em> — they describe individual clicks or short windows, not the temporal organization of click sequences.</p>
+<p><strong>ICI histograms</strong> capture the <em>distribution</em> of inter-click intervals but discard their ordering. A coda that goes fast-fast-slow-slow and one that goes fast-slow-fast-slow produce identical ICI histograms. This is a serious loss of information for codas where rhythm pattern, not just rhythm rate, carries communicative content.</p>
+<p><strong>TDA features</strong> capture the <em>shape of the dynamical trajectory</em> in delay-coordinate space. This shape reflects the temporal organization — the ordering, the cyclicity, the clustering of intervals — in a way that is invariant to absolute tempo (stretching time uniformly is a continuous deformation that preserves topology) but sensitive to structural pattern. Two codas with different rhythmic organizations produce topologically distinct attractors even if their ICI histograms and spectral content are identical.</p>
+<h3 id="574-practical-pipeline">5.7.4 Practical Pipeline</h3>
+<p>The complete pipeline for a batch of whale click recordings:</p>
+<pre><code class="language-python">import numpy as np
+from eris_ketos.tda_clicks import compute_persistence, tda_feature_vector
+
+def process_coda(ici_sequence: np.ndarray) -&gt; np.ndarray:
+    &quot;&quot;&quot;Extract topological features from a single coda's ICI sequence.
+
+    Args:
+        ici_sequence: Inter-click intervals in seconds.
+
+    Returns:
+        16-dimensional TDA feature vector.
+    &quot;&quot;&quot;
+    result = compute_persistence(
+        signal=ici_sequence,
+        delay=1,          # consecutive ICIs
+        dim=3,            # 3D embedding
+        max_points=500,   # subsample for long sequences
+        max_homology_dim=1,
+        thresh=2.0,
+        seed=42,
+    )
+    return tda_feature_vector(result)
+
+# Process a collection of codas
+coda_icis = [...]  # list of ICI arrays, one per coda
+feature_matrix = np.stack([process_coda(ici) for ici in coda_icis])
+# feature_matrix.shape = (n_codas, 16)
+</code></pre>
+<p>The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of distinct interval clusters).</p>
+<h3 id="575-interpretation-of-results">5.7.5 Interpretation of Results</h3>
+<p>When applied to the DSWP dataset (1,501 annotated sperm whale codas), TDA features reveal structure aligned with the known social organization:</p>
+<ul>
+<li>
+<p><strong>$H_0$ features differentiate coda types by interval clustering.</strong> Codas with a single characteristic interval (e.g., &ldquo;regular&rdquo; codas with roughly equal spacing) produce a single dominant $H_0$ component. Codas with two characteristic intervals (e.g., &ldquo;1+1+3&rdquo; codas with a short-short-long pattern) produce two well-separated clusters, reflected in higher $H_0$ count and longer maximum $H_0$ lifetime.</p>
+</li>
+<li>
+<p><strong>$H_1$ features capture rhythmic regularity.</strong> Codas with highly stereotyped rhythm (low rubato) produce clean loops in the delay embedding, yielding high $H_1$ max lifetime. Codas with variable rhythm (high rubato, ornamentation) produce noisier loops with lower persistence. This topological measure of rhythmic regularity correlates with — but is not reducible to — the coefficient of variation of ICIs.</p>
+</li>
+<li>
+<p><strong>Clan separation.</strong> Different vocal clans produce topologically distinct attractors. The topological feature vectors cluster by clan in ways that complement spectral clustering, suggesting that clans differ not only in <em>what</em> intervals they use but in <em>how</em> they organize those intervals dynamically. This is consistent with the combinatorial phonetic hypothesis: clan identity is encoded in the compositional structure of codas, not merely in their spectral or temporal primitives.</p>
+</li>
+</ul>
+<hr />
+<h2 id="58-summary">5.8 Summary</h2>
+<p>Topological data analysis provides a principled framework for extracting shape-based features from data that complement and extend distance-based methods. The key ideas of this chapter are:</p>
+<ol>
+<li>
+<p><strong>Takens&rsquo; embedding</strong> lifts one-dimensional time series into higher-dimensional point clouds that faithfully reconstruct the topology of the underlying dynamical system, provided the embedding dimension satisfies $d \geq 2m + 1$.</p>
+</li>
+<li>
+<p><strong>Persistent homology</strong> tracks topological features (components, loops, voids) across a growing sequence of simplicial complexes built from the point cloud. Each feature has a birth, a death, and a persistence (lifetime).</p>
+</li>
+<li>
+<p><strong>Long persistence indicates signal; short persistence indicates noise.</strong> This heuristic is formalized by the stability theorem, which guarantees that small perturbations produce small changes in the persistence diagram.</p>
+</li>
+<li>
+<p><strong>Persistence diagrams</strong> visualize the birth-death pairs as a scatter plot. Points far from the diagonal represent robust topological features.</p>
+</li>
+<li>
+<p><strong>Feature extraction</strong> converts variable-size persistence diagrams into fixed-length vectors (8 summary statistics per homology dimension) suitable for downstream learning.</p>
+</li>
+<li>
+<p><strong>Application to cetacean bioacoustics</strong> demonstrates that topological features capture the dynamical shape of vocal patterns — cyclic structure, interval clustering, rhythmic regularity — in ways that are invariant to tempo and complementary to spectral analysis.</p>
+</li>
+</ol>
+<p>The topological perspective will recur in later chapters. In Part II, we will see how persistent homology can detect phase transitions in adversarial parameter spaces (Chapter 9) and how topological features serve as robust invariants for structural fuzzing campaigns (Chapter 20). The key takeaway is that topology captures qualitative structure — the presence or absence of holes, loops, and clusters — that persists under the continuous deformations induced by noise, measurement error, and parameter perturbation, making it a natural complement to the metric and manifold methods developed in Chapters 2 through 4.</p>
+<hr />
+<h2 id="exercises">Exercises</h2>
+<p><strong>5.1.</strong> <em>Embedding dimension.</em> Generate a Lorenz attractor time series ($\sigma = 10$, $\rho = 28$, $\beta = 8/3$) and compute Takens&rsquo; embedding with $d = 2, 3, 4, 5$ and $\tau = 15$. For each $d$, compute the $H_1$ persistence diagram. At what $d$ does the dominant $H_1$ feature stabilize? How does this relate to the known dimension of the Lorenz attractor ($m \approx 2.06$)?</p>
+<p><strong>5.2.</strong> <em>Stability under noise.</em> Take a clean sine wave, compute its $H_1$ persistence diagram, and record the lifetime of the most persistent loop. Add Gaussian noise with increasing standard deviation ($\sigma = 0.01, 0.05, 0.1, 0.5, 1.0$) and repeat. Plot the dominant $H_1$ lifetime as a function of $\sigma$. At what noise level does the loop become indistinguishable from noise features? Relate your findings to the stability theorem.</p>
+<p><strong>5.3.</strong> <em>Feature comparison.</em> For a dataset of your choosing (e.g., ECG time series, financial data, synthetic chaotic systems), compute both (a) standard time-domain features (mean, variance, autocorrelation) and (b) TDA features from the Takens embedding. Train a classifier on each feature set independently, then on their concatenation. Does TDA provide complementary information?</p>
+<p><strong>5.4.</strong> <em>Computational scaling.</em> Measure the wall-clock time of <code>compute_persistence</code> as a function of <code>max_points</code> for $n \in \{100, 200, 500, 1000, 2000, 5000\}$ with <code>max_homology_dim=1</code>. Fit a power law $T(n) \propto n^\alpha$. What is the empirical exponent? How does it compare to the theoretical $O(n^3)$ worst case?</p>
+<hr />
+<h2 id="notes-and-further-reading">Notes and Further Reading</h2>
+<p>Takens&rsquo; original embedding theorem appeared in F. Takens, &ldquo;Detecting strange attractors in turbulence,&rdquo; <em>Lecture Notes in Mathematics</em> 898 (1981). The definitive modern treatment is T. Sauer, J. Yorke, and M. Casdagli, &ldquo;Embedology,&rdquo; <em>Journal of Statistical Physics</em> 65 (1991). For practical guidance on choosing $\tau$ and $d$, see H. Kantz and T. Schreiber, <em>Nonlinear Time Series Analysis</em> (Cambridge, 2nd ed., 2004).</p>
+<p>Persistent homology was introduced by H. Edelsbrunner, D. Letscher, and A. Zomorodian, &ldquo;Topological persistence and simplification,&rdquo; <em>Discrete &amp; Computational Geometry</em> 28 (2002), and the algebraic foundations were laid by A. Zomorodian and G. Carlsson, &ldquo;Computing persistent homology,&rdquo; <em>Discrete &amp; Computational Geometry</em> 33 (2005). The stability theorem is due to D. Cohen-Steiner, H. Edelsbrunner, and J. Harer, &ldquo;Stability of persistence diagrams,&rdquo; <em>Discrete &amp; Computational Geometry</em> 37 (2007). For a comprehensive introduction, see H. Edelsbrunner and J. Harer, <em>Computational Topology: An Introduction</em> (AMS, 2010).</p>
+<p>The Ripser algorithm is described in U. Bauer, &ldquo;Ripser: efficient computation of Vietoris-Rips persistence barcodes,&rdquo; <em>Journal of Applied and Computational Topology</em> 5 (2021). The Python binding is available as <code>ripser</code> on PyPI.</p>
+<p>For TDA in time series analysis, see J. Perea and J. Harer, &ldquo;Sliding windows and persistence: an application of topological methods to signal analysis,&rdquo; <em>Foundations of Computational Mathematics</em> 15 (2015). For applications to biological signals, see B. Stolz et al., &ldquo;Persistent homology of time-dependent functional networks constructed from coupled time series,&rdquo; <em>Chaos</em> 27 (2017).</p>
+<p>The cetacean vocalization data and combinatorial phonetic analysis are from P. Sharma et al., &ldquo;Contextual and combinatorial structure in sperm whale vocalisations,&rdquo; <em>Nature Communications</em> 15, 3617 (2024), and G. Begus et al., &ldquo;Vowel- and diphthong-like spectral patterns in sperm whale codas,&rdquo; <em>Open Mind</em> (MIT Press, 2025). The DSWP dataset is available at <a href="https://huggingface.co/datasets/orrp/DSWP">huggingface.co/datasets/orrp/DSWP</a>.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-04-spd-manifolds.html" class="nav-prev">&larr; Chapter 4: SPD Manifolds and Spectral Geometry</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-06-pathfinding-on-manifolds.html" class="nav-next">Chapter 6: Pathfinding on Manifolds &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

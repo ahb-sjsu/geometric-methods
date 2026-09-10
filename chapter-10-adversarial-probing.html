@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 10: Adversarial Probing &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 10: Adversarial Probing from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-10-adversarial-probing">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 10: Adversarial Probing</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-09-adversarial-robustness.html" class="nav-prev">&larr; Chapter 9: Adversarial Robustness and the Model Robustness I…</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-11-subset-enumeration.html" class="nav-next">Chapter 11: The Subset Enumeration Pattern &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-10-adversarial-probing">Chapter 10: Adversarial Probing</h1>
+<blockquote>
+<p><em>&ldquo;The best way to understand a system is to try to break it&mdash;and then listen carefully to the sound it makes.&rdquo;</em>
+&mdash; Attributed to Richard Hamming</p>
+</blockquote>
+<p>The Model Robustness Index developed in Chapter 9 answers a critical question: <em>how stable is this configuration under random perturbation?</em> But random perturbation is blunt. It tells you that a model is fragile without telling you <em>why</em>, and it tells you that a model is robust without telling you <em>to what</em>. This chapter sharpens the MRI into a family of directed probing tools that interrogate model internals with the precision of a radar system. Where Chapter 9 threw noise at a model and measured the aggregate response, this chapter sends <em>specific, controlled signals</em> and reads the reflections.</p>
+<p>We develop this idea into three concrete tools: the StructureProbe scanner (Section 10.3), parametric intensity sweeps (Section 10.4), and compositional interaction testing (Section 10.5). Section 10.6 then shows how the same mathematical framework extends from parameter-space fuzzing to signal-space fuzzing through the Decoder Robustness Index (DRI), applying MRI principles to acoustic decoders where semantic distance replaces raw error.</p>
+<hr />
+<h2 id="101-the-radar-analogy">10.1 The Radar Analogy</h2>
+<h3 id="1011-from-physical-radar-to-computational-probing">10.1.1 From Physical Radar to Computational Probing</h3>
+<p>A radar transmitter emits a pulse of known shape $s(t)$. The environment reflects it, and the receiver records $r(t)$. The object of interest is the <em>transfer function</em> $H$ such that $r = H(s)$. By sweeping the frequency of $s$ and recording the response, the radar constructs a spectral signature of the target.</p>
+<p>Adversarial probing replaces the electromagnetic pulse with a parametric perturbation and the physical environment with a computational model. The perturbation transform $T_\alpha$ takes an input and returns a modified version at intensity $\alpha \in [0, 1]$. The <em>probing displacement</em> is:</p>
+<p>$$\delta(\alpha) = d\bigl(M(x),\; M(T_\alpha(x))\bigr)$$</p>
+<p>where $d$ is an appropriate distance function&mdash;$L^2$ norm in representation space, MAE in prediction space, or semantic distance in classification space. The function $\delta : [0, 1] \to \mathbb{R}_{\geq 0}$ is the <em>intensity-response curve</em>, and its shape encodes the model&rsquo;s structural relationship to the perturbation.</p>
+<h3 id="1012-reading-the-reflection-profile">10.1.2 Reading the Reflection Profile</h3>
+<p>Three canonical profiles emerge across domains:</p>
+<p><strong>Flat profile</strong> ($\delta(\alpha) \approx 0$ for all $\alpha$). The model is invariant to the perturbation. Desirable for structural invariants; alarming for stress transforms (the model is not reading the content being destroyed).</p>
+<p><strong>Threshold profile</strong> ($\delta(\alpha) \approx 0$ for $\alpha < \alpha^*$, then sharp rise). The model tolerates perturbation up to a critical intensity $\alpha^*$&mdash;the <em>adversarial threshold</em>. Binary search finds $\alpha^*$ efficiently.</p>
+<p><strong>Linear profile</strong> ($\delta(\alpha) \approx k\alpha$). Proportional degradation with no hidden tipping points&mdash;the most benign failure mode.</p>
+<h3 id="1013-invariance-and-sensitivity-as-structural-signatures">10.1.3 Invariance and Sensitivity as Structural Signatures</h3>
+<p>Transforms divide into <em>invariant</em> (semantics-preserving) and <em>stress</em> (semantics-destroying), a domain-dependent classification:</p>
+<p>In parameter-space fuzzing (Chapter 9):</p>
+<ul>
+<li><strong>Invariant perturbations</strong> are small multiplicative shifts. A model robust to 10% parameter variation occupies a broad minimum&mdash;desirable for deployment.</li>
+<li><strong>Stress perturbations</strong> are large directional shifts or dimension ablations. A model that does not respond when an entire feature group is deactivated has not learned to use that group.</li>
+</ul>
+<p>In acoustic decoder testing (Section 10.5):</p>
+<ul>
+<li><strong>Invariant transforms</strong> include amplitude scaling and circular time shifts. A correct decoder should recognize the same coda regardless of recording volume or temporal alignment.</li>
+<li><strong>Stress transforms</strong> include Doppler shift, multipath echo, and click dropout. These degrade the signal in ways that may legitimately change the decoder&rsquo;s output.</li>
+</ul>
+<p>The <em>sensitivity gap</em>&mdash;the ratio of mean displacement under stress transforms to mean displacement under invariant transforms&mdash;is a single scalar that captures how well the model separates structural content from surface variation. A large gap indicates a model that has learned the domain&rsquo;s meaningful invariances; a small gap indicates a model that confuses structure with surface.</p>
+<hr />
+<h2 id="102-parametric-transforms-the-intensity-zero-identity">10.2 Parametric Transforms: The Intensity-Zero Identity</h2>
+<h3 id="1021-the-design-principle">10.2.1 The Design Principle</h3>
+<p>Every parametric transform must satisfy one non-negotiable property:</p>
+<blockquote>
+<p><strong>Intensity-zero identity.</strong> For all inputs $x$: $T(x, 0) = x$. At zero intensity, the transform is the identity.</p>
+</blockquote>
+<p>This guarantees $\delta(0) = 0$, providing a calibrated baseline. The <code>AcousticTransform</code> class encapsulates this:</p>
+<pre><code class="language-python">@dataclass
+class AcousticTransform:
+    &quot;&quot;&quot;Parametric transform with controllable intensity.&quot;&quot;&quot;
+    name: str
+    fn: Callable[[np.ndarray, int, float], np.ndarray]
+    intensity_range: tuple[float, float] = (0.0, 1.0)
+    is_invariant: bool = True
+
+    def __call__(self, signal, sr=32000, intensity=1.0):
+        clamped = max(self.intensity_range[0],
+                      min(self.intensity_range[1], intensity))
+        return self.fn(signal, sr, clamped)
+
+    def at_intensity(self, intensity):
+        &quot;&quot;&quot;Return a fixed-intensity closure for composition.&quot;&quot;&quot;
+        return lambda signal, sr: self(signal, sr, intensity)
+</code></pre>
+<p>The <code>at_intensity</code> method returns a closure with fixed perturbation strength, enabling composition into chains (Section 10.5) or integration with higher-order functions.</p>
+<h3 id="1022-intensity-sweeps">10.2.2 Intensity Sweeps</h3>
+<p>The most informative single measurement is the <em>intensity sweep</em>: evaluating the model&rsquo;s response at uniformly spaced levels from 0 to 1:</p>
+<pre><code class="language-python">def intensity_sweep(self, decoder, signals, sr, transform, n_points=10):
+    &quot;&quot;&quot;Sweep intensity from 0 to 1, recording mean omega at each level.&quot;&quot;&quot;
+    curve = []
+    for intensity in np.linspace(0, 1, n_points):
+        result = self.measure_single_transform(
+            decoder, signals, sr, transform, float(intensity)
+        )
+        curve.append((float(intensity), result.mean_omega))
+    return curve
+</code></pre>
+<p>Plotting all transform sweeps on a single figure produces the model&rsquo;s <em>sensitivity fingerprint</em>&mdash;a visual summary revealing which transforms the model tolerates, which it resists, and at what intensities transitions occur.</p>
+<h3 id="1023-adversarial-threshold-search">10.2.3 Adversarial Threshold Search</h3>
+<p>Where the sweep gives a coarse picture, binary search finds the exact threshold:</p>
+<pre><code class="language-python">def find_adversarial_threshold(self, decoder, signal, sr, transform,
+                                tolerance=0.01):
+    &quot;&quot;&quot;Binary search for minimal intensity that flips the output.&quot;&quot;&quot;
+    baseline = decoder.classify(signal, sr)
+
+    def causes_flip(intensity):
+        transformed = transform(signal, sr, intensity)
+        return decoder.classify(transformed, sr).strip().lower() \
+               != baseline.strip().lower()
+
+    if not causes_flip(1.0):
+        return 1.0
+
+    low, high = 0.0, 1.0
+    while high - low &gt; tolerance:
+        mid = (low + high) / 2
+        if causes_flip(mid):
+            high = mid
+        else:
+            low = mid
+    return high
+</code></pre>
+<p>A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The algorithm is identical to Chapter 9&rsquo;s parameter-space adversarial search&mdash;binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.</p>
+<hr />
+<h2 id="103-structureprobe-the-probe-response-matrix">10.3 StructureProbe: The Probe Response Matrix</h2>
+<h3 id="1031-the-measurement-protocol">10.3.1 The Measurement Protocol</h3>
+<p>Given a model $M$, an input corpus $\{x_1, \ldots, x_N\}$, and $K$ parametric transforms, the StructureProbe scanner constructs a $K \times J$ <em>probe response matrix</em> where entry $(k, j)$ is the mean displacement when transform $T_k$ is applied at intensity $\alpha_j$:</p>
+<p>$$\bar{\delta}_{kj} = \frac{1}{N} \sum_{i=1}^{N} d\bigl(M(x_i),\; M(T_k(x_i, \alpha_j))\bigr)$$</p>
+<p>Each row is an intensity-response curve. Each column is a cross-transform sensitivity snapshot.</p>
+<h3 id="1032-from-ablation-to-graded-perturbation">10.3.2 From Ablation to Graded Perturbation</h3>
+<p>Chapter 9&rsquo;s sensitivity profile ablates each dimension (on/off). The probe response matrix generalizes this to <em>graded</em> perturbation. For dimension $i$ with baseline value $\theta_i$, define:</p>
+<p>$$T_i(\theta, \alpha) = \theta \text{ with } \theta_i \leftarrow \theta_i \cdot e^{\alpha \cdot \sigma}$$</p>
+<p>The intensity-response curve $\delta_i(\alpha) = |\text{MAE}(T_i(\theta, \alpha)) - \text{MAE}(\theta)|$ traces how error evolves as dimension $i$ is progressively perturbed:</p>
+<pre><code class="language-python">def probe_response_matrix(params, dim_names, evaluate_fn,
+                          n_intensities=11, scale=2.0):
+    &quot;&quot;&quot;Compute (n_dims, n_intensities) displacement matrix.&quot;&quot;&quot;
+    intensities = np.linspace(0, 1, n_intensities)
+    matrix = np.zeros((len(dim_names), n_intensities))
+    base_mae, _ = evaluate_fn(params)
+
+    for i in range(len(dim_names)):
+        for j, alpha in enumerate(intensities):
+            perturbed = params.copy()
+            perturbed[i] = params[i] * np.exp(alpha * scale)
+            perturbed[i] = np.clip(perturbed[i], 0.001, 1e6)
+            pert_mae, _ = evaluate_fn(perturbed)
+            matrix[i, j] = abs(pert_mae - base_mae)
+    return matrix
+</code></pre>
+<h3 id="1033-topological-analysis-of-probe-surfaces">10.3.3 Topological Analysis of Probe Surfaces</h3>
+<p>When the probe response matrix is analyzed with persistent homology (Chapter 5), additional structure emerges. Treating the matrix as a height function on a grid, the Vietoris-Rips complex reveals connected components (clusters of transforms with similar profiles) and loops (closed sensitivity circuits suggesting redundancy in the transform library). This connection&mdash;TDA applied to the outputs of adversarial probing&mdash;is a key integrative theme: geometric tools analyzing the results of other geometric tools.</p>
+<hr />
+<h2 id="104-compositional-testing-probing-dimension-interactions">10.4 Compositional Testing: Probing Dimension Interactions</h2>
+<h3 id="1041-beyond-single-dimension-probing">10.4.1 Beyond Single-Dimension Probing</h3>
+<p>The probe response matrix perturbs one dimension at a time, revealing <em>marginal</em> sensitivity but missing <em>interactions</em>. Two dimensions might individually show low sensitivity but produce catastrophic failure when perturbed simultaneously&mdash;the parameter-space analogue of drug interactions in pharmacology.</p>
+<p>Exhaustive pairwise probing (testing all $\binom{n}{2}$ dimension pairs at multiple intensities) is feasible for small $n$ but scales quadratically. For larger problems, the compositional testing framework provides a structured alternative that reveals the most important interactions without exhaustive search.</p>
+<h3 id="1042-greedy-dimension-building-sequences">10.4.2 Greedy Dimension-Building Sequences</h3>
+<p>The <code>compositional_test</code> function builds dimension subsets incrementally, revealing interactions:</p>
+<pre><code class="language-python">from structural_fuzzing.compositional import compositional_test
+
+result = compositional_test(
+    start_dim=0,
+    candidate_dims=[1, 2, 3, 4],
+    dim_names=[&quot;Size&quot;, &quot;Complexity&quot;, &quot;Halstead&quot;, &quot;OO&quot;, &quot;Process&quot;],
+    evaluate_fn=evaluate_fn,
+    n_grid=20,
+    n_random=5000,
+)
+
+for i, (name, mae) in enumerate(
+    zip(result.order_names, result.mae_sequence)
+):
+    print(f&quot;Step {i}: add '{name}' -&gt; MAE = {mae:.4f}&quot;)
+</code></pre>
+<p>At each step, the algorithm tries adding each remaining dimension, re-optimizes all parameters, and selects the dimension producing the greatest MAE reduction. The <em>interaction signature</em> is encoded in the step-to-step MAE differences. If $\text{MAE}_k - \text{MAE}_{k+1}$ exceeds the marginal sensitivity of $d_{k+1}$ alone, there is a positive interaction. If it falls below, there is redundancy.</p>
+<p>The trajectory&rsquo;s shape is diagnostic: steep initial descent means a few key dimensions dominate; gradual uniform descent means all dimensions contribute equally; plateau-then-drop indicates synergistic interactions detectable only through combinatorial probing.</p>
+<h3 id="1043-transform-chains-in-signal-space">10.4.3 Transform Chains in Signal Space</h3>
+<p>The compositional principle extends to signal space through <em>transform chains</em>:</p>
+<pre><code class="language-python">class TransformChain:
+    &quot;&quot;&quot;Compose transforms for compound distortion testing.&quot;&quot;&quot;
+    def __init__(self, transforms: list[tuple[AcousticTransform, float]]):
+        self.transforms = transforms
+        self.name = &quot; -&gt; &quot;.join(
+            f&quot;{t.name}@{i:.1f}&quot; for t, i in transforms
+        )
+
+    def __call__(self, signal, sr=32000):
+        result = signal.copy()
+        for transform, intensity in self.transforms:
+            result = transform(result, sr, intensity)
+        return result
+</code></pre>
+<p>A chain like <code>noise@0.3 -&gt; echo@0.6 -&gt; doppler@0.4</code> applies three perturbations sequentially. Order matters: noise before echo gets echoed; noise after echo does not. The <code>TransformChain.generate_chains</code> factory produces diverse random chains:</p>
+<pre><code class="language-python">chains = TransformChain.generate_chains(
+    transforms=transform_suite,
+    max_length=3, intensities=[0.3, 0.6, 1.0],
+    n_chains=50, seed=42,
+)
+</code></pre>
+<p>A model that handles each individual transform at intensity 0.6 but fails under chains of length 2 at intensity 0.3 has a <em>superlinear interaction</em>&mdash;compound perturbation worse than the sum of its parts.</p>
+<hr />
+<h2 id="105-the-decoder-robustness-index-mri-for-signal-space">10.5 The Decoder Robustness Index: MRI for Signal Space</h2>
+<h3 id="1051-from-parameters-to-signals">10.5.1 From Parameters to Signals</h3>
+<p>The DRI applies the MRI&rsquo;s mathematical structure to <em>input perturbation</em> rather than <em>parameter perturbation</em>. The formula carries over unchanged:</p>
+<p>$$\text{DRI} = 0.5 \cdot \bar{\omega} + 0.3 \cdot P_{75}(\omega) + 0.2 \cdot P_{95}(\omega)$$</p>
+<p>where each $\omega_i$ is now the displacement between baseline and perturbed predictions, and lower DRI indicates greater robustness.</p>
+<h3 id="1052-graduated-omega-via-semantic-distance">10.5.2 Graduated Omega via Semantic Distance</h3>
+<p>The DRI&rsquo;s key innovation is <em>semantic distance</em> rather than binary match/mismatch. For a cetacean decoder classifying whale codas, misclassifying <em>rhythm</em> (fundamental structure) is worse than misclassifying <em>ornamentation</em> (fine detail):</p>
+<pre><code class="language-python">CODA_FEATURE_WEIGHTS = {
+    &quot;rhythm&quot;:        1.0,   # Fundamental timing pattern
+    &quot;tempo&quot;:         0.7,   # Overall speed
+    &quot;rubato&quot;:        0.4,   # Subtle timing variation
+    &quot;ornamentation&quot;: 0.2,   # Extra clicks, finest detail
+}
+
+class CodaSemanticDistance:
+    &quot;&quot;&quot;Semantic distance using coda feature hierarchy.&quot;&quot;&quot;
+    def __init__(self, feature_weights=None, coda_features=None):
+        self.weights = feature_weights or CODA_FEATURE_WEIGHTS
+        self.coda_features = coda_features or {}
+
+    def distance(self, pred1, pred2):
+        if pred1.strip().lower() == pred2.strip().lower():
+            return 0.0
+        feat1 = self.coda_features.get(pred1.strip())
+        feat2 = self.coda_features.get(pred2.strip())
+        if feat1 is not None and feat2 is not None:
+            total_weight = sum(self.weights.values())
+            mismatch_weight = sum(
+                w for f, w in self.weights.items()
+                if feat1.get(f) != feat2.get(f)
+            )
+            semantic_dist = mismatch_weight / total_weight
+            return max(0.5, 0.5 + 0.5 * semantic_dist)
+        return 0.75  # Fallback: binary mismatch
+</code></pre>
+<p>The hybrid formula&mdash;minimum 0.5 penalty for any flip, scaling to 1.0 for maximally different predictions&mdash;ensures the DRI never ignores a decision flip. An ornamentation change gets $\omega \approx 0.54$; a rhythm change gets $\omega \approx 0.93$. The graduated omega reflects the domain&rsquo;s feature hierarchy.</p>
+<h3 id="1053-the-full-dri-pipeline">10.5.3 The Full DRI Pipeline</h3>
+<p>The <code>DecoderRobustnessIndex.measure</code> method orchestrates four phases&mdash;per-transform intensity sweeps, compositional chain testing, adversarial threshold search, and DRI computation&mdash;mirroring the structure of the <code>run_campaign</code> pipeline in the structural fuzzing framework:</p>
+<pre><code class="language-python">transforms = make_acoustic_transform_suite()
+dri = DecoderRobustnessIndex(transforms)
+result = dri.measure(decoder, signals, labels, sr=32000)
+print(f&quot;DRI: {result.dri:.4f}&quot;)
+print(f&quot;DRI (invariant): {result.dri_invariant:.4f}&quot;)
+print(f&quot;DRI (stress):    {result.dri_stress:.4f}&quot;)
+</code></pre>
+<p>The <code>DRIResult</code> provides three granularity levels:</p>
+<ol>
+<li><strong>Scalar DRI.</strong> A single number for cross-decoder comparison.</li>
+<li><strong>DRI by category.</strong> Separate values for invariant and stress transforms, revealing whether weaknesses lie in unlearned symmetries or over-sensitivity to legitimate distortion.</li>
+<li><strong>Per-transform diagnostics.</strong> Mean omega per transform, chain results, and adversarial thresholds&mdash;the full radar image.</li>
+</ol>
+<h3 id="1054-the-acoustic-transform-suite">10.5.4 The Acoustic Transform Suite</h3>
+<p>Nine transforms form the probing library, categorized by invariance expectation:</p>
+<table>
+<thead>
+<tr>
+<th>Transform</th>
+<th>Type</th>
+<th>What It Tests</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>amplitude_scale</td>
+<td>Invariant</td>
+<td>Volume independence</td>
+</tr>
+<tr>
+<td>time_shift</td>
+<td>Invariant</td>
+<td>Temporal alignment independence</td>
+</tr>
+<tr>
+<td>additive_noise</td>
+<td>Invariant</td>
+<td>White noise tolerance</td>
+</tr>
+<tr>
+<td>pink_noise</td>
+<td>Invariant</td>
+<td>Realistic ocean noise tolerance</td>
+</tr>
+<tr>
+<td>doppler_shift</td>
+<td>Stress</td>
+<td>Frequency stability under motion</td>
+</tr>
+<tr>
+<td>multipath_echo</td>
+<td>Stress</td>
+<td>Echo robustness</td>
+</tr>
+<tr>
+<td>time_stretch</td>
+<td>Stress</td>
+<td>Tempo variation tolerance</td>
+</tr>
+<tr>
+<td>spectral_mask</td>
+<td>Stress</td>
+<td>Bandwidth limitation robustness</td>
+</tr>
+<tr>
+<td>click_dropout</td>
+<td>Stress</td>
+<td>Missing data robustness</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>is_invariant</code> flag drives separate <code>dri_invariant</code> and <code>dri_stress</code> aggregation. A decoder with high <code>dri_invariant</code> has engineering defects. A decoder with high <code>dri_stress</code> may simply be doing its job&mdash;detecting genuine signal degradation.</p>
+<hr />
+<h2 id="106-connection-to-the-structural-fuzzing-pipeline">10.6 Connection to the Structural Fuzzing Pipeline</h2>
+<h3 id="1061-the-six-step-campaign">10.6.1 The Six-Step Campaign</h3>
+<p>The structural fuzzing pipeline orchestrates all probing tools into a unified analysis:</p>
+<pre><code class="language-python">from structural_fuzzing.pipeline import run_campaign
+
+report = run_campaign(
+    dim_names=[&quot;Size&quot;, &quot;Complexity&quot;, &quot;Halstead&quot;, &quot;OO&quot;, &quot;Process&quot;],
+    evaluate_fn=evaluate_fn,
+    max_subset_dims=4,
+    n_mri_perturbations=300,
+    adversarial_tolerance=0.5,
+)
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Tool</th>
+<th>Chapter</th>
+<th>Question</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Subset enumeration</td>
+<td>11</td>
+<td>Which dimension combinations matter?</td>
+</tr>
+<tr>
+<td>2</td>
+<td>Pareto frontier</td>
+<td>8</td>
+<td>Which configurations are non-dominated?</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Sensitivity profiling</td>
+<td>9</td>
+<td>Which dimensions drive predictions?</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Model Robustness Index</td>
+<td>9</td>
+<td>How stable is the best configuration?</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Adversarial thresholds</td>
+<td>9&ndash;10</td>
+<td>Where does each dimension break?</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Compositional testing</td>
+<td>12</td>
+<td>How do dimensions interact?</td>
+</tr>
+</tbody>
+</table>
+<h3 id="1062-the-report-as-a-geometric-object">10.6.2 The Report as a Geometric Object</h3>
+<p>The <code>StructuralFuzzReport</code> returned by <code>run_campaign</code> is itself a geometric object. Its fields encode: a set of <em>points</em> in the (dimensions, MAE) plane (subset results), a <em>frontier</em> in this plane (Pareto-optimal configurations), a <em>vector</em> of importances (sensitivity profile), a <em>scalar</em> with supporting distribution (the MRI and its omega distribution), a set of <em>boundaries</em> in parameter space (adversarial thresholds), and a <em>path</em> through subset space (the compositional building sequence). Taken together, these define the geometric structure of the model&rsquo;s configuration space as explored by the probing campaign.</p>
+<h3 id="1063-portability-of-the-framework">10.6.3 Portability of the Framework</h3>
+<p>The MRI/DRI mathematical structure is domain-agnostic. The specific transforms change, but the measurement protocol, aggregation formula, and diagnostic decomposition remain identical:</p>
+<table>
+<thead>
+<tr>
+<th>Bond Index (Ethics)</th>
+<th>DRI (Bioacoustics)</th>
+<th>MRI (Structural Fuzzing)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Scenario transforms</td>
+<td>Acoustic transforms</td>
+<td>Parameter perturbations</td>
+</tr>
+<tr>
+<td>Option semantic distance</td>
+<td>Coda semantic distance</td>
+<td>MAE deviation ($\omega$)</td>
+</tr>
+<tr>
+<td>Graduated omega</td>
+<td>Graduated omega</td>
+<td>Continuous omega</td>
+</tr>
+<tr>
+<td>Adversarial threshold</td>
+<td>Adversarial threshold</td>
+<td>Adversarial threshold</td>
+</tr>
+<tr>
+<td>Compositional chains</td>
+<td>Compositional chains</td>
+<td>Compositional testing</td>
+</tr>
+</tbody>
+</table>
+<p>The common mathematical spine is:</p>
+<p>$$\text{Index} = w_1 \cdot \bar{\omega} + w_2 \cdot P_{75}(\omega) + w_3 \cdot P_{95}(\omega)$$</p>
+<p>with $\omega$ computed as domain-appropriate distance between baseline and perturbed outputs. The framework is a template instantiable for any domain where &ldquo;perturbation,&rdquo; &ldquo;output,&rdquo; and &ldquo;distance&rdquo; are well-defined.</p>
+<hr />
+<h2 id="107-practical-considerations">10.7 Practical Considerations</h2>
+<h3 id="1071-computational-budget">10.7.1 Computational Budget</h3>
+<p>A full DRI measurement with 9 transforms, 3 intensity levels, 50 chains, and 100 signals requires approximately 7,800 model evaluations. Three strategies reduce cost: subsample the corpus (if the profile is stable at $N = 20$, use 20); reduce the intensity grid (3 levels captures most curves); and parallelize (transform evaluations are embarrassingly parallel).</p>
+<h3 id="1072-deterministic-seeding">10.7.2 Deterministic Seeding</h3>
+<p>All stochastic transforms are seeded from the input&rsquo;s content hash, ensuring identical perturbations across model comparisons and enabling differential analysis of model updates.</p>
+<h3 id="1073-choosing-the-distance-function">10.7.3 Choosing the Distance Function</h3>
+<p>The distance function must match the output space: $L^2$ norm for continuous outputs, semantic distance for classifications, edit distance for sequences. The DRI&rsquo;s graduated semantic distance is a general pattern for any classification domain where some errors are worse than others.</p>
+<hr />
+<h2 id="108-summary-and-forward-connections">10.8 Summary and Forward Connections</h2>
+<h3 id="1081-what-this-chapter-established">10.8.1 What This Chapter Established</h3>
+<p>This chapter developed the adversarial probing framework:</p>
+<ol>
+<li><strong>Parametric transforms</strong> with the intensity-zero identity property.</li>
+<li><strong>The StructureProbe scanner</strong> producing probe response matrices&mdash;structural fingerprints under perturbation.</li>
+<li><strong>Intensity sweeps and adversarial threshold search</strong> for precise failure-boundary characterization.</li>
+<li><strong>Compositional testing</strong> via greedy dimension-building and transform chains, revealing interaction effects.</li>
+<li><strong>The Decoder Robustness Index (DRI)</strong> as MRI for signal-space perturbation with graduated semantic distance.</li>
+<li><strong>Topological analysis</strong> of probe surfaces using persistent homology (Chapter 5).</li>
+</ol>
+<p>The unifying theme is the radar analogy: <em>the difference between &ldquo;sent&rdquo; and &ldquo;received&rdquo; encodes the structure of the system being probed</em>.</p>
+<h3 id="1082-connection-to-part-iii">10.8.2 Connection to Part III</h3>
+<p>Part III shifts from developing tools in isolation to identifying reusable design patterns. The probing framework is central:</p>
+<ul>
+<li><strong>Chapter 11</strong> applies the subset enumeration pattern to systematically explore which dimension combinations matter, using the probing tools from this chapter to validate each configuration.</li>
+<li><strong>Chapter 12</strong> develops compositional testing, integrating probing with incremental dimension-building to reveal interaction effects invisible to single-dimension analysis.</li>
+<li><strong>Chapter 13</strong> combines probing with group-theoretic data augmentation, exploiting symmetries to multiply probing coverage without proportional computational cost.</li>
+</ul>
+<p>The transition from Part II to Part III mirrors the transition from constructing individual instruments to building an orchestra. Each instrument&mdash;Pareto analysis, sensitivity profiling, MRI, adversarial probing, TDA&mdash;has been developed and tested in isolation. Part III teaches them to play together.</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-09-adversarial-robustness.html" class="nav-prev">&larr; Chapter 9: Adversarial Robustness and the Model Robustness I…</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-11-subset-enumeration.html" class="nav-next">Chapter 11: The Subset Enumeration Pattern &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>
