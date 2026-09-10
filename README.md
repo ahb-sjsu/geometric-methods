@@ -14,26 +14,28 @@ https://erisml.org/geometric-methods/ via the erisml-lib `site` submodule.
 
 ## Structure
 
-- `chapters/*.md` — the book content (source of truth). The site is a
-  single-page app: `index.html` renders these Markdown files client-side
-  (marked.js + KaTeX) and mounts the interactive visualizations in
-  `assets/demos.js`.
-- `index.html` — the app shell. Its chapter manifest (the `CHAPTERS` array,
-  `CHAPTER_TITLES`, and the landing-page counts) is **generated** from
-  `chapters/*.md`, not hand-edited.
+- `chapters/*.md` — the book content (source of truth): 20 chapters + 3
+  appendices, one file each, `# Chapter N: Title` as the first line.
+- `assets/demos.js`, `assets/demos.css` — the interactive visualizations.
+  `injectDemos(chapterId, element)` mounts a demo under the section listed in
+  `DEMO_MAP`; the built chapter pages call it on load.
+- `.build/` — the shared Geometric Series build kit (see below). The
+  canonical copy lives in `erisml-lib/tools/series-build/`; do not edit the
+  copy here, edit the canonical one and re-sync.
 
-## Build (Markdown → HTML manifest)
+## Build (Markdown → static HTML)
 
-After adding, removing, or renaming a chapter in `chapters/`, run:
+The volume is rendered to one static page per chapter in the unified
+Geometric Series look (shared CSS, manifest-driven series nav from
+`erisml-lib/docs/books.json`, breadcrumb, prev/next, KaTeX):
 
 ```bash
-python .build/build_methods.py
+python .build/build.py                 # -> output/  (index.html + one page per chapter)
+python .build/series_check.py          # mechanical proofreading + KaTeX/xref/code checks
+python .build/publish_site.py --keep assets --push   # rebuild + push the `site` branch
 ```
 
-It rescans `chapters/*.md`, re-orders them (chapters by number, then
-appendices), and rewrites the marked regions of `index.html`
-(`<!--BUILD:CHCOUNT-->`, `<!--BUILD:APXCOUNT-->`, `// <BUILD:MANIFEST>`).
-Nav labels come from the curated `NAV_TITLES` map in the script; a new file
-without an entry gets a label derived from its `# ` heading (and a note to
-curate it). `python .build/build_methods.py --check` exits non-zero if
-`index.html` is out of sync — suitable for CI.
+Old single-page URLs of the form `index.html#chapter-02-...` are forwarded
+to the static pages by a small script on the contents page. After publishing,
+re-pin the submodule in erisml-lib with
+`python tools/series-build/bump_submodules.py --commit`.
