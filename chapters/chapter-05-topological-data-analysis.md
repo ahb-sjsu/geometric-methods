@@ -14,7 +14,7 @@ Topological data analysis (TDA) brings this perspective to finite point clouds. 
 
 This invariance is not merely aesthetic. In applications where the generative process produces structured geometry — oscillatory systems, recurrent dynamics, hierarchical organization — the topological features of the data encode the structure of the process itself. A periodic signal traces a loop. A quasiperiodic signal traces a torus. A chaotic attractor produces a characteristic tangle of components and cycles that distinguishes it from stochastic noise. TDA extracts these features in a principled, stable, and computable way.
 
-This chapter develops the TDA pipeline from first principles. We begin with a technique for lifting one-dimensional time series into higher-dimensional point clouds where topological structure becomes visible (Section 5.2). We then define persistent homology, the central algebraic tool that tracks topological features across scales (Section 5.3), and its standard visualization, the persistence diagram (Section 5.4). Section 5.5 addresses the practical problem of converting persistence diagrams into fixed-length feature vectors suitable for downstream machine learning. Finally, Section 5.6 applies the full pipeline to cetacean bioacoustics, where topological features of vocal dynamics distinguish social groups that are indistinguishable by spectral analysis alone.
+This chapter develops the TDA pipeline from first principles. We begin with a technique for lifting one-dimensional time series into higher-dimensional point clouds where topological structure becomes visible (Section 5.2). We then define persistent homology, the central algebraic tool that tracks topological features across scales (Section 5.3), and its standard visualization, the persistence diagram (Section 5.4). Section 5.5 addresses the practical problem of converting persistence diagrams into fixed-length feature vectors suitable for downstream machine learning. Section 5.6 assembles the full pipeline, and Section 5.7 applies it to cetacean bioacoustics, where topological features of vocal dynamics complement spectral analysis.
 
 ---
 
@@ -169,7 +169,7 @@ Given a persistence diagram $\{(b_i, d_i)\}_{i=1}^n$ with finite features (exclu
 | 3 | Max lifetime | $\max_i \ell_i$ | Most persistent (dominant) feature |
 | 4 | 75th percentile | $Q_{75}(\ell)$ | Robust measure of typical persistence |
 | 5 | Mean birth time | $\frac{1}{n}\sum_i b_i$ | Average scale at which features appear |
-| 6 | Total persistence | $\sum_i \ell_i^2$ | $L^2$ norm of the persistence landscape |
+| 6 | Total persistence | $\sum_i \ell_i^2$ | Sum of squared lifetimes |
 | 7 | Normalized persistence | $\frac{\sqrt{\sum_i \ell_i^2}}{n}$ | Average energy per feature |
 
 The implementation:
@@ -186,7 +186,7 @@ def _diagram_features(dgm: np.ndarray) -> np.ndarray:
         4: p75_lifetime — 75th percentile
         5: mean_birth
         6: total_persistence — sum of squared lifetimes (L2 norm)
-        7: normalized_persistence — total / count
+        7: normalized_persistence — sqrt(total) / count
 
     Args:
         dgm: Persistence diagram, shape [n, 2] with (birth, death).
@@ -390,7 +390,7 @@ TDA captures the *dynamics* of click production by treating the ICI sequence as 
 
 1. **Extract ICI sequence.** Given a coda with click onset times $t_1, t_2, \ldots, t_k$, compute the inter-click intervals $\Delta_i = t_{i+1} - t_i$. This is a short one-dimensional time series (typically 3--20 values for sperm whale codas, longer for click trains of other species).
 
-2. **Time-delay embed.** Apply Takens embedding with appropriate $\tau$ and $d$. For short ICI sequences, $d = 2$ or $d = 3$ and $\tau = 1$ (consecutive ICIs) is common. For longer click trains or continuous audio, higher $\tau$ and subsampling are needed.
+2. **Time-delay embed.** Apply Takens embedding with appropriate $\tau$ and $d$. For short ICI sequences, $d = 2$ or $d = 3$ and $\tau = 1$ (consecutive ICIs) is common. For longer click trains or continuous audio, higher $\tau$ and subsampling are needed. Note how small these clouds are: with $d = 3$ and $\tau = 1$, a coda of $m$ intervals gives $m - 2$ points, so a coda of five intervals gives three. Three points can form no loop, and a handful of points can form only short-lived ones, so $H_1$ features of single codas should be read with that in mind; pooling the intervals of many codas of one type gives clouds large enough for loops to mean something.
 
 3. **Compute persistent homology.** The Vietoris-Rips persistence of the embedded cloud captures:
    - **$H_0$ (components):** Distinct clusters in the ICI attractor. A coda type with two characteristic rhythms (e.g., fast clicks followed by slow clicks) produces two well-separated clusters in the embedding, visible as a long-lived $H_0$ feature.
@@ -442,7 +442,7 @@ feature_matrix = np.stack([process_coda(ici) for ici in coda_icis])
 # feature_matrix.shape = (n_codas, 16)
 ```
 
-The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of distinct interval clusters).
+The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of finite $H_0$ bars, which is one less than the number of points in the cloud and so tracks the length of the coda).
 
 ### 5.7.5 Interpretation of Results
 
@@ -472,7 +472,7 @@ Topological data analysis provides a principled framework for extracting shape-b
 
 6. **Application to cetacean bioacoustics** demonstrates that topological features capture the dynamical shape of vocal patterns — cyclic structure, interval clustering, rhythmic regularity — in ways that are invariant to tempo and complementary to spectral analysis.
 
-The topological perspective will recur in later chapters. In Part II, we will see how persistent homology can detect phase transitions in adversarial parameter spaces (Chapter 9) and how topological features serve as robust invariants for structural fuzzing campaigns (Chapter 20). The key takeaway is that topology captures qualitative structure — the presence or absence of holes, loops, and clusters — that persists under the continuous deformations induced by noise, measurement error, and parameter perturbation, making it a natural complement to the metric and manifold methods developed in Chapters 2 through 4.
+The topological perspective will recur in later chapters. Chapter 10 uses connected components to group transforms with similar probe responses, and the bioacoustics case study of Chapter 20 uses the features of this chapter as one of its channels. The key takeaway is that topology captures qualitative structure — the presence or absence of holes, loops, and clusters — that persists under the continuous deformations induced by noise, measurement error, and parameter perturbation, making it a natural complement to the metric and manifold methods developed in Chapters 2 through 4.
 
 ---
 

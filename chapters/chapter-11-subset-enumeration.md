@@ -81,9 +81,9 @@ grid_values = np.logspace(np.log10(0.01), np.log10(100), n_grid)
 
 This produces `n_grid` points uniformly spaced on a logarithmic scale between $10^{-2}$ and $10^2$. With `n_grid = 20`, the values are approximately:
 
-$$0.01, \; 0.017, \; 0.029, \; 0.050, \; 0.085, \; \ldots, \; 11.7, \; 20.0, \; 34.1, \; 58.5, \; 100.0$$
+$$0.01, \; 0.016, \; 0.026, \; 0.043, \; 0.070, \; \ldots, \; 14.4, \; 23.4, \; 37.9, \; 61.6, \; 100.0$$
 
-Each adjacent pair of grid points differs by a constant multiplicative factor of $(10^4)^{1/19} \approx 1.66$. This provides uniform resolution in the sense that matters: a change from 0.01 to 0.017 is as significant (in relative terms) as a change from 58.5 to 100.0.
+Each adjacent pair of grid points differs by a constant multiplicative factor of $(10^4)^{1/19} \approx 1.62$. This provides uniform resolution in the sense that matters: a change from 0.01 to 0.016 is as significant (in relative terms) as a change from 61.6 to 100.0.
 
 For random search in higher dimensions, the same principle applies:
 
@@ -198,7 +198,7 @@ class SubsetResult:
 
 The fields serve distinct roles:
 
-- **`dims`** and **`dim_names`**: the active dimensions, both by index and by name. The index form enables array operations; the name form enables human-readable output. The tuple type ensures immutability---a `SubsetResult` cannot be silently modified after creation.
+- **`dims`** and **`dim_names`**: the active dimensions, both by index and by name. The index form enables array operations; the name form enables human-readable output. The tuple type keeps these two fields from being modified in place.
 
 - **`n_dims`**: the cardinality of the active subset. Storing this explicitly (rather than computing `len(dims)` each time) supports efficient sorting and filtering: "give me all results with exactly 2 active dimensions" is a constant-time field access, not a linear scan.
 
@@ -352,7 +352,7 @@ This heuristic is not implemented in the framework's core because it sacrifices 
 
 ### 11.5.3 Tuning `n_grid` and `n_random`
 
-The `n_grid` parameter controls the resolution of 1D and 2D searches. Increasing it from 20 to 50 improves resolution (the multiplicative step drops from 1.66 to 1.19) but increases the 2D cost from 400 to 2,500 evaluations per subset. For smooth evaluation functions, `n_grid = 20` is usually sufficient. For functions with narrow optima or sharp transitions, `n_grid = 50` or higher may be warranted.
+The `n_grid` parameter controls the resolution of 1D and 2D searches. Increasing it from 20 to 50 improves resolution (the multiplicative step drops from 1.62 to 1.21) but increases the 2D cost from 400 to 2,500 evaluations per subset. For smooth evaluation functions, `n_grid = 20` is usually sufficient. For functions with narrow optima or sharp transitions, `n_grid = 50` or higher may be warranted.
 
 The `n_random` parameter controls the coverage of 3D+ searches. The expected coverage of a random search depends on the effective dimensionality of the loss landscape. If the loss depends strongly on only one of the $k$ active dimensions, then 5,000 random samples provide excellent coverage of that dimension even in a $k$-dimensional space. If the loss depends on all $k$ dimensions with comparable sensitivity, coverage scales as $n_{\text{random}}^{1/k}$---about 17 effective grid points per dimension for $k = 3$ and $n_{\text{random}} = 5000$, or about 8 for $k = 4$. These numbers are adequate for identifying the approximate optimum but not for precise characterization. For the latter, a targeted refinement step (not part of the core framework) can be applied to the most promising configurations.
 
@@ -449,7 +449,7 @@ Running `enumerate_subsets` with `max_dims = 4` on the defect prediction example
 | Halstead | ~5.4 | Weak (correlated with Size) |
 | OO | ~8.9 | Near-noise |
 
-Complexity alone is the best single predictor, confirming the domain knowledge that cyclomatic complexity is the primary driver of defect-proneness. OO metrics contribute almost nothing in isolation---a finding consistent with the data generation process, where OO features are pure noise.
+Complexity alone is the best single predictor, consistent with the generator, in which the complexity coefficients are the largest (essential complexity carries 0.15). These values are illustrative; Section 19.4 gives the recorded ones, in which the single groups score within two MAE points of one another and the ordering carries no information. OO metrics contribute almost nothing in isolation---a finding consistent with the data generation process, where OO features are pure noise.
 
 **Two-dimension results ($k = 2$).** The ten pairwise combinations reveal interaction effects:
 
@@ -555,7 +555,7 @@ The subset enumeration pattern is the simplest and most powerful tool in the str
 
 When these conditions hold, `enumerate_subsets` with a moderate `max_dims` produces a complete structural map in acceptable time. The `SubsetResult` objects that emerge---typed, immutable, carrying both scalar and multi-dimensional performance data---feed directly into Pareto analysis, sensitivity profiling, adversarial testing, and every other downstream stage of the structural fuzzing pipeline.
 
-The pattern's limitation is equally clear: it does not scale to hundreds of dimensions. For those problems, the heuristic methods---forward selection, backward elimination, and the stochastic approaches discussed in Chapter 12---are necessary. But the heuristics are most effective when calibrated against the brute-force ground truth on a reduced problem, and the transition from exact enumeration to approximate search is the subject of the next chapter.
+The pattern's limitation is equally clear: it does not scale to hundreds of dimensions. For those problems, the heuristic methods---forward selection, backward elimination, and the screening and sampling methods of Chapter 17---are necessary. But the heuristics are most effective when calibrated against the brute-force ground truth on a reduced problem, and the transition from exact enumeration to approximate search is the subject of Chapter 17.
 
 ---
 

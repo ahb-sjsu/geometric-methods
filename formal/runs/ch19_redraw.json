@@ -1,0 +1,304 @@
+{
+ "seeds": [
+  {
+   "seed": 0,
+   "winner": [
+    "OO"
+   ],
+   "winner_mae": 35.36129762909949,
+   "winner_recall": 14.705882352941174,
+   "runner_up_mae": 35.56755614526512,
+   "configs_with_any_recall": 9,
+   "auc_min": 43.97390535161432,
+   "auc_max": 59.56988058381246,
+   "median_mae": 48.43342178976854
+  },
+  {
+   "seed": 1,
+   "winner": [
+    "Complexity",
+    "OO"
+   ],
+   "winner_mae": 37.89607666966158,
+   "winner_recall": 2.857142857142854,
+   "runner_up_mae": 42.50805820150992,
+   "configs_with_any_recall": 4,
+   "auc_min": 40.884097035040426,
+   "auc_max": 58.46900269541779,
+   "median_mae": 48.49757412398922
+  },
+  {
+   "seed": 2,
+   "winner": [
+    "Size",
+    "Halstead",
+    "OO"
+   ],
+   "winner_mae": 39.13161585100749,
+   "winner_recall": 2.7027027027027017,
+   "runner_up_mae": 39.475865142069566,
+   "configs_with_any_recall": 6,
+   "auc_min": 37.80700852944199,
+   "auc_max": 56.12475593464187,
+   "median_mae": 49.10020210324393
+  },
+  {
+   "seed": 3,
+   "winner": [
+    "Halstead",
+    "Process"
+   ],
+   "winner_mae": 38.80657333413447,
+   "winner_recall": 3.030303030303031,
+   "runner_up_mae": 38.896198488031864,
+   "configs_with_any_recall": 16,
+   "auc_min": 38.792418567699464,
+   "auc_max": 59.368970604925664,
+   "median_mae": 46.072377815257354
+  },
+  {
+   "seed": 4,
+   "winner": [
+    "Size",
+    "Complexity",
+    "OO",
+    "Process"
+   ],
+   "winner_mae": 36.53626927531376,
+   "winner_recall": 2.173913043478258,
+   "runner_up_mae": 37.959578589465615,
+   "configs_with_any_recall": 6,
+   "auc_min": 42.558199246833276,
+   "auc_max": 62.88942143101677,
+   "median_mae": 48.15787972155654
+  },
+  {
+   "seed": 5,
+   "winner": [
+    "Complexity",
+    "OO"
+   ],
+   "winner_mae": 34.15076252723311,
+   "winner_recall": 6.666666666666664,
+   "runner_up_mae": 37.546321791127795,
+   "configs_with_any_recall": 9,
+   "auc_min": 36.67538126361656,
+   "auc_max": 56.58823529411765,
+   "median_mae": 48.18867102396514
+  },
+  {
+   "seed": 6,
+   "winner": [
+    "Complexity"
+   ],
+   "winner_mae": 34.3053295131254,
+   "winner_recall": 13.725490196078432,
+   "runner_up_mae": 35.86564682704179,
+   "configs_with_any_recall": 8,
+   "auc_min": 41.46389479486574,
+   "auc_max": 56.53988503031735,
+   "median_mae": 47.78135286243011
+  },
+  {
+   "seed": 7,
+   "winner": [
+    "Complexity",
+    "Halstead",
+    "Process"
+   ],
+   "winner_mae": 34.974039397295215,
+   "winner_recall": 2.3809523809523796,
+   "runner_up_mae": 39.224326319675164,
+   "configs_with_any_recall": 7,
+   "auc_min": 37.05703211517165,
+   "auc_max": 61.203396087117014,
+   "median_mae": 47.844978858350956
+  },
+  {
+   "seed": 8,
+   "winner": [
+    "Process"
+   ],
+   "winner_mae": 41.534317204177405,
+   "winner_recall": 4.545454545454547,
+   "runner_up_mae": 43.97674395916583,
+   "configs_with_any_recall": 4,
+   "auc_min": 39.78604403409091,
+   "auc_max": 54.71413352272727,
+   "median_mae": 49.03113162878788
+  },
+  {
+   "seed": 9,
+   "winner": [
+    "OO",
+    "Process"
+   ],
+   "winner_mae": 41.74901062867481,
+   "winner_recall": 3.125,
+   "runner_up_mae": 42.27448230508946,
+   "configs_with_any_recall": 3,
+   "auc_min": 34.66068097014925,
+   "auc_max": 53.31156716417911,
+   "median_mae": 50.02809390547263
+  },
+  {
+   "seed": 10,
+   "winner": [
+    "Process"
+   ],
+   "winner_mae": 35.44595803596415,
+   "winner_recall": 8.51063829787234,
+   "runner_up_mae": 39.124670262219354,
+   "configs_with_any_recall": 8,
+   "auc_min": 45.26112185686653,
+   "auc_max": 61.365738794045924,
+   "median_mae": 46.78670703333053
+  },
+  {
+   "seed": 11,
+   "winner": [
+    "Halstead"
+   ],
+   "winner_mae": 36.08409444835301,
+   "winner_recall": 10.810810810810807,
+   "runner_up_mae": 40.55843607680759,
+   "configs_with_any_recall": 6,
+   "auc_min": 41.80454218477032,
+   "auc_max": 62.51669920871442,
+   "median_mae": 48.8204227040729
+  },
+  {
+   "seed": 12,
+   "winner": [
+    "Size",
+    "Complexity"
+   ],
+   "winner_mae": 35.22940427179577,
+   "winner_recall": 3.448275862068968,
+   "runner_up_mae": 37.97325359460491,
+   "configs_with_any_recall": 15,
+   "auc_min": 46.125461254612546,
+   "auc_max": 64.95101157908131,
+   "median_mae": 46.409797684183744
+  },
+  {
+   "seed": 13,
+   "winner": [
+    "Halstead"
+   ],
+   "winner_mae": 42.77319586023465,
+   "winner_recall": 2.6315789473684177,
+   "runner_up_mae": 43.598828644485344,
+   "configs_with_any_recall": 3,
+   "auc_min": 42.42165528324628,
+   "auc_max": 58.944355162715944,
+   "median_mae": 48.66905048881746
+  },
+  {
+   "seed": 14,
+   "winner": [
+    "Size"
+   ],
+   "winner_mae": 40.5946263003166,
+   "winner_recall": 3.125,
+   "runner_up_mae": 42.57288788768922,
+   "configs_with_any_recall": 5,
+   "auc_min": 38.16464552238806,
+   "auc_max": 52.979244402985074,
+   "median_mae": 50.374207089552236
+  },
+  {
+   "seed": 15,
+   "winner": [
+    "Size",
+    "Complexity",
+    "Halstead",
+    "OO",
+    "Process"
+   ],
+   "winner_mae": 34.632328016240635,
+   "winner_recall": 1.8867924528301856,
+   "runner_up_mae": 35.9169311324227,
+   "configs_with_any_recall": 17,
+   "auc_min": 41.95630585898709,
+   "auc_max": 60.648537162936364,
+   "median_mae": 40.74112424346989
+  },
+  {
+   "seed": 16,
+   "winner": [
+    "Size",
+    "Complexity",
+    "Halstead",
+    "Process"
+   ],
+   "winner_mae": 37.858641975308636,
+   "winner_recall": 3.3333333333333357,
+   "runner_up_mae": 41.80377632534495,
+   "configs_with_any_recall": 10,
+   "auc_min": 40.17283950617284,
+   "auc_max": 56.71604938271605,
+   "median_mae": 49.02716049382716
+  },
+  {
+   "seed": 17,
+   "winner": [
+    "Complexity"
+   ],
+   "winner_mae": 32.066816234449064,
+   "winner_recall": 20.930232558139537,
+   "runner_up_mae": 37.07074070722609,
+   "configs_with_any_recall": 10,
+   "auc_min": 45.63387928694236,
+   "auc_max": 58.24359786444666,
+   "median_mae": 47.815141917775165
+  },
+  {
+   "seed": 18,
+   "winner": [
+    "Process"
+   ],
+   "winner_mae": 39.447053775544944,
+   "winner_recall": 9.090909090909093,
+   "runner_up_mae": 44.99625468164794,
+   "configs_with_any_recall": 3,
+   "auc_min": 35.85291113381002,
+   "auc_max": 59.794574963114286,
+   "median_mae": 49.64124389967087
+  },
+  {
+   "seed": 19,
+   "winner": [
+    "Size",
+    "Halstead",
+    "OO",
+    "Process"
+   ],
+   "winner_mae": 37.92854259331854,
+   "winner_recall": 2.439024390243901,
+   "runner_up_mae": 37.97939483929274,
+   "configs_with_any_recall": 8,
+   "auc_min": 41.680007533666064,
+   "auc_max": 55.37715415764196,
+   "median_mae": 48.94089838967888
+  }
+ ],
+ "winner_counts": {
+  "Complexity": 2,
+  "Complexity + Halstead + Process": 1,
+  "Complexity + OO": 2,
+  "Halstead": 2,
+  "Halstead + Process": 1,
+  "OO": 1,
+  "OO + Process": 1,
+  "Process": 3,
+  "Size": 1,
+  "Size + Complexity": 1,
+  "Size + Complexity + Halstead + OO + Process": 1,
+  "Size + Complexity + Halstead + Process": 1,
+  "Size + Complexity + OO + Process": 1,
+  "Size + Halstead + OO": 1,
+  "Size + Halstead + OO + Process": 1
+ },
+ "winners_with_OO": 8
+}

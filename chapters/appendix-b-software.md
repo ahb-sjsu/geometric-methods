@@ -60,7 +60,7 @@ conda activate structural-fuzzing
 
 ## B.3 The structural-fuzzing Package
 
-The `structural-fuzzing` package (version 0.2.0 at the time of writing)
+The `structural-fuzzing` package (version 0.4.0 as of November 2026)
 provides the core framework used throughout this book. It implements
 structural validation through parameter-space exploration, Pareto analysis,
 sensitivity profiling, robustness quantification, and adversarial threshold
@@ -97,7 +97,7 @@ pip install -e ".[dev,examples,docs]"
 
 ```python
 import structural_fuzzing
-print(structural_fuzzing.__version__)  # Should print "0.2.0" or later
+print(structural_fuzzing.__version__)  # Should print "0.4.0" or later
 ```
 
 ## B.4 Core and Optional Dependencies
@@ -111,7 +111,7 @@ aggregation. It is installed automatically with `structural-fuzzing`.
 
 ### Optional: scikit-learn (>= 1.3)
 
-Required for the machine learning examples in Parts II and III, including
+Required for the machine learning examples in Parts II to IV, including
 the defect prediction case study. Provides the classifiers and regressors
 that serve as evaluation targets for structural fuzzing campaigns. Included
 in the `[examples]` extras group.
@@ -189,9 +189,9 @@ domains:
   ethical-economic parameter space against 16 behavioral economics targets.
   Repository: [github.com/ahb-sjsu/eris-econ](https://github.com/ahb-sjsu/eris-econ)
 
-- **eris-ketos** (`pip install eris-ketos`) -- Marine ecosystem modeling
-  with geometric structure, extending the decision framework to ecological
-  and environmental domains.
+- **eris-ketos** (`pip install eris-ketos`) -- Geometric analysis of cetacean
+  communication: hyperbolic embeddings, topological data analysis, and
+  adversarial robustness testing for whale vocalization decoding (Chapters 4, 5, 10, 14 and 20).
 
 - **arc-agi** -- ARC-AGI-2 solver using geometric embeddings, hyperbolic
   rule inference, and adversarial structure probing. Applies fuzzing and
@@ -201,35 +201,36 @@ domains:
 
 ## B.8 Chapter Dependency Matrix
 
-The table below shows which packages are required or recommended for each
-chapter. "Core" means only `structural-fuzzing` and NumPy are needed.
+The table below shows which packages the code in each chapter imports. "Core" means `structural-fuzzing` and NumPy. "Required" means the chapter's code does not run without the package; "Examples" means only the worked example needs it. The last column names companion packages from Section B.7 that a chapter's code comes from. The table was rebuilt in November 2026 by searching each chapter's code for its imports.
 
-| Chapter / Part | Core | scikit-learn | pandas | scipy | gudhi/ripser | geoopt |
-|----------------|------|-------------|--------|-------|-------------|--------|
+| Chapter / Part | Core | scikit-learn | SciPy | PyTorch | ripser | Other |
+|----------------|------|-------------|-------|---------|--------|-------|
 | **Part I: Foundations** | | | | | | |
 | Ch 1. Why Geometry? | Required | -- | -- | -- | -- | -- |
-| Ch 2. Mahalanobis Distance | Required | -- | -- | Recommended | -- | -- |
-| Ch 3. Hyperbolic Geometry | Required | -- | -- | Recommended | -- | Required |
-| Ch 4. SPD Manifolds | Required | -- | -- | Required | -- | -- |
-| Ch 5. Topological Data Analysis | Required | -- | -- | Required | Required | -- |
+| Ch 2. Mahalanobis Distance | Required | -- | Required | -- | -- | `eris-econ` (described) |
+| Ch 3. Hyperbolic Geometry | Required | -- | Required | Required | -- | -- |
+| Ch 4. SPD Manifolds | Required | -- | -- | Required | -- | `eris-ketos` |
+| Ch 5. Topological Data Analysis | Required | -- | -- | -- | Required | `eris-ketos` |
 | **Part II: Algorithms** | | | | | | |
-| Ch 6. Pathfinding on Manifolds | Required | -- | -- | Recommended | -- | -- |
-| Ch 7. Equilibrium on Manifolds | Required | -- | -- | -- | -- | -- |
-| Ch 8. Pareto Optimization | Required | Recommended | -- | -- | -- | -- |
-| Ch 9. Adversarial Robustness (MRI) | Required | Recommended | Recommended | -- | -- | -- |
-| Ch 10. Adversarial Probing | Required | -- | -- | -- | -- | -- |
+| Ch 6. Pathfinding on Manifolds | Required | -- | -- | -- | -- | `eris-econ` |
+| Ch 7. Equilibrium on Manifolds | Required | -- | -- | -- | -- | `eris-econ` |
+| Ch 8. Pareto Optimization | Required | Examples | -- | -- | -- | -- |
+| Ch 9. Adversarial Robustness (MRI) | Required | Examples | -- | -- | -- | -- |
+| Ch 10. Adversarial Probing | Required | -- | -- | -- | -- | `eris-ketos` |
 | **Part III: Design Patterns** | | | | | | |
-| Ch 11. Subset Enumeration | Required | Recommended | -- | -- | -- | -- |
-| Ch 12. Compositional Testing | Required | Recommended | Recommended | -- | -- | -- |
-| Ch 13. Group-Theoretic Augmentation | Required | -- | -- | -- | -- | -- |
-| Ch 14. Gradient Reversal | Required | -- | -- | -- | -- | -- |
-| Ch 15. Cholesky Parameterization | Required | -- | -- | Recommended | -- | -- |
+| Ch 11. Subset Enumeration | Required | Examples | -- | -- | -- | -- |
+| Ch 12. Compositional Testing | Required | Examples | -- | -- | -- | -- |
+| Ch 13. Group-Theoretic Augmentation | Required | -- | -- | -- | -- | `arc-prize` (described) |
+| Ch 14. Gradient Reversal | Required | -- | -- | Required | -- | `eris-ketos` |
+| Ch 15. Cholesky Parameterization | Required | -- | Required | Required | -- | `eris-econ` (described) |
 | **Part IV: Systems** | | | | | | |
-| Ch 16. Building Geometric Pipelines | Required | Recommended | Recommended | -- | -- | -- |
-| Ch 17. Scaling to High Dimensions | Required | -- | -- | Recommended | -- | -- |
-| Ch 18. Production Deployment | Required | -- | -- | -- | -- | -- |
-| Ch 19. Case Study: Defect Prediction | Required | Required | Recommended | -- | -- | -- |
-| Ch 20. Case Study: Bioacoustics | Required | -- | Recommended | Recommended | Required | Required |
+| Ch 16. Building Geometric Pipelines | Required | Examples | -- | -- | -- | -- |
+| Ch 17. Scaling to High Dimensions | Required | -- | Recommended | -- | -- | `openvector-bench` (Section 17.11) |
+| Ch 18. Production Deployment | Required | -- | -- | -- | -- | `requests`, `pandas` |
+| Ch 19. Case Study: Defect Prediction | Required | Required | -- | -- | -- | `matplotlib` |
+| Ch 20. Case Study: Bioacoustics | Required | -- | Recommended | Required | Required | `eris-ketos` |
+| **Part V: Method** | | | | | | |
+| Ch 21. The Measurement Discipline | -- | -- | -- | -- | -- | -- |
 
 ## B.9 Complete Installation for All Chapters
 
@@ -241,21 +242,21 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install structural-fuzzing with all optional groups
 pip install structural-fuzzing[examples,dev,docs]
 
-# Install external geometric libraries
-pip install scipy gudhi geoopt
+# Install the libraries the chapters import (see the matrix in B.8)
+pip install scipy torch ripser matplotlib requests pandas
 
 # Install ecosystem packages
 pip install eris-econ eris-ketos
 ```
 
-For a minimal installation covering Parts I and II only:
+For a minimal installation:
 
 ```bash
 pip install structural-fuzzing
 ```
 
-This installs only `structural-fuzzing` and NumPy, sufficient for
-Chapters 1 through 2 and Chapters 6 through 11.
+This installs only `structural-fuzzing` and NumPy. That is enough for
+the framework itself; the matrix above lists what each chapter adds.
 
 ## B.10 Verifying the Full Installation
 
@@ -265,7 +266,9 @@ import sys
 for module, name in [("structural_fuzzing", "structural-fuzzing"),
                      ("numpy", "NumPy"), ("sklearn", "scikit-learn"),
                      ("pandas", "pandas"), ("scipy", "SciPy"),
-                     ("gudhi", "GUDHI"), ("geoopt", "Geoopt")]:
+                     ("torch", "PyTorch"), ("ripser", "ripser"),
+                     ("matplotlib", "matplotlib"), ("requests", "requests"),
+                     ("eris_econ", "eris-econ"), ("eris_ketos", "eris-ketos")]:
     try:
         mod = __import__(module)
         print(f"  {name:.<30s} {getattr(mod, '__version__', 'ok')}")

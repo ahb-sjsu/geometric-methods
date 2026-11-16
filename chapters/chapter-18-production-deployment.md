@@ -20,7 +20,7 @@ In a production `requirements.txt` or `pyproject.toml`, pin the version explicit
 ```toml
 [project]
 dependencies = [
-    "structural-fuzzing==0.2.0",
+    "structural-fuzzing==0.4.0",
     # ... other production dependencies
 ]
 ```
@@ -28,7 +28,7 @@ dependencies = [
 For organizations that mirror PyPI internally, the package installs cleanly from private indices:
 
 ```bash
-pip install structural-fuzzing==0.2.0 --index-url https://pypi.internal.corp.example.com/simple
+pip install structural-fuzzing==0.4.0 --index-url https://pypi.internal.corp.example.com/simple
 ```
 
 The optional `examples` extras (`scikit-learn`, `pandas`) are development conveniences and should not be installed in production images. If your `evaluate_fn` requires scikit-learn, that dependency belongs in your application's dependency list, not in the validation tool's.
@@ -84,7 +84,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install structural-fuzzing==0.2.0
+          pip install structural-fuzzing==0.4.0
 
       - name: Run structural fuzzing campaign
         run: python scripts/run_validation.py --output results/
@@ -103,11 +103,11 @@ jobs:
 
 Three design decisions merit attention.
 
-**The `schedule` trigger.** Structural fuzzing on every commit is often too expensive. The workflow above runs the full campaign weekly on a schedule, while PR-triggered runs execute a lighter check (Section 18.4). The scheduled run establishes the baseline; PR runs check for regressions against it.
+**The `schedule` trigger.** Structural fuzzing on every commit is often too expensive. The workflow above runs the full campaign weekly on a schedule, while PR-triggered runs execute a lighter check (Section 18.5). The scheduled run establishes the baseline; PR runs check for regressions against it.
 
 **The `timeout-minutes` limit.** Production CI must have a hard upper bound on execution time. A campaign that runs indefinitely---because an `evaluate_fn` hangs, because a combinatorial explosion was not anticipated---blocks the pipeline and erodes trust in the validation system. Section 18.5 discusses timeout handling in detail.
 
-**Artifact retention.** Campaign results are uploaded as CI artifacts with a 90-day retention window. This creates a versioned history of geometric baselines that can be compared over time (Section 18.8).
+**Artifact retention.** Campaign results are uploaded as CI artifacts with a 90-day retention window. This creates a versioned history of geometric baselines that can be compared over time (Section 18.9).
 
 ### 18.2.2 The Validation Script
 
@@ -202,11 +202,12 @@ class ThresholdPolicy:
     max_mri_p95: float = 4.0
     min_pareto_count: int = 2
     max_best_mae: float = 3.0
-    max_adversarial_count: int = 10
     max_sensitivity_delta: float = 5.0
 ```
 
-The `max_mri` threshold deserves careful calibration. An MRI of 2.0 means the weighted combination of mean deviation, 75th percentile, and 95th percentile is at most 2.0---the model's error roughly doubles under the worst perturbations seen during validation. Whether this is acceptable depends on the domain. For a defect prediction model that informs code review priorities, an MRI of 2.0 may be fine. For a model that triggers automated security responses, an MRI above 1.0 may be unacceptable. Chapter 9 provides guidance on setting these thresholds based on domain-specific risk tolerance.
+The `max_mri` threshold deserves careful calibration. The MRI is measured in the units of the MAE: an MRI of 2.0 means that the weighted combination of the mean, 75th-percentile and 95th-percentile absolute changes in MAE under perturbation is 2.0 points. It is not a ratio, so whether 2.0 is large depends on the MAE itself: it is a small wobble for a model whose MAE is 40 and larger than the whole error of a model whose MAE is 1.5. Set the threshold relative to the baseline MAE and the domain. For a model that informs code review priorities a generous bound may be fine; for one that triggers automated security responses it may not.
+
+A low MRI passes this gate whether the model is robust or the evaluation function cannot see the perturbation. Section 19.7 reports a campaign whose MRI is exactly zero for the second reason. Run the witness check of Section 21.4, two parameter vectors that must give different scores, before trusting the gate. Chapter 9 provides guidance on setting these thresholds based on domain-specific risk tolerance.
 
 The `max_mri_p95` threshold independently bounds the tail of the perturbation distribution. A model can have a low composite MRI (because the mean is low) while still exhibiting catastrophic behavior in the worst 5% of perturbations. Bounding P95 separately catches this case.
 
@@ -221,8 +222,10 @@ The `check_thresholds.py` script loads the JSON results and applies the policy:
 import json
 import sys
 
+from policy import ThresholdPolicy  # the dataclass above, saved as scripts/policy.py
 
-def check_thresholds(results_path: str) -> bool:
+
+def check_thresholds(results_path: str, policy: ThresholdPolicy = ThresholdPolicy()) -> bool:
     with open(results_path) as f:
         results = json.load(f)
 
@@ -230,34 +233,34 @@ def check_thresholds(results_path: str) -> bool:
 
     # MRI checks
     mri = results.get("mri")
-    if mri is not None and mri > 2.0:
-        failures.append(f"MRI {mri:.4f} exceeds threshold 2.0")
+    if mri is not None and mri > policy.max_mri:
+        failures.append(f"MRI {mri:.4f} exceeds threshold {policy.max_mri}")
 
     mri_p95 = results.get("mri_p95")
-    if mri_p95 is not None and mri_p95 > 4.0:
-        failures.append(f"MRI P95 {mri_p95:.4f} exceeds threshold 4.0")
+    if mri_p95 is not None and mri_p95 > policy.max_mri_p95:
+        failures.append(f"MRI P95 {mri_p95:.4f} exceeds threshold {policy.max_mri_p95}")
 
     # Pareto frontier check
     pareto_count = results.get("pareto_count", 0)
-    if pareto_count < 2:
+    if pareto_count < policy.min_pareto_count:
         failures.append(
             f"Pareto frontier has {pareto_count} points "
-            f"(minimum 2 required)"
+            f"(minimum {policy.min_pareto_count} required)"
         )
 
     # Best MAE check
     pareto_maes = results.get("pareto_maes", [])
-    if pareto_maes and min(pareto_maes) > 3.0:
+    if pareto_maes and min(pareto_maes) > policy.max_best_mae:
         failures.append(
-            f"Best Pareto MAE {min(pareto_maes):.4f} exceeds threshold 3.0"
+            f"Best Pareto MAE {min(pareto_maes):.4f} exceeds threshold {policy.max_best_mae}"
         )
 
     # Sensitivity check: no single dimension should dominate excessively
     for entry in results.get("sensitivity_ranking", []):
-        if abs(entry["delta_mae"]) > 5.0:
+        if abs(entry["delta_mae"]) > policy.max_sensitivity_delta:
             failures.append(
                 f"Dimension '{entry['dim']}' has excessive sensitivity "
-                f"(delta_MAE={entry['delta_mae']:.4f}, threshold=5.0)"
+                f"(delta_MAE={entry['delta_mae']:.4f}, threshold={policy.max_sensitivity_delta})"
             )
 
     # Report
@@ -275,8 +278,20 @@ def check_thresholds(results_path: str) -> bool:
 
 
 if __name__ == "__main__":
-    success = check_thresholds(sys.argv[1])
-    sys.exit(0 if success else 1)
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("results")
+    ap.add_argument("--baseline")
+    ap.add_argument("--max-mri-regression", type=float, default=0.20)
+    ap.add_argument("--max-mae-regression", type=float, default=0.10)
+    args = ap.parse_args()
+
+    ok = check_thresholds(args.results)
+    if args.baseline:  # check_regression is defined in Section 18.3.3, same file
+        ok = check_regression(args.results, args.baseline,
+                              args.max_mri_regression, args.max_mae_regression) and ok
+    sys.exit(0 if ok else 1)
 ```
 
 The exit code is the contract with the CI system: zero means pass, non-zero means fail. When `check_thresholds.py` exits with code 1, the GitHub Actions step fails, the PR check turns red, and the change cannot merge without an explicit override.
@@ -286,7 +301,12 @@ The exit code is the contract with the CI system: zero means pass, non-zero mean
 Threshold checking against fixed constants is a starting point. The more powerful mode compares against a *previous baseline*:
 
 ```python
-def check_regression(current_path: str, baseline_path: str) -> bool:
+def check_regression(
+    current_path: str,
+    baseline_path: str,
+    max_mri_regression: float = 0.20,
+    max_mae_regression: float = 0.10,
+) -> bool:
     """Check for regressions relative to a stored baseline."""
     with open(current_path) as f:
         current = json.load(f)
@@ -296,9 +316,9 @@ def check_regression(current_path: str, baseline_path: str) -> bool:
     failures: list[str] = []
 
     # MRI regression: current should not be more than 20% worse
-    if current["mri"] is not None and baseline["mri"] is not None:
+    if current["mri"] is not None and baseline["mri"]:  # skips a zero baseline
         ratio = current["mri"] / baseline["mri"]
-        if ratio > 1.2:
+        if ratio > 1 + max_mri_regression:
             failures.append(
                 f"MRI regressed by {(ratio - 1) * 100:.1f}% "
                 f"({baseline['mri']:.4f} -> {current['mri']:.4f})"
@@ -314,7 +334,7 @@ def check_regression(current_path: str, baseline_path: str) -> bool:
     # Best MAE should not increase by more than 10%
     curr_best = min(current["pareto_maes"]) if current["pareto_maes"] else float("inf")
     base_best = min(baseline["pareto_maes"]) if baseline["pareto_maes"] else float("inf")
-    if curr_best > base_best * 1.1:
+    if curr_best > base_best * (1 + max_mae_regression):
         failures.append(
             f"Best MAE regressed by {(curr_best / base_best - 1) * 100:.1f}% "
             f"({base_best:.4f} -> {curr_best:.4f})"
@@ -354,7 +374,6 @@ The following pattern wraps a model served via HTTP:
 
 ```python
 import time
-from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -444,7 +463,7 @@ def make_cached_evaluate_fn(
     base_fn: callable,
     cache_size: int = 4096,
 ) -> callable:
-    """Wrap an evaluate_fn with an LRU cache.
+    """Wrap an evaluate_fn with a bounded cache (first in, first out).
 
     Note: NumPy arrays are not hashable. We convert to a tuple
     of rounded values for cache keys.
@@ -593,7 +612,7 @@ def campaign_timeout(seconds: int):
 #     report = run_campaign(...)
 ```
 
-When the timeout fires, the `CampaignTimeoutError` propagates up, the CI step fails, and the artifact upload step (marked `if: always()`) still runs, capturing whatever partial results were produced.
+When the timeout fires, the `CampaignTimeoutError` propagates up, the CI step fails, and the artifact upload step (marked `if: always()`) still runs. It uploads only what was written before the timeout, and `run_validation.py` writes its results after the campaign returns, so a timed-out run uploads no campaign results. Writing each stage's output as it completes would change that.
 
 ---
 
@@ -607,7 +626,7 @@ The monitoring system is straightforward: store campaign results in a time-serie
 
 ```python
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -618,7 +637,7 @@ def append_to_history(
 ) -> None:
     """Append campaign results to the history file."""
     entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "model_version": model_version,
         **results,
     }
@@ -691,30 +710,20 @@ def pareto_hypervolume(
 ) -> float:
     """Compute the hypervolume dominated by the Pareto frontier.
 
-    Uses a reference point (ref_dims, ref_mae) as the upper-right
-    corner of the dominated region. Larger hypervolume is better.
+    Both objectives are minimized. A point (d, m) dominates the box
+    [d, ref_dims] x [m, ref_mae]; the hypervolume is the area of the
+    union of those boxes. Larger hypervolume is better.
     """
-    if not pareto_dims or not pareto_maes:
-        return 0.0
-
-    # Sort by dims ascending
-    points = sorted(zip(pareto_dims, pareto_maes))
-
+    points = sorted(
+        (d, m) for d, m in zip(pareto_dims, pareto_maes)
+        if d < ref_dims and m < ref_mae
+    )
     area = 0.0
-    prev_dims = 0
-    for dims, mae in points:
-        if mae < ref_mae:
-            width = dims - prev_dims
-            height = ref_mae - mae
-            area += width * height
-            prev_dims = dims
-
-    # Add final rectangle to reference point
-    if prev_dims < ref_dims:
-        last_mae = points[-1][1]
-        if last_mae < ref_mae:
-            area += (ref_dims - prev_dims) * (ref_mae - last_mae)
-
+    best_mae = ref_mae
+    for i, (dims, mae) in enumerate(points):
+        next_dims = points[i + 1][0] if i + 1 < len(points) else ref_dims
+        best_mae = min(best_mae, mae)  # lowest MAE reachable with <= dims
+        area += (next_dims - dims) * (ref_mae - best_mae)
     return area
 
 
@@ -814,9 +823,9 @@ def interpret_campaign(results: dict) -> list[dict]:
                 "severity": Severity.CRITICAL,
                 "value": mri,
                 "message": (
-                    f"MRI of {mri:.2f} indicates severe fragility. "
-                    f"The model's error triples under worst-case "
-                    f"perturbations."
+                    f"MRI of {mri:.2f}: perturbations move the MAE by "
+                    f"{mri:.2f} points on a tail-weighted average. "
+                    f"Investigate before deploying."
                 ),
             })
         elif mri > 2.0:
@@ -949,7 +958,7 @@ The generated LaTeX integrates into a larger document via `\input{tables.tex}`. 
 \section{Geometric Validation Results}
 
 The following results were produced by the structural fuzzing
-framework (v0.2.0) running against the production validation
+framework (v0.4.0) running against the production validation
 holdout set.
 
 \input{tables.tex}
@@ -958,13 +967,13 @@ holdout set.
 
 The Model Robustness Index of 1.43 indicates that under
 worst-case perturbations within the explored parameter space,
-the model's mean absolute error increases by a factor of
-approximately 1.4. The 95th percentile perturbation produces
+the model's mean absolute error moves by about 1.4 points
+on a weighted average that emphasizes the worst perturbations. The 95th percentile perturbation produces
 a deviation of 3.1, indicating non-trivial tail risk.
 
 The Pareto frontier identifies four non-dominated configurations,
 suggesting meaningful tradeoffs between model complexity and
-prediction accuracy. See Chapter~5 of \cite{bond2026geometric}
+prediction accuracy. See Chapter~8 of \cite{bond2026geometric}
 for the theoretical basis of Pareto analysis in this context.
 
 \end{document}
@@ -1016,6 +1025,7 @@ When a new model version is promoted to production, its campaign results become 
 
 ```python
 import shutil
+from datetime import datetime, timezone
 
 
 def promote_baseline(
@@ -1030,7 +1040,7 @@ def promote_baseline(
 
     # Archive old baseline with timestamp
     if baseline.exists():
-        timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
         archive_name = f"baseline_{timestamp}.json"
         shutil.copy2(baseline, archive / archive_name)
 
@@ -1044,12 +1054,16 @@ def promote_baseline(
 As the structural fuzzing framework evolves, the JSON schema of campaign results may change. A `schema_version` field in every results file prevents silent incompatibilities:
 
 ```python
+import json
+from datetime import datetime, timezone
+
+
 def save_results(results: dict, path: str) -> None:
     """Save campaign results with schema version."""
     versioned = {
         "schema_version": "1.0",
-        "framework_version": "0.2.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "framework_version": "0.4.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         **results,
     }
     with open(path, "w") as f:
@@ -1142,14 +1156,14 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install structural-fuzzing==0.2.0
+          pip install structural-fuzzing==0.4.0
 
       - name: Estimate evaluation cost
         id: budget
         run: |
           python -c "
-          from scripts.budget import estimate_budget
-          params = estimate_budget(
+          from scripts.budget import budget_campaign_params
+          params = budget_campaign_params(
               n_dims=5,
               eval_time_seconds=0.05,
               budget_minutes=30,
@@ -1160,10 +1174,7 @@ jobs:
 
       - name: Run structural fuzzing
         run: |
-          python scripts/run_validation.py \
-            --output results/ \
-            --model models/production_latest.pkl \
-            --dataset data/validation_holdout.parquet
+          python scripts/run_validation.py --output results/
 
       - name: Check absolute thresholds
         run: python scripts/check_thresholds.py results/campaign.json

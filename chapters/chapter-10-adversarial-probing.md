@@ -5,7 +5,7 @@
 
 The Model Robustness Index developed in Chapter 9 answers a critical question: *how stable is this configuration under random perturbation?* But random perturbation is blunt. It tells you that a model is fragile without telling you *why*, and it tells you that a model is robust without telling you *to what*. This chapter sharpens the MRI into a family of directed probing tools that interrogate model internals with the precision of a radar system. Where Chapter 9 threw noise at a model and measured the aggregate response, this chapter sends *specific, controlled signals* and reads the reflections.
 
-We develop this idea into three concrete tools: the StructureProbe scanner (Section 10.3), parametric intensity sweeps (Section 10.4), and compositional interaction testing (Section 10.5). Section 10.6 then shows how the same mathematical framework extends from parameter-space fuzzing to signal-space fuzzing through the Decoder Robustness Index (DRI), applying MRI principles to acoustic decoders where semantic distance replaces raw error.
+We develop this idea into three concrete tools: parametric intensity sweeps (Section 10.2), the StructureProbe scanner (Section 10.3), and compositional interaction testing (Section 10.4). Section 10.5 then shows how the same mathematical framework extends from parameter-space fuzzing to signal-space fuzzing through the Decoder Robustness Index (DRI), applying MRI principles to acoustic decoders where semantic distance replaces raw error.
 
 ---
 
@@ -78,7 +78,7 @@ class AcousticTransform:
         return lambda signal, sr: self(signal, sr, intensity)
 ```
 
-The `at_intensity` method returns a closure with fixed perturbation strength, enabling composition into chains (Section 10.5) or integration with higher-order functions.
+The `at_intensity` method returns a closure with fixed perturbation strength, enabling composition into chains (Section 10.4) or integration with higher-order functions.
 
 ### 10.2.2 Intensity Sweeps
 
@@ -126,7 +126,7 @@ def find_adversarial_threshold(self, decoder, signal, sr, transform,
     return high
 ```
 
-A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The algorithm is identical to Chapter 9's parameter-space adversarial search---binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.
+A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The search plays the role of Chapter 9's parameter-space threshold search, with one difference: Chapter 9 scans a log-spaced grid, while here binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.
 
 ---
 
@@ -284,7 +284,7 @@ class CodaSemanticDistance:
         return 0.75  # Fallback: binary mismatch
 ```
 
-The hybrid formula---minimum 0.5 penalty for any flip, scaling to 1.0 for maximally different predictions---ensures the DRI never ignores a decision flip. An ornamentation change gets $\omega \approx 0.54$; a rhythm change gets $\omega \approx 0.93$. The graduated omega reflects the domain's feature hierarchy.
+The hybrid formula---minimum 0.5 penalty for any flip, scaling to 1.0 for maximally different predictions---ensures the DRI never ignores a decision flip. An ornamentation change gets $\omega \approx 0.54$; a change in rhythm alone gets $\omega \approx 0.72$. The graduated omega reflects the domain's feature hierarchy.
 
 ### 10.5.3 The Full DRI Pipeline
 
@@ -293,7 +293,7 @@ The `DecoderRobustnessIndex.measure` method orchestrates four phases---per-trans
 ```python
 transforms = make_acoustic_transform_suite()
 dri = DecoderRobustnessIndex(transforms)
-result = dri.measure(decoder, signals, labels, sr=32000)
+result = dri.measure(decoder, signals, sr=32000)
 print(f"DRI: {result.dri:.4f}")
 print(f"DRI (invariant): {result.dri_invariant:.4f}")
 print(f"DRI (stress):    {result.dri_stress:.4f}")
@@ -411,7 +411,7 @@ The unifying theme is the radar analogy: *the difference between "sent" and "rec
 
 Part III shifts from developing tools in isolation to identifying reusable design patterns. The probing framework is central:
 
-- **Chapter 11** applies the subset enumeration pattern to systematically explore which dimension combinations matter, using the probing tools from this chapter to validate each configuration.
+- **Chapter 11** applies the subset enumeration pattern to systematically explore which dimension combinations matter.
 - **Chapter 12** develops compositional testing, integrating probing with incremental dimension-building to reveal interaction effects invisible to single-dimension analysis.
 - **Chapter 13** combines probing with group-theoretic data augmentation, exploiting symmetries to multiply probing coverage without proportional computational cost.
 

@@ -7,7 +7,7 @@ Chapter 9 introduced adversarial robustness testing: probing a model's behavior 
 
 The motivation is immediate and practical. An encoder trained to classify sperm whale coda types from spectrograms will, left to its own devices, happily memorize the recording conditions---hydrophone frequency response, ambient noise spectrum, ocean reverberation profile---alongside the biological signal. It achieves excellent accuracy on the training set because the recording conditions are correlated with the deployment location, and the deployment location is correlated with the whale clan. The encoder has learned a shortcut: predict the clan, then predict the coda type. On a new hydrophone, deployed in a new ocean basin, this encoder fails catastrophically, because the shortcut no longer holds.
 
-This is not a pathology specific to cetacean bioacoustics. It is the central problem of **domain adaptation**, and it arises whenever surface features are correlated with target labels in the training data but not in the deployment environment. The gradient reversal layer, introduced by Ganin and Lempitsky (2015) and developed further by Ganin et al. (2016), provides an elegant solution: attach an adversarial classifier to the encoder's latent representation, train it to predict the nuisance variable (recording conditions, domain identity, speaker identity), and then *reverse the gradient* flowing back through the encoder, so that the encoder is trained to make the adversarial classifier's job *impossible*. The result is a representation that is invariant to the nuisance variable by construction.
+This is not a pathology specific to cetacean bioacoustics. It is the central problem of **domain adaptation**, and it arises whenever surface features are correlated with target labels in the training data but not in the deployment environment. The gradient reversal layer, introduced by Ganin and Lempitsky (2015) and developed further by Ganin et al. (2016), provides an elegant solution: attach an adversarial classifier to the encoder's latent representation, train it to predict the nuisance variable (recording conditions, domain identity, speaker identity), and then *reverse the gradient* flowing back through the encoder, so that the encoder is trained to make the adversarial classifier's job *impossible*. The aim is a representation that is invariant to the nuisance variable. Whether a trained encoder achieves it has to be measured, and Section 14.9 shows that defeating the adversarial classifier is not the same thing.
 
 We begin with a precise statement of the invariance problem (Section 14.1), develop the gradient reversal layer and its training procedure (Section 14.2), give the geometric interpretation as projection onto the orthogonal complement of a nuisance subspace (Section 14.3), implement the full system in PyTorch (Section 14.4), apply it to cetacean bioacoustics (Section 14.5), connect to the adversarial robustness framework of Chapter 9 (Section 14.6), and close with forward connections to the Cholesky parameterization methods of Chapter 15.
 
@@ -31,12 +31,12 @@ The standard training objective places no constraint on the mutual information $
 
 The consequence of high $I(\mathbf{z}; s)$ is predictable: when the correlation between $s$ and $y$ breaks down---because the model is deployed on a new domain, a new device, or a new population---the encoder's predictions degrade. This is **domain shift**, and it is one of the most common failure modes in applied machine learning.
 
-The structural fuzzing framework of Chapter 9 can *detect* this failure mode after training. The Decoder Robustness Index (DRI), adapted from the Bond Index, applies parametric acoustic transforms at varying intensities and measures how the decoder's output changes:
+The probing framework of Chapter 10 can *detect* this failure mode after training. The Decoder Robustness Index (DRI), adapted from the Bond Index, applies parametric acoustic transforms at varying intensities and measures how the decoder's output changes:
 
 ```python
 # From eris_ketos.decoder_robustness — diagnosis after the fact
 dri = DecoderRobustnessIndex(transforms)
-result = dri.measure(decoder, signals, labels, sr=32000)
+result = dri.measure(decoder, signals, sr=32000)
 # result.per_transform reveals which transforms cause the most drift
 ```
 
@@ -96,7 +96,7 @@ This is a minimax game:
 
 $$\min_{\theta, \phi} \max_\psi \; \mathcal{L}_{\text{task}}(\theta, \phi) - \lambda \, \mathcal{L}_{\text{domain}}(\theta, \psi)$$
 
-At equilibrium, the domain discriminator performs at chance level: the latent representation contains no information about the nuisance variable, so no classifier can predict it above baseline.
+At an equilibrium of the minimax game, the domain discriminator performs at chance. That means the representation defeats this discriminator. It does not mean that the representation contains no information about the nuisance, and Section 14.9 shows a case where a classifier fitted afterwards recovers the nuisance almost perfectly.
 
 ### 14.2.3 Why Not Just Remove the Nuisance Variable?
 
@@ -164,7 +164,7 @@ An important practical question is: how many dimensions does the nuisance subspa
 
 But if the nuisance variable is high-dimensional (e.g., a full characterization of recording conditions including hydrophone response, noise spectrum, reverberation profile, and depth), $\mathcal{V}_{\text{nuis}}$ may span many directions in $\mathbb{R}^d$, and the orthogonal complement $\mathcal{V}_{\text{nuis}}^\perp$ may have insufficient capacity for the task. In this case, the $\lambda$ parameter mediates a genuine tradeoff: higher $\lambda$ forces stronger invariance at the cost of task performance.
 
-The structural fuzzing framework provides a direct way to diagnose this tradeoff. After training with gradient reversal, apply the DRI from Chapter 9 to measure residual sensitivity to each nuisance dimension. If the DRI for a particular transform (e.g., `amplitude_scale` or `additive_noise`) remains high despite gradient reversal training, the corresponding nuisance direction is entangled with the task subspace in a way that gradient reversal alone cannot resolve.
+The structural fuzzing framework provides a direct way to diagnose this tradeoff. After training with gradient reversal, apply the DRI from Chapter 10 to measure residual sensitivity to each nuisance dimension. If the DRI for a particular transform (e.g., `amplitude_scale` or `additive_noise`) remains high despite gradient reversal training, the corresponding nuisance direction is entangled with the task subspace in a way that gradient reversal alone cannot resolve.
 
 ---
 
@@ -410,7 +410,7 @@ Cetacean bioacoustics presents a textbook case for gradient reversal. The field 
 | Recording gain | Operator settings | Overall amplitude scaling |
 | Sample rate | Equipment generation | Bandwidth truncation |
 
-The `acoustic_transforms` module in `eris_ketos` parameterizes exactly these nuisance factors as intensity-controllable transforms. Chapter 9 used them for post-hoc robustness testing. Here we use the same taxonomy to define the nuisance variable for invariance training.
+The `acoustic_transforms` module in `eris_ketos` parameterizes exactly these nuisance factors as intensity-controllable transforms. Chapter 10 used them for post-hoc robustness testing. Here we use the same taxonomy to define the nuisance variable for invariance training.
 
 ### 14.5.2 Architecture for Invariant Coda Classification
 
@@ -496,7 +496,7 @@ class RecordingConditionHead(nn.Module):
         return self.head(z)
 ```
 
-The domain head is deliberately smaller than the task head. This is a design choice, not an oversight. A domain head that is too powerful can extract nuisance information from subtle correlations in the latent space that a simpler head would miss, leading to an unstable minimax game. A moderately sized domain head provides a sufficient invariance signal without the pathological dynamics of an overpowered adversary.
+The domain head is a three-layer network of about the same size as the task head (about 10.5 thousand parameters against 9.8 thousand). Its size is a design choice. A domain head that is too powerful can extract nuisance information from subtle correlations in the latent space that a simpler head would miss, leading to an unstable minimax game. A moderately sized domain head provides a sufficient invariance signal without the pathological dynamics of an overpowered adversary.
 
 ### 14.5.3 Assembling and Training the Invariant Classifier
 
@@ -607,7 +607,7 @@ If a recording-condition transform still shows high DRI after invariance trainin
 
 ---
 
-## 14.6 Connection to Adversarial Robustness (Chapter 9)
+## 14.6 Connection to Adversarial Robustness (Chapters 9 and 10)
 
 ### 14.6.1 Two Sides of the Same Coin
 
@@ -621,7 +621,7 @@ Chapter 9's adversarial robustness testing and this chapter's gradient reversal 
 | **Output** | DRI score, sensitivity profile | Invariant encoder |
 | **Geometry** | Measures distances in output space under perturbation | Projects representation onto complement of nuisance subspace |
 
-The connection is more than analogical. The DRI's per-transform sensitivity profile (Section 9.4 of Chapter 9) provides exactly the information needed to configure gradient reversal training: transforms with high DRI scores identify the nuisance dimensions that the encoder has memorized, and these dimensions define the nuisance variable $s$ for the domain discriminator.
+The connection is more than analogical. The DRI's per-transform sensitivity profile (Section 10.5) provides exactly the information needed to configure gradient reversal training: transforms with high DRI scores identify the nuisance dimensions that the encoder has memorized, and these dimensions define the nuisance variable $s$ for the domain discriminator.
 
 ### 14.6.2 The Feedback Loop
 
@@ -644,7 +644,7 @@ This loop is the invariance analogue of the "fuzz-diagnose-fix-verify" cycle in 
 
 ### 14.6.3 The Adversarial Threshold Connection
 
-Chapter 9 introduced adversarial threshold search: binary search for the minimal transform intensity that flips the decoder's output. The implementation in `eris_ketos.decoder_robustness` finds the exact tipping point:
+Chapter 10 introduced the flip-threshold search: binary search for the minimal transform intensity that flips the decoder's output. The implementation in `eris_ketos.decoder_robustness` finds the exact tipping point:
 
 ```python
 threshold = dri.find_adversarial_threshold(
@@ -680,7 +680,7 @@ These are the transforms that a correct decoder *should* be invariant to. They d
 
 ### 14.7.2 Domain Head Capacity
 
-The domain discriminator must be strong enough to detect nuisance information when it is present, but not so strong that the adversarial game becomes unstable. In practice, a two-to-three-layer MLP with hidden dimensions roughly half the encoder's latent dimension works well. If the domain head is too weak, it will appear to converge (high domain accuracy plateau) before gradient reversal training has a chance to enforce invariance. If it is too strong, the minimax game oscillates without converging.
+The domain discriminator must be strong enough to detect nuisance information when it is present, but not so strong that the adversarial game becomes unstable. In practice, a two-to-three-layer MLP with hidden dimensions roughly half the encoder's latent dimension works well. If the domain head is too weak, its accuracy stays near chance whether or not the encoder has become invariant, and the training curve looks like success. Section 14.9 shows that chance accuracy of the domain head is not evidence of invariance on its own. If it is too strong, the minimax game oscillates without converging.
 
 A useful diagnostic: if domain accuracy oscillates wildly during training rather than smoothly decreasing, the domain head is too powerful relative to $\lambda$. Reduce the domain head's capacity or decrease $\max\_\lambda$.
 
@@ -751,66 +751,54 @@ In all three cases, the DRI provides an objective diagnostic. If the DRI for nui
 
 ---
 
-## 14.9 Worked Example: Five-Hydrophone Experiment
+## 14.9 Worked Example: Does Reversal Remove a Recording Shortcut?
 
-To make the preceding theory concrete, consider a controlled experiment with coda recordings from five different hydrophone deployments. The task is to classify coda types (23 classes). The nuisance variable is the hydrophone deployment (5 categories).
+An earlier version of this section trained the classifier on random spectrograms with random labels and treated a domain accuracy near chance as the sign of success. That test cannot fail: with nothing to learn, the domain head is at chance whether or not gradient reversal is used. This section replaces it with an experiment that can fail, run on the code of Sections 14.2 to 14.5 exactly as printed. The script extracts those code blocks from this chapter and executes them (`formal/runs/ch14_shortcut_experiment.py`; record `ch14_shortcut.json`, run 16 November 2026, PyTorch 2.11 on CPU).
 
-```python
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+### 14.9.1 Design
 
-# Simulated data: 2000 spectrograms from 5 hydrophones
-n_samples = 2000
-n_mels = 128
-n_frames = 64
-n_coda_types = 23
-n_hydrophones = 5
+The data are synthetic spectrograms, 32 mel bins by 48 frames, with Gaussian noise. Six coda types are carried by *timing*: each type is a rhythm of three to five broadband clicks with its own spacing, at a random offset. Five recording conditions are carried by *spectrum*: each condition multiplies the spectrogram by its own frequency response and adds a narrow band of noise. In the training data the condition predicts the coda type 90% of the time, so the condition is a shortcut. Two test sets of 1,200 spectrograms each measure what was learned: one with the same correlation, and one, the *shifted* set, in which condition and type are independent.
 
-torch.manual_seed(42)
-spectrograms = torch.randn(n_samples, 1, n_mels, n_frames)
-coda_labels = torch.randint(0, n_coda_types, (n_samples,))
-hydrophone_labels = torch.randint(0, n_hydrophones, (n_samples,))
+Three measurements are taken for each model:
 
-dataset = TensorDataset(spectrograms, coda_labels, hydrophone_labels)
-loader = DataLoader(dataset, batch_size=64, shuffle=True)
+- the accuracy of the domain head during training, the quantity the earlier version used;
+- task accuracy on the correlated and on the shifted test sets;
+- the accuracy of a *probe*: a logistic regression fitted after training, on the frozen latent vectors of 1,200 new spectrograms, to predict the recording condition, and scored on the shifted set.
 
-# Build and train the invariant classifier
-model = build_invariant_coda_classifier(
-    n_mels=n_mels,
-    latent_dim=128,
-    n_coda_types=n_coda_types,
-    n_conditions=n_hydrophones,
-    max_lambda=0.5,
-)
+The probe is the measurement that matters. The domain head is trained against the encoder and is fooled by it; the probe is fitted afterwards and is not.
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-task_criterion = nn.CrossEntropyLoss()
-domain_criterion = nn.CrossEntropyLoss()
+Three predictions were written into the script before it ran, with their thresholds. **P1:** on the earlier version's random data, a model trained with no reversal at all ends with domain accuracy within 5 points of chance. **P2:** on the shortcut data, the model without reversal loses at least 10 points between the correlated and the shifted test. **P3:** with full reversal ($\lambda_{\max} = 1$), the probe's accuracy falls by at least 15 points, and shifted accuracy rises by at least 5, relative to no reversal. The chapter's default, $\lambda_{\max} = 0.5$, was run without a prediction. Each setting was run with three seeds.
 
-history = train_dann(
-    model=model,
-    train_loader=loader,
-    optimizer=optimizer,
-    task_criterion=task_criterion,
-    domain_criterion=domain_criterion,
-    total_epochs=50,
-    gamma=10.0,
-    max_lambda=0.5,
-)
+### 14.9.2 Results
 
-# Verify: domain accuracy should approach chance (1/5 = 20%)
-print(f"Final domain accuracy: {history['domain_accuracy'][-1]:.1%}")
-print(f"Chance level: {1/n_hydrophones:.1%}")
-```
+| Setting | Domain head (training) | Correlated test | Shifted test | Probe |
+|---|:---:|:---:|:---:|:---:|
+| Random data, no reversal | 21.5% | | | |
+| Shortcut data, no reversal | 95.9% | 28.0% | 17.6% | 99.9% |
+| Shortcut data, $\lambda_{\max} = 0.5$ | 84.8% | 75.4% | 16.7% | 100.0% |
+| Shortcut data, $\lambda_{\max} = 1$ | 37.7% | 49.8% | 17.1% | 99.9% |
 
-At convergence, the domain accuracy should approach 20% (chance level for 5 hydrophones), indicating that the encoder's latent representation no longer contains hydrophone-discriminative information. The task accuracy may decrease slightly relative to a non-invariant baseline---this is the price of invariance, and the DRI confirms whether the price was worth paying.
+Means over three seeds. Chance is 20% for the condition and 16.7% for the coda type.
+
+**P1 holds.** With random data and no reversal the domain head ends at 21.5%, within two points of chance on every seed. A domain accuracy near chance is therefore not evidence that reversal did anything.
+
+**P2 holds,** but for a reason that limits what follows. The model without reversal loses 10.4 points between the correlated and the shifted test, just over the bar. On the shifted test, however, every setting is at chance: 16.7% to 17.6%. At the click strength fixed before the run, no model learned the rhythm in 25 epochs. What each model knows about the coda type, it knows through the recording condition.
+
+**P3 fails.** Full reversal fooled the domain head, whose training accuracy fell from 95.9% to 37.7% on average and to 17.6% on one seed, below chance. But the probe, fitted on the same encoder's output afterwards, recovers the recording condition 99.9% of the time, exactly as it does without reversal. The information was not removed; it was moved to where this domain head could not read it. Shifted accuracy did not rise.
+
+### 14.9.3 What the Experiment Shows
+
+The experiment cannot say whether gradient reversal helps a model that is able to learn the true signal, because none of these models learned it. That question needs the same design with a stronger signal, and the result should be registered before it is run.
+
+It does show, on the code of this chapter, the point Elazar and Goldberg (2018) made for text: an adversary at chance during training is compatible with a representation from which a fresh classifier recovers the nuisance almost perfectly. The adversary's accuracy measures the adversary. Invariance is measured by a probe trained afterwards, on held-out data, and by accuracy on a test set where the shortcut is broken. Report both whenever gradient reversal is claimed to have worked.
+
+The reference is Elazar, Y. and Goldberg, Y., "Adversarial removal of demographic attributes from text data," *Proceedings of EMNLP 2018*, pages 11--21.
 
 ---
 
 ## 14.10 Summary
 
-The gradient reversal layer is a minimal intervention---five lines of autograd logic---with a maximal geometric effect: it projects the encoder's latent representation onto the orthogonal complement of the nuisance subspace, producing representations that are invariant to specified surface features by construction.
+The gradient reversal layer is a minimal intervention---five lines of autograd logic---with a maximal geometric effect: it projects the encoder's latent representation onto the orthogonal complement of the nuisance subspace, aiming at representations that are invariant to specified surface features. Whether it succeeds is a measurement, not a consequence of the construction (Section 14.9).
 
 The chapter developed five interconnected ideas:
 
@@ -822,7 +810,7 @@ The chapter developed five interconnected ideas:
 
 4. **The cetacean bioacoustics application.** Recording conditions (hydrophone response, ambient noise, ocean reverberation) contaminate spectral features. Gradient reversal forces the encoder to be invariant to these conditions while preserving biological signal---coda type, rhythmic pattern, spectral content.
 
-5. **The feedback loop with adversarial testing.** The DRI from Chapter 9 diagnoses which nuisance factors the encoder is sensitive to; gradient reversal eliminates those sensitivities; the DRI validates the result. The two methods compose into a "diagnose-treat-verify" pipeline.
+5. **The feedback loop with adversarial testing.** The DRI from Chapter 10 diagnoses which nuisance factors the encoder is sensitive to; gradient reversal aims to remove those sensitivities; the DRI, a probe fitted afterwards, and a test set with the shortcut broken check whether it did (Section 14.9). The two methods compose into a "diagnose-treat-verify" pipeline.
 
 ---
 

@@ -163,9 +163,9 @@ The Riemannian conformal factor on the Poincare ball. Relates the Poincare metri
 
 ### A.4.7 Lorentz Factor
 
-$$\gamma_c(x) = \frac{1}{1 - c\,\|x\|^2}$$
+$$\gamma_c(k) = \frac{1}{\sqrt{1 - c\,\|k\|^2}}$$
 
-Used in the Einstein midpoint computation. Differs from the conformal factor $\lambda_x^c$ by a factor of 2 because it is derived in the Klein model rather than the Poincare model. Chapter 3.
+Defined for a point $k$ of the Klein model and used in the Einstein midpoint. If $k$ is the Klein image of the Poincaré point $x$, then $\gamma_c(k) = \lambda_x^c - 1$. Chapter 3.
 
 ### A.4.8 Projection onto the Poincare Ball
 
@@ -185,9 +185,9 @@ Any linear projection from a multi-dimensional evaluation to a single scalar. Th
 
 ### A.5.1 Einstein Midpoint
 
-$$\bar{x} = \frac{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i\, x_i}{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i}$$
+$$\bar{x} = \tfrac{1}{2} \otimes_c \left( \frac{\sum_{i=1}^{N} w_i\, \lambda^c_{x_i}\, x_i}{\sum_{i=1}^{N} w_i\, (\lambda^c_{x_i} - 1)} \right)$$
 
-Weighted average of points on the Poincare ball, derived from the Klein model. Upweights points near the boundary via the Lorentz factor $\gamma_c$. Reduces to the Euclidean weighted mean as $c \to 0$. Chapter 3.
+Weighted average of points on the Poincare ball, defined in the Klein model as the Lorentz-weighted mean and written here in Poincaré coordinates; $\otimes_c$ is Möbius scalar multiplication. Lies in the ball, reduces to the Euclidean weighted mean as $c \to 0$, and for two points with equal weights is their geodesic midpoint. Chapter 3.
 
 ### A.5.2 Frechet Mean on SPD(n)
 
@@ -247,9 +247,15 @@ where $L_\text{path} = \sum_{t=1}^{T-1} d_{LE}(\mathbf{C}_t, \mathbf{C}_{t+1})$ 
 | MAE | Mean absolute error | Ch. 1 |
 | MRI | Model Robustness Index (composite robustness score) | Ch. 1 |
 
-### A.7.1 MRI Weights
+### A.7.1 Model Robustness Index
 
-The Model Robustness Index combines mean deviation, 75th percentile, and 95th percentile of perturbation response into a single robustness score. The composite explicitly accounts for tail risk, unlike standard deviation which treats all deviations symmetrically. Chapter 1 (introduced), Chapter 9 (developed).
+$$\omega_k = \bigl| f(\boldsymbol{\theta} \odot e^{\boldsymbol{\varepsilon}_k}) - f(\boldsymbol{\theta}) \bigr|, \quad \boldsymbol{\varepsilon}_k \sim \mathcal{N}(0, \sigma^2 I), \qquad \text{MRI} = 0.5\,\bar{\omega} + 0.3\,\omega_{75} + 0.2\,\omega_{95}$$
+
+The deviation $\omega_k$ is the absolute change in MAE under the $k$-th multiplicative perturbation (default $\sigma = 0.5$, 300 draws, clipped to $[10^{-3}, 10^6]$); $\bar{\omega}$, $\omega_{75}$ and $\omega_{95}$ are its mean and percentiles. The MRI is in the units of the MAE, not a ratio, and it is zero whenever the evaluation function cannot see the perturbation (Section 19.7). The weights emphasize the tail. Chapter 1 (introduced), Chapter 9 (developed).
+
+### A.7.1a Decoder Robustness Index
+
+The same weighted combination applied to semantic deviations $\omega \in [0, 1]$ of a decoder's output under input transforms: $\omega = 0$ when the decision is unchanged, and at least $0.5$ when it flips. Chapter 10.
 
 ### A.7.2 Softmax Choice Rule
 
@@ -298,13 +304,13 @@ Common dimension sets used in examples:
 
 **Software defect prediction (5 dimensions):**
 
-| Index | Name | Features |
-|-------|------|----------|
-| $s_1$ | Size | LOC, SLOC, blank lines |
-| $s_2$ | Complexity | Cyclomatic, essential, design |
-| $s_3$ | Halstead | Volume, difficulty, effort, time |
-| $s_4$ | Object-Orientation | Coupling, cohesion, inheritance depth |
-| $s_5$ | Process | Revisions, distinct authors, code churn |
+| Symbol | Code index | Name | Features |
+|-------|:---:|------|----------|
+| $s_1$ | 0 | Size | LOC, SLOC, blank lines |
+| $s_2$ | 1 | Complexity | Cyclomatic, essential, design |
+| $s_3$ | 2 | Halstead | Volume, difficulty, effort, time |
+| $s_4$ | 3 | Object-Orientation | Coupling, cohesion, inheritance depth |
+| $s_5$ | 4 | Process | Revisions, distinct authors, code churn |
 
 **Ethical-economic space (9 dimensions):**
 
@@ -322,7 +328,7 @@ Common dimension sets used in examples:
 
 ### A.8.3 Sentinel Values
 
-The sentinel value $10^6$ (denoted `inactive_value` in code) indicates that a dimension is *inactive* --- its corresponding feature group is excluded from the metric. When a parameter value exceeds the threshold $10^5$, the framework assigns zero weight to that dimension, effectively removing it from the distance computation:
+The sentinel value $10^6$ (denoted `inactive_value` in code) indicates that a dimension is *inactive* --- its corresponding feature group is excluded from the metric. When a parameter value reaches a threshold, the evaluation function treats that dimension as off. The threshold is chosen by each evaluation function, not by the framework: the economics example uses $10^5$, as below, and the defect example of Chapter 19 uses $10^3$. In the economics example:
 
 $$w_i = \begin{cases} 1 / \max(p_i, 10^{-6}) & \text{if } p_i < 10^5 \\ 0 & \text{if } p_i \geq 10^5 \end{cases}$$
 

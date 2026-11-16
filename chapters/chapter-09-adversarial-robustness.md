@@ -216,7 +216,7 @@ This three-stage workflow is exactly how `run_campaign` in the pipeline module o
 
 ### 9.3.4 Limitations of One-at-a-Time Ablation
 
-One-at-a-time ablation captures *marginal* importance: how much does each dimension contribute when all others are present? It does not capture *interaction effects*: the case where dimensions $i$ and $j$ are individually unimportant but jointly critical (their information is redundant, and either one alone suffices). The subset enumeration of Chapter 11 and the compositional testing of Section 9.5 address this limitation by exploring multi-dimensional combinations. Sensitivity profiling is a fast screening step, not a complete analysis.
+One-at-a-time ablation captures *marginal* importance: how much does each dimension contribute when all others are present? It does not capture *interaction effects*: the case where dimensions $i$ and $j$ are individually unimportant but jointly critical (their information is redundant, and either one alone suffices). The subset enumeration of Chapter 11 and the compositional testing of Chapter 12 address this limitation by exploring multi-dimensional combinations. Sensitivity profiling is a fast screening step, not a complete analysis.
 
 ---
 
@@ -410,7 +410,7 @@ The report is a complete, machine-readable artifact that captures every aspect o
 
 A natural extension---not yet automated in the pipeline but straightforward to implement---is to compute the MRI for every Pareto-optimal configuration, not just the best one. This answers a question that Chapter 8's Pareto analysis alone cannot: among the non-dominated tradeoffs between accuracy and complexity, *which are the most robust?*
 
-It is entirely possible (and in practice common) that the Pareto-optimal configuration with the lowest MAE is also the most fragile. A 3-dimension configuration at MAE 1.7 might have MRI 0.3, while the 5-dimension configuration at MAE 1.5 has MRI 1.8. The 0.2 improvement in MAE comes at the cost of a 6x increase in fragility. A practitioner who saw only the Pareto frontier would choose the 5-dimension model; a practitioner who also saw the MRI values would think twice.
+It is entirely possible that the Pareto-optimal configuration with the lowest MAE is also the most fragile. A 3-dimension configuration at MAE 1.7 might have MRI 0.3, while the 5-dimension configuration at MAE 1.5 has MRI 1.8. The 0.2 improvement in MAE comes at the cost of a 6x increase in fragility. A practitioner who saw only the Pareto frontier would choose the 5-dimension model; a practitioner who also saw the MRI values would think twice.
 
 ---
 
@@ -430,7 +430,7 @@ The sensitivity profile, computed by ablating each of the five dimensions from t
 | 4 | OO | +0.15 | 1.85 |
 | 5 | Halstead | +0.08 | 1.78 |
 
-The model depends overwhelmingly on Complexity and Process. Size contributes modestly. OO and Halstead are nearly redundant---removing either barely changes the model's error. This confirms the intuition from Chapter 1's Pareto analysis, where the {Complexity, Process} two-dimensional subset achieved MAE 2.1, capturing most of the accuracy of the full five-dimensional model at MAE 1.7.
+The model depends overwhelmingly on Complexity and Process. Size contributes modestly. OO and Halstead are nearly redundant---removing either barely changes the model's error. This confirms the intuition from Chapter 1's Pareto analysis, where the {Complexity, Process} two-dimensional subset achieved MAE 2.1, capturing most of the accuracy of the full five-dimensional model at MAE 1.5. These are the illustrative numbers of Section 1.5; Chapter 19 reports what a recorded run of the example gives.
 
 But sensitivity profiling adds something the Pareto analysis could not: it tells us that the *specific parameter values* for OO and Halstead in the best configuration contribute almost nothing. This is stronger than saying the dimensions are unnecessary in principle (which is what Pareto analysis shows). It says they are unnecessary *at their current fitted values*, which has direct implications for model simplification and maintenance.
 
@@ -446,7 +446,7 @@ Running `compute_mri` with 300 perturbations at scale 0.5 on the best configurat
 | **MRI** | **1.44** |
 | Worst-case MAE | 5.2 |
 
-The standard deviation of the $\omega$ distribution might be 0.9. A naive report would say "the model's sensitivity has standard deviation 0.9"---a number that sounds modest. The MRI of 1.44 tells a more complete story: the typical perturbation causes moderate degradation, but the 95th percentile deviation is 3.1, meaning that 5% of perturbations nearly *double* the model's error (from baseline 1.7 to approximately 4.8).
+The standard deviation of the $\omega$ distribution might be 0.9. A naive report would say "the model's sensitivity has standard deviation 0.9"---a number that sounds modest. The MRI of 1.44 tells a more complete story: the typical perturbation causes moderate degradation, but the 95th percentile deviation is 3.1, meaning that 5% of perturbations nearly *triple* the model's error (from a baseline of 1.5 to about 4.6).
 
 The worst-case MAE of 5.2 indicates that at least one perturbation tripled the error. This single data point is too volatile to build an index around (it would change dramatically with different random seeds), but it is a useful flag: somewhere in the parameter neighborhood, there exists a configuration that catastrophically degrades the model.
 
@@ -492,11 +492,11 @@ The MRI can be connected to the local geometry of the loss landscape through the
 
 $$\mathcal{L}(\boldsymbol{\theta}^* + \boldsymbol{\delta}) \approx \mathcal{L}(\boldsymbol{\theta}^*) + \frac{1}{2} \boldsymbol{\delta}^\top \mathbf{H} \boldsymbol{\delta}$$
 
-the expected squared deviation under Gaussian perturbation $\boldsymbol{\delta} \sim \mathcal{N}(0, \sigma^2 \mathbf{I})$ is:
+the deviation $\omega = \tfrac{1}{2} \boldsymbol{\delta}^\top \mathbf{H} \boldsymbol{\delta}$ under Gaussian perturbation $\boldsymbol{\delta} \sim \mathcal{N}(0, \sigma^2 \mathbf{I})$ has mean and second moment
 
-$$\mathbb{E}[\omega^2] = \frac{\sigma^2}{2} \text{tr}(\mathbf{H})$$
+$$\mathbb{E}[\omega] = \frac{\sigma^2}{2} \text{tr}(\mathbf{H}), \qquad \mathbb{E}[\omega^2] = \frac{\sigma^4}{4} \bigl( \text{tr}(\mathbf{H})^2 + 2\, \text{tr}(\mathbf{H}^2) \bigr).$$
 
-In this regime, the MRI is approximately proportional to $\sqrt{\text{tr}(\mathbf{H})}$---the square root of the sum of eigenvalues of the Hessian. Large eigenvalues (sharp directions in the loss landscape) contribute disproportionately to the MRI, which is exactly the behavior we want: the MRI should be elevated when the landscape has even one sharp direction, because that direction represents a vulnerability.
+In this regime, the mean term of the MRI is proportional to $\text{tr}(\mathbf{H})$, the sum of the eigenvalues of the Hessian, and the spread that drives its percentile terms grows with $\text{tr}(\mathbf{H}^2)$, the sum of their squares. Large eigenvalues (sharp directions in the loss landscape) therefore contribute disproportionately to the MRI, which is exactly the behavior we want: the MRI should be elevated when the landscape has even one sharp direction, because that direction represents a vulnerability.
 
 But the approximation breaks down when the loss surface is non-quadratic---when it has asymmetric curvature, flat plateaus that transition into cliffs, or multiple local minima in the perturbation neighborhood. In these cases, the MRI's empirical sampling approach captures behavior that the Hessian analysis misses. The Hessian is a local linear approximation; the MRI is a global (within the perturbation radius) nonlinear probe. Both are useful, but the MRI is more general.
 
@@ -518,7 +518,7 @@ $$d_{\log}(\boldsymbol{\theta}_1, \boldsymbol{\theta}_2) = \sqrt{\sum_{i=1}^d \l
 
 This is the Euclidean distance in log-coordinates, but it is *not* Euclidean in the original coordinates. Perturbations that are uniformly distributed in log-space are *not* uniformly distributed in the original space---they are biased toward larger perturbations in the upward direction (multiplication) and smaller perturbations in the downward direction (division). This asymmetry reflects the natural geometry of positive parameters: doubling a parameter is as "far" as halving it, in the log-metric sense.
 
-Chapter 10 will develop more sophisticated non-Euclidean perturbation strategies, using the manifold structure of specific parameter spaces to generate perturbations that respect the geometry of the problem. The log-space perturbation used here is a special case---but a broadly applicable one that works well for most geometric models.
+Chapter 10 moves from perturbing parameters to perturbing inputs, with transforms whose strength is set by an intensity parameter. The log-space perturbation used here is a special case---but a broadly applicable one that works well for most geometric models.
 
 ---
 
@@ -578,7 +578,7 @@ The adversarial threshold search shares its philosophy with adversarial example 
 
 ## 9.10 What Comes Next
 
-This chapter has developed tools for characterizing the robustness of a model at a single operating point---the best configuration found by optimization. Chapter 10 extends this analysis in two directions. First, it introduces *adversarial probing*: systematic exploration of the full parameter space to find not just tipping points along individual dimensions but adversarial *regions*---connected subsets of parameter space where the model fails. This requires the topological tools (persistent homology) from Chapter 5, because the shape of an adversarial region---whether it is a thin sliver or a broad basin, whether it is simply connected or has holes---determines the practical risk it poses. Second, Chapter 10 develops methods for *hardening* a model against the vulnerabilities that the MRI and adversarial threshold search reveal, closing the loop from diagnosis to treatment.
+This chapter has developed tools for characterizing the robustness of a model at a single operating point---the best configuration found by optimization. Chapter 10 carries the same analysis from parameter space to input space. It introduces *adversarial probing*: transforms of the input whose strength is set by an intensity parameter, a probe response matrix that records how each transform moves the output, and the Decoder Robustness Index, which applies the MRI formula to a signal decoder. Mapping adversarial *regions* of parameter space with the topological tools of Chapter 5, and hardening a model against the weaknesses found, are not developed in this volume.
 
 The progression from Chapter 8 to Chapter 10 mirrors the progression from a static to a dynamic understanding of the model. Chapter 8 asks: "Which configurations are optimal?" This chapter asks: "How fragile are those optima?" Chapter 10 will ask: "What does the failure landscape look like, and can we reshape it?"
 

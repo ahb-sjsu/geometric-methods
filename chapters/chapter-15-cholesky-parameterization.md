@@ -6,7 +6,7 @@
 
 > *"The art of parameterization is the art of turning constrained problems into unconstrained ones."*
 
-In Chapter 2, we introduced the Mahalanobis distance and the precision matrix $\Sigma^{-1}$ that gives it shape. In Chapter 4, we developed the geometry of the SPD manifold on which covariance matrices live. Both chapters deferred a central engineering question: when you need to *optimize* a covariance or precision matrix --- when the metric itself is a learnable parameter --- how do you ensure that the result is always symmetric and positive definite?
+In Chapter 2, we introduced the Mahalanobis distance and the precision matrix $\Sigma^{-1}$ that gives it shape. In Chapter 4, we developed the geometry of the SPD manifold on which covariance matrices live. Section 2.5 gave a first answer to a central engineering question, and this chapter develops it in full: when you need to *optimize* a covariance or precision matrix --- when the metric itself is a learnable parameter --- how do you ensure that the result is always symmetric and positive definite?
 
 This chapter answers that question in full. The Cholesky factorization $\Sigma = LL^\top$ transforms the constrained optimization over SPD matrices into an unconstrained optimization over lower-triangular matrices. The log-diagonal variant, where the diagonal of $L$ is parameterized in log-space, removes the last remaining constraint (positive diagonals) and yields a parameterization that is fully unconstrained, numerically stable, and differentiable end-to-end. These properties make it the default choice for covariance learning in modern computational modeling, from behavioral economics calibration to deep metric learning.
 
@@ -137,7 +137,7 @@ def cholesky_params_to_precision(params: np.ndarray, n: int) -> np.ndarray:
     return L @ L.T
 ```
 
-The function unpacks the flat array in a specific order: the first $n$ entries are log-diagonal values, and the remaining entries fill the lower triangle column by column. The `np.exp` call on the diagonal is the only nonlinearity --- everything else is linear.
+The function unpacks the flat array in a specific order: the first $n$ entries are log-diagonal values, and the remaining entries fill the lower triangle row by row. The `np.exp` call on the diagonal is the only nonlinearity --- everything else is linear.
 
 The calibration loop wraps this in an objective function and calls L-BFGS-B:
 
@@ -356,7 +356,7 @@ The `eris-econ` framework parameterizes the *precision* matrix $\Sigma^{-1} = LL
 
 $$\Sigma = (\Sigma^{-1})^{-1} = (LL^\top)^{-1} = (L^\top)^{-1}L^{-1} = (L^{-1})^\top L^{-1}$$
 
-Since $L$ is triangular, its inverse $L^{-1}$ can be computed in $O(n^2)$ by back-substitution, which is cheaper than the general $O(n^3)$ matrix inversion. Alternatively, one can parameterize $\Sigma = LL^\top$ directly and compute $\Sigma^{-1}$ when needed --- the choice depends on which matrix appears more often in the computation.
+Since $L$ is triangular, its inverse $L^{-1}$ can be applied to a vector in $O(n^2)$ by back-substitution, without forming the inverse, which would cost $O(n^3)$. Alternatively, one can parameterize $\Sigma = LL^\top$ directly and compute $\Sigma^{-1}$ when needed --- the choice depends on which matrix appears more often in the computation.
 
 In the `eris-econ` `estimate_sigma` function, the final step recovers $\Sigma$ from the learned $\Sigma^{-1}$:
 
@@ -473,7 +473,7 @@ The `calibration_v2.py` module includes two tools for assessing the reliability 
 
 **Cross-validation** selects the regularization strength. The targets are partitioned into $k$ folds; the diagonal precision is fitted on $k-1$ folds and evaluated on the held-out fold. The regularization $\lambda$ that minimizes the cross-validated negative log-likelihood is chosen. The `cross_validate` function in `calibration_v2.py` implements this, sweeping over regularization values $[0.001, 0.005, 0.01, 0.05, 0.1, 0.5]$ and returning the best.
 
-**Bootstrap confidence intervals** quantify parameter uncertainty. The training data is resampled with replacement $B$ times; the diagonal precision is fitted to each bootstrap sample; and the distribution of the resulting parameters reveals which dimensions are reliably important and which are unstable. In the `eris-econ` joint calibration, bootstrap analysis reveals that Consequences ($d_1$), Fairness ($d_3$), and Privacy/Trust ($d_5$) consistently receive high precision across bootstrap samples, while Autonomy ($d_4$) and Legitimacy ($d_8$) are unstable --- wide confidence intervals indicate the data does not strongly constrain their contribution. This aligns with the structural fuzzing results: the Pareto frontier of dimension subsets is dominated by configurations containing Consequences and Fairness.
+**Bootstrap confidence intervals** quantify parameter uncertainty. The training data is resampled with replacement $B$ times; the diagonal precision is fitted to each bootstrap sample; and the distribution of the resulting parameters reveals which dimensions are reliably important and which are unstable. The `eris-econ` joint calibration implements this procedure. A dimension with a wide interval is one the data do not constrain, and fixing it at a prior value costs little. No recorded bootstrap run is cited here, so the book makes no claim about which of the nine dimensions are stable.
 
 ---
 
@@ -499,7 +499,7 @@ This is a linear function of the log-diagonal parameters --- no eigendecompositi
 
 ## 15.10 Synthesis: From Parameterization Patterns to Geometric Framework
 
-This chapter completes the core parameterization toolkit of Part III. Let us step back and trace the thread that connects the patterns developed in Chapters 12--15 to the geometric framework established in Part I.
+This chapter completes the core parameterization toolkit of Part III. Let us step back and trace the thread that connects the patterns developed in Chapters 11--15 to the geometric framework established in Part I.
 
 ### The Central Theme
 
