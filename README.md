@@ -12,9 +12,21 @@ https://erisml.org/geometric-methods/ via the erisml-lib `site` submodule.
 > [lebse](https://github.com/ahb-sjsu/lebse)). Domain volumes are *posited* until they pass
 > these gates; as of this date roughly two domains (legal text, moral dimensions 8/9) have.
 
+> **Review of 2026-11-15/16.** Chapter 21 now states the method named above, which no chapter
+> contained before, and Section 21.8 lists the status of every result in the volume. Chapter 17
+> gained Section 17.11 (intrinsic dimension and hubness) and Chapter 6 gained Section 6.4.4
+> (coordinates that degenerate at a boundary). Results that no run had produced were replaced by
+> recorded runs: Chapter 19 (the defect campaign, whose real output differs from the old text in
+> almost every respect), Section 14.9 (a registered experiment; one of three predictions failed)
+> and Section 20.9 (the numbers of the executed `eris-ketos` notebook). Mathematical errors were
+> corrected in Chapters 3 (Einstein midpoint), 7, 9, 12 (sign convention of interactions), 13
+> and 18 and in Appendix C, along with about a hundred cross-references and smaller defects.
+> Scripts and records: `formal/runs/` (Python, run on Atlas) and `formal/matlab/` (symbolic and
+> numerical checks).
+
 ## Structure
 
-- `chapters/*.md` — the book content (source of truth): 20 chapters + 3
+- `chapters/*.md` — the book content (source of truth): 21 chapters + 3
   appendices, one file each, `# Chapter N: Title` as the first line.
 - `assets/demos.js`, `assets/demos.css` — the interactive visualizations.
   `injectDemos(chapterId, element)` mounts a demo under the section listed in

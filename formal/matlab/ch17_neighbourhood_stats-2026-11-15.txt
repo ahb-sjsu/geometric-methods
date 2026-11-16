@@ -1,0 +1,25 @@
+MATLAB R2026a on the Atlas workstation, 2026-11-15 (local date), Symbolic Math Toolbox.
+Command: matlab -batch "run('ch17_neighbourhood_stats.m')"
+
+PASS  Poisson mean = L
+PASS  Poisson variance = L
+PASS  Poisson third central moment = L
+PASS  (17.6) Poisson skewness = 1/sqrt(L)
+PASS  mean count = rho
+PASS  (17.7) Var(N) = rho + rho^2 Var(w)
+PASS  (17.8) mu3(N) = rho + 3 rho^2 Var(w) + rho^3 mu3(w)
+PASS  (17.9) Var(w) = (Var(N) - rho)/rho^2
+PASS  (17.9) mu3(w) = (mu3(N) - 3 Var(N) + 2 rho)/rho^3
+PASS  hubness.py form of mu3(w) agrees with (17.9)
+PASS  (17.1) ln(mu) has survival exp(-d s)
+PASS  (17.2) MLE d = N / sum(ln mu)
+PASS  (17.3) truncated mean
+trim factor at q = 0.9: 1.343802
+PASS  (17.3) factor rounds to 1.344
+Monte Carlo: d = 20, trimmed estimate 26.8622, ratio 1.34311
+PASS  trimmed estimator reads factor*d (Monte Carlo)
+16000^(1/52) = 1.2046
+PASS  16000^(1/52) rounds to 1.2
+PASS  rho row = 4, 2, 1, 0.5
+PASS  1.79 / (1/sqrt(0.5)) rounds to 1.27
+TALLY: 18 PASS, 0 FAIL

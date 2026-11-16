@@ -19,7 +19,7 @@ The curse of dimensionality is not a single phenomenon but a family of related p
 
 **Volume explosion.** The fraction of a unit hypercube's volume within distance $\epsilon$ of the center shrinks as $(2\epsilon)^n$. For $n = 50$ and $\epsilon = 0.1$, this is $0.2^{50} \approx 10^{-35}$. The `optimize_subset` function in `core.py` uses 5,000 random samples for subsets of size 3 or more. In 50 dimensions, those samples cover a vanishingly small fraction of the feasible region.
 
-**Distance concentration.** As $n$ grows, the ratio of maximum to minimum pairwise distance in a random point set converges to 1. All points become approximately equidistant, undermining nearest-neighbor methods and distance-based analysis.
+**Distance concentration.** As $n$ grows, the ratio of maximum to minimum pairwise distance in a random point set converges to 1. All points become approximately equidistant, undermining nearest-neighbor methods and distance-based analysis. Section 17.11 takes up what happens to nearest neighbours in real embedding data, which is not a random point set.
 
 **Empty neighborhoods.** For MRI computation (Chapter 9), 300 perturbation samples in 50 dimensions are scattered across an exponentially larger space. The MRI's percentile statistics---P75 and P95---remain well-defined but may not capture the true tail behavior of the perturbation response surface.
 
@@ -404,9 +404,159 @@ Total: 2--3 hours instead of 12.5 years.
 
 ---
 
-## 17.11 Limitations and Open Problems
+## 17.11 Neighbourhood Statistics in High Dimension: Intrinsic Dimension and Hubness
+
+The sections above scale the *parameter* space. The same curse appears in the *data* space whenever the points are learned embeddings with hundreds or thousands of coordinates and the method depends on nearest neighbours, as the Mahalanobis, hyperbolic and topological methods of Part I all do. Section 17.1.1 stated distance concentration for a random point set. Real embeddings are not a random point set, and two statistics describe how they differ: the **intrinsic dimension** of a neighbourhood and the **hubness** of the nearest-neighbour graph.
+
+This section defines both, gives the estimators, and then reports what happened when they were used as acceptance gates in a long measurement campaign. The lesson of that campaign is that both statistics depend on the measurement protocol far more than their definitions suggest, and that a number quoted without its protocol is not a statistic.
+
+> **Epistemic status.** The measurements in this section come from the `openvector-bench` repository (result files named below). The main corpus is 1024-dimensional Cohere Embed-V3 embeddings of Wikipedia passages. The intrinsic-dimension profile was repeated on three further corpora; the hubness results were measured on the Wikipedia corpus only. None of it is peer reviewed. The identities are checked symbolically in `formal/matlab/ch17_neighbourhood_stats.m`.
+
+### 17.11.1 Intrinsic Dimension by the Two-Nearest-Neighbour Estimator
+
+Let $r_1(x) \le r_2(x)$ be the distances from a point $x$ to its first and second nearest neighbours, and let $\mu = r_2 / r_1$. If the density is locally uniform on a $d$-dimensional manifold, the ratio is Pareto distributed with shape $d$, whatever the density is (Facco et al., 2017):
+
+$$\Pr(\mu > t) = t^{-d}, \qquad t \ge 1. \tag{17.1}$$
+
+So $\ln \mu$ is exponential with rate $d$, and the maximum-likelihood estimate from $N$ points is
+
+$$\hat d = \frac{N}{\sum_{i=1}^{N} \ln \mu_i}. \tag{17.2}$$
+
+The estimator uses only the two nearest neighbours, so it reads the dimension *at the scale of the sampling density*. That is its strength and the source of everything that follows.
+
+**Trimming changes the level.** Large ratios come from outliers and from boundaries between clusters, so implementations discard them. The campaign's estimator keeps the ratios below their empirical quantile $q = 0.9$ and then applies (17.2) to what is left:
+
+```python
+def id_twonn(d: np.ndarray) -> float:
+    """Facco two-NN MLE, trimmed at the 90th percentile of mu."""
+    r1, r2 = d[:, 0], d[:, 1]
+    mu = r2[r1 > 0] / np.maximum(r1[r1 > 0], 1e-12)
+    mu = mu[mu > 1.0]
+    if len(mu) < 100:
+        return float("nan")
+    mu = mu[mu <= np.quantile(mu, 0.9)]
+    return float(len(mu) / np.sum(np.log(mu)))
+```
+
+Applying the untruncated formula to a truncated sample is not neutral. For an exponential variable with rate $d$ cut at its $q$-quantile, the mean is $\frac{1}{d}\bigl(1 + \frac{(1-q)\ln(1-q)}{q}\bigr)$, so on data that satisfy (17.1) exactly the trimmed estimator converges to
+
+$$\hat d_q \;\to\; \frac{d}{1 + \dfrac{(1-q)\ln(1-q)}{q}}, \qquad \hat d_{0.9} \to 1.344\, d. \tag{17.3}$$
+
+The factor is the same for every corpus measured with the same code, so ratios between corpora are unaffected. Levels are not comparable with an untrimmed two-NN value, or with the original procedure of Facco et al., which fits a line to the trimmed empirical distribution and has no such factor. Every level quoted below is a $q = 0.9$ trimmed value.
+
+**The right nominal dimension does not give the right measured dimension.** The campaign tested whether a low-dimensional manifold is enough to imitate real embeddings. At $n = 16{,}000$ points in 1024 ambient dimensions, with the same estimator on each row (`results/EC_FALSIFICATION.md`):
+
+| Point set | Nominal dimension | Measured $\hat d$ | Ratio to real |
+|---|:---:|:---:|:---:|
+| Real embeddings (Wikipedia, Embed-V3) | unknown | 61.4 | 1.00 |
+| Flat torus, uniform density | 52 | 345 | 5.63 |
+| Isotropic Gaussian | 1024 | 325 | 5.29 |
+
+A flat 52-dimensional torus, uniformly sampled, reads like the Gaussian. The reason is a count: $16{,}000^{1/52} \approx 1.2$ points per dimension. Every neighbourhood is so sparsely filled that the two nearest neighbours of a point are, in effect, random directions in the ambient space. The real corpus reads 61 at the same $n$ because its mass is **concentrated**: it sits in clusters dense enough that the two nearest neighbours of a point lie on its own local patch. A later family built as a mixture of flat linear patches, each in its own random subspace, matched the real value to within 0.95 to 1.14 times (`results/GEN_ROUND3_CONCENTRATION.md`). A flat patch has infinite reach in the sense of the Niyogi--Smale--Weinberger condition quoted in Chapter 5, so a sparse sample of it still reads its true dimension. Low nominal dimension is not what makes real embeddings distinctive. Inhomogeneity is.
+
+**The value depends on how many points there are and on who is asking.** The same corpus does not have one intrinsic dimension. Two protocols were run on four corpora (`results/R107_REPLICATION.md`). In the first, the reference points are a uniform random hold-out of the corpus itself, so they are exchangeable with the points they search. In the second, they are rows taken from far outside the sampled region of a topically ordered collection.
+
+| Corpus (encoder) | $\hat d$, uniform hold-out, $n = 25{,}000 \to 200{,}000$ | Distant rows over uniform hold-out, $n = 100{,}000$ |
+|---|:---:|:---:|
+| Wikipedia (Cohere Embed-V3) | $26.9 \to 18.3$ | 3.01 |
+| MS MARCO (Cohere Embed-V3) | $18.7 \to 14.9$ | 3.46 |
+| DBpedia (OpenAI ada-002) | $33.2 \to 26.4$ | 1.29 |
+| DBpedia (OpenAI text-embedding-3-large) | $34.9 \to 26.5$ | 0.97 |
+
+Two things are visible. The estimate *falls* as the sample gets denser, in all four corpora and all three encoders, because a denser sample resolves a finer and lower-dimensional scale. And reference points drawn from a different region of a large ordered collection see about three times the dimension that exchangeable points see, an effect that vanishes on the two smaller collections that have no distant region. The value 61.4 in the previous table was measured with real search queries, which are of the second kind.
+
+So an intrinsic dimension is reported with four things attached: the number of points, the encoder, the corpus, and the rule that chose the reference points. Without them two values cannot be compared.
+
+### 17.11.2 Hubness and the Query Budget
+
+Search a set of $n$ points with $n_q$ queries, returning $k$ neighbours each. The **$k$-occurrence** $N_k(x)$ is the number of queries that return $x$. In high dimension its distribution becomes strongly right-skewed: a few points, the *hubs*, are returned for a large share of queries, and many points are never returned (Radovanović et al., 2010). The standard measure of hubness is the skewness
+
+$$S_k = \frac{\mathbb{E}\bigl[(N_k - \bar N_k)^3\bigr]}{\operatorname{Var}(N_k)^{3/2}}. \tag{17.4}$$
+
+Hubs matter to every method in this book that takes a neighbourhood as its input. A hub appears in many neighbourhoods and an anti-hub in none, so local estimates are dominated by a few points.
+
+**The budget.** The mean of $N_k$ is fixed by the experiment and not by the data:
+
+$$\rho = \frac{n_q\, k}{n}. \tag{17.5}$$
+
+We call $\rho$ the query budget. It is the number of retrieval slots per point.
+
+**The null is not zero.** Suppose the corpus has no hub structure at all, so every point is equally likely to be returned. Then $N_k$ is close to Poisson with mean $\rho$, whose skewness is
+
+$$S_k^{\text{null}} = \frac{1}{\sqrt{\rho}}. \tag{17.6}$$
+
+A structureless corpus therefore shows positive hubness, and shows more of it as the budget falls. On the real corpus, with $n_q = 10{,}000$ held fixed while $n$ grows (`spec/QUERY_BUDGET.md`):
+
+| $n$ | 25,000 | 50,000 | 100,000 | 200,000 |
+|---|:---:|:---:|:---:|:---:|
+| $\rho$ at $k = 10$ | 4 | 2 | 1 | 0.5 |
+| $S_{10}$ over its null | 3.19 | 2.14 | 1.58 | 1.27 |
+| $S_{30}$ over its null | 6.05 | 4.01 | 2.66 | 1.85 |
+| $S_{100}$ over its null | 11.07 | 7.95 | 5.34 | 3.54 |
+
+In the last cell at $k = 10$ the measured skewness is 1.79 against a null of 1.41. About four fifths of that reading is the null. A gate that compares two corpora on $S_k$ in that cell compares two numbers pinned near the same floor, and it passes almost anything.
+
+**Removing the budget.** Give each point an *attractiveness* $w \ge 0$ with mean one, the rate at which the query distribution selects it, and model its count as $N_k \mid w \sim \text{Poisson}(\rho w)$. Then
+
+$$\operatorname{Var}(N_k) = \rho + \rho^2 \operatorname{Var}(w), \tag{17.7}$$
+
+$$\mu_3(N_k) = \rho + 3\rho^2 \operatorname{Var}(w) + \rho^3 \mu_3(w), \tag{17.8}$$
+
+where $\mu_3$ is the third central moment. Both moments of $w$ can be solved for:
+
+$$\operatorname{Var}(w) = \frac{\operatorname{Var}(N_k) - \rho}{\rho^2}, \qquad \mu_3(w) = \frac{\mu_3(N_k) - 3\operatorname{Var}(N_k) + 2\rho}{\rho^3}. \tag{17.9}$$
+
+The **attractiveness skew** $\mu_3(w)/\operatorname{Var}(w)^{3/2}$ belongs to the corpus and the query distribution and does not contain $\rho$. From `openvector_bench/hubness.py`:
+
+```python
+def attractiveness_skew(counts: np.ndarray) -> float:
+    c = np.asarray(counts, dtype=np.float64)
+    rho = float(c.mean())
+    if rho <= 0:
+        return float("nan")
+    var_w = (float(c.var()) - rho) / rho**2
+    if var_w <= 1e-9:
+        return float("nan")
+    mu3_w = (float(((c - rho) ** 3).mean()) - rho - 3 * rho**2 * var_w) / rho**3
+    return float(mu3_w / var_w**1.5)
+```
+
+On a fixed corpus with a known attractiveness skew of 9.85, measured at $\rho \in \{0.5, 1, 2, 4\}$, the raw $S_k$ ranged from 2.46 to 5.59 while the deconvolved estimate stayed between 9.84 and 10.02. The function returns no value when the measured variance is at or below $\rho$, which is the correct answer when the budget is too small to resolve any structure.
+
+**Dividing by a null is not the same as removing it.** Two simpler corrections were tried first: the largest count divided by the largest count a Poisson sample would reach, and the mass of the busiest one percent divided by its Poisson expectation. Both were believed to be free of the budget. They were then measured on the same rows, code and seeds under two protocols, one holding $\rho$ constant as $n$ grew and one holding $n_q$ constant. The slope of each statistic per tenfold increase in $n$, at $k = 10$:
+
+| Statistic | Constant $\rho$ | Constant $n_q$ | Difference |
+|---|:---:|:---:|:---:|
+| Attractiveness skew | $+0.543$ | $+0.474$ | 0.07 |
+| Top-1% mass over its null | $+0.399$ | $-0.513$ | 0.91 |
+| Maximum over its null | $+1.101$ | $-1.034$ | 2.14 |
+
+The two ratio statistics change sign with the protocol. Dividing by a null removes its location but not its shape: the distribution of a maximum, or of a tail mass, changes form with occupancy, so its ratio to its own expectation still moves with the budget. Only the estimator that models the sampling and inverts it gave the same answer twice.
+
+**An invariant estimator does not protect against a biased sample.** The agreement in the first row was read as showing that the hubness of the real corpus rises with $n$ at about $+0.5$ per decade. It does not show that. The script behind all three measurements drew its corpus and its queries from different files of a topically ordered dataset, so the queries came from a shifted distribution. When the same rows were shuffled before the split, the slope was $+0.26 \pm 0.20$, against $+0.48 \pm 0.17$ with the original split, on six seeds; an independent measurement inside a single file gave $-0.10 \pm 0.13$ (`results/R14_TARGETS_SPLIT_CHECK.md`). The invariance result stands, because the split was the same under both protocols. The claim about the corpus does not. Three measurements that agree and share one sampling rule are one measurement.
+
+**Hubs are made by the queries.** Which points become hubs? The campaign described each point by eight features: seven of local geometry (density, three neighbour radii, the slope of radius with rank, local intrinsic dimension, anisotropy) and one of query exposure, the amount of query mass near the point. A partition of the points built from all eight carried at most 1.20 times the information about retrieval counts that a partition built from query exposure alone carried, at twelve cells and on held-out points (`results/R13_STAGE1_RESULT.md`). Local geometry adds little once query exposure is known. Consistent with this, real queries against the corpus gave an attractiveness skew of 6.36 where queries drawn from the corpus's own distribution gave 2.51 in a matched cell.
+
+The lower tail depends on the budget as well. The share of points never returned at $k = 10$ was 26.5% at $\rho = 3.34$, 55.2% at $\rho = 1.25$ and 75.9% at $\rho = 0.50$. At the highest budget, half of the never-returned points were ones that no query had come near. A count of anti-hubs taken at one budget is partly a count of unasked questions.
+
+### 17.11.3 Rules for Practice
+
+1. **Report the budget.** Every count statistic is quoted with $\rho$ from (17.5).
+2. **Compare across corpus sizes in the deconvolved form.** Use the attractiveness skew of (17.9) for any claim that crosses $n$. Raw skewness, maxima and their ratios to a null are for comparisons at one matched $\rho$.
+3. **Keep $\rho \ge 2$ where a decision depends on the count.** Below that the null dominates every statistic, whatever its form. At $k = 10$ this needs $n_q \ge 0.2\, n$.
+4. **Make queries and corpus exchangeable unless the shift is the object of study.** Permute before splitting. If the queries are meant to differ from the corpus, say so, because that difference will be most of the hubness.
+5. **Quote an intrinsic dimension with its protocol.** State the number of points, the encoder, the corpus, the trimming and the rule that chose the reference points.
+6. **Test invariance by measurement.** Before calling a statistic independent of a nuisance quantity, measure it under two protocols that differ only in that quantity. An argument that the correction ought to work was wrong twice in this campaign.
+
+Rule 6 holds an instrument to the standard this book holds a model to: a property is accepted after it survives a test that could have refuted it.
+
+---
+
+## 17.12 Limitations and Open Problems
 
 Several challenges remain unresolved in the current framework.
+
+**Neighbourhood statistics on other corpora.** The hubness results of Section 17.11.2 were measured on one corpus and one encoder. The dependence on query exposure has not been tested where queries and corpus share a distribution by construction, and the attractiveness skew has high variance on heavy-tailed corpora, where the third moment is carried by a few points.
 
 **Non-linear dimension interactions.** LASSO screening assesses dimensions individually via the $L^1$ penalty on each parameter. Dimensions whose importance emerges only through three-way or higher-order interactions may be incorrectly screened out. Developing screening methods that detect higher-order interactions without exhaustive search is an open problem in both the structural fuzzing framework and the broader feature selection literature.
 
@@ -418,7 +568,7 @@ Several challenges remain unresolved in the current framework.
 
 ---
 
-## 17.12 Connection to Chapter 18
+## 17.13 Connection to Chapter 18
 
 This chapter addressed scaling in the dimension of the *parameter space*---what happens when the model has many parameters and the geometric methods of earlier chapters encounter computational limits. The strategies developed here---LASSO screening, greedy alternatives, streaming evaluation, adaptive budget allocation---are each effective in isolation, but their true power emerges when they are composed into coherent workflows.
 
@@ -433,5 +583,7 @@ High-dimensional parameter spaces challenge every stage of the structural fuzzin
 1. **Greedy methods** (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ while typically finding configurations within 5--15% of the global optimum.
 2. **LASSO screening** reduces effective dimensionality from $n$ to $n' \ll n$ at cost independent of $n$, enabling exhaustive enumeration on the reduced set.
 3. **Sampling strategies** (Latin hypercube, quasi-random sequences, importance sampling) improve coverage of high-dimensional perturbation spaces for MRI and robustness analysis.
+
+High dimension also changes the data space. The intrinsic dimension and the hubness of a point set are both functions of the measurement protocol: the first of the sample size and of who chooses the reference points, the second of the query budget and the query distribution. Section 17.11 gives the estimators, a budget-free form of hubness, and six reporting rules.
 
 The remaining pipeline stages---Pareto extraction, sensitivity profiling, MRI, adversarial search---are polynomial in $n$ and scale gracefully. Streaming evaluation and compressed storage prevent memory from becoming a bottleneck. The central engineering principle is *adaptive strategy selection*: use exact methods when feasible, screen aggressively when necessary, and validate approximations by comparing greedy results against partial enumeration on a reduced dimension set.

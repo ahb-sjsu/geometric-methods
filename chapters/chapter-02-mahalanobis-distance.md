@@ -12,7 +12,7 @@ $$d_{\text{Euclid}}(\mathbf{a}, \mathbf{b}) = \sqrt{\sum_{i=1}^{n} (a_i - b_i)^2
 
 This treats every dimension identically. A difference of 1.0 in dimension 3 contributes the same as a difference of 1.0 in dimension 7, regardless of what those dimensions represent. When the dimensions are measured in commensurable units and have comparable variances, this is reasonable. In practice, it almost never is.
 
-Consider the 9-dimensional ethical-economic space used in the `eris-econ` model (and reimplemented in this book's `geometric_economics` example). Dimension 0 ("Consequences") represents monetary payoffs and varies on a scale from 0 to roughly 50. Dimension 2 ("Fairness") is a normalized score that varies between 0 and 10. Dimension 8 ("Epistemic") is a knowledge-completeness indicator that is often constant at 8.0. Treating a 1-unit change in monetary payoff the same as a 1-unit change in fairness is not merely inaccurate -- it is *meaningless*. The units are incommensurable.
+Consider the 9-dimensional ethical-economic space used in the `eris-econ` model (and reimplemented in this book's `geometric_economics` example). Dimension 0 ("Consequences") represents monetary payoffs in dollars; in the ultimatum game of Chapter 6 it ranges from 5 to 10. Dimension 2 ("Fairness") is a score between 0 and 1, which the same game moves from 0.1 to 0.9. Dimension 8 ("Epistemic") is an information-quality score that sits at 0.5 unless a game changes it. Treating a 1-unit change in monetary payoff the same as a 1-unit change in fairness is not merely inaccurate -- it is *meaningless*. The units are incommensurable.
 
 The Mahalanobis distance resolves this by introducing a positive-definite matrix $\Sigma^{-1}$ into the distance computation:
 
@@ -51,7 +51,7 @@ The covariance matrix $\Sigma$ is a symmetric, positive-definite $n \times n$ ma
 
 **Off-diagonal entries** $\sigma_{ij} = \text{Cov}(X_i, X_j)$ for $i \neq j$ encode linear coupling between dimensions. A positive off-diagonal entry means the two dimensions tend to increase together; a negative entry means they move in opposition. When the off-diagonal structure is non-trivial, the equidistant contours rotate away from the coordinate axes, and the metric captures the fact that *correlated* deviations are less surprising than *uncorrelated* ones.
 
-In the `eris-econ` model, the covariance matrix for the 9D ethical-economic space is constructed from domain knowledge rather than estimated from data. This is a common and underappreciated approach: when you understand the generative process, you can build $\Sigma$ directly rather than waiting for enough samples to estimate it reliably. Consider the following structure:
+In the `eris-econ` model, the covariance matrix for the 9D ethical-economic space is constructed from domain knowledge rather than estimated from data. This is a common and underappreciated approach: when you understand the generative process, you can build $\Sigma$ directly rather than waiting for enough samples to estimate it reliably. The package's own default is simple: variance 25 for money, 0.25 for every other dimension, and four couplings (it is printed in Section 6.6.1). To show what a richer construction looks like, this section uses an illustrative matrix with more varied entries. It is not the package default, and no result in the book depends on it. Consider the following structure:
 
 | Entry | Value | Interpretation |
 |-------|-------|----------------|
@@ -141,7 +141,7 @@ The solution is to search in log-space. Instead of distributing $n$ grid points 
 
 $$v_k = 10^{\log_{10}(\alpha) + k \cdot \frac{\log_{10}(\beta) - \log_{10}(\alpha)}{n-1}}, \quad k = 0, 1, \ldots, n-1$$
 
-This produces values that are *multiplicatively* spaced. For $\alpha = 0.01$, $\beta = 100$, and $n = 20$, the first few values are approximately $0.01, 0.019, 0.036, 0.069, \ldots$ and the last few are $\ldots, 14.6, 27.8, 53.0, 100.0$. Each region of the range receives proportional coverage on a logarithmic scale.
+This produces values that are *multiplicatively* spaced. For $\alpha = 0.01$, $\beta = 100$, and $n = 20$, the first few values are approximately $0.01, 0.016, 0.026, 0.043, \ldots$ and the last few are $\ldots, 23.4, 37.9, 61.6, 100.0$; each value is $10^{4/19} \approx 1.62$ times the one before. Each region of the range receives proportional coverage on a logarithmic scale.
 
 The `optimize_subset` function in the structural fuzzing core uses exactly this approach:
 
@@ -318,7 +318,7 @@ Here `params[i]` plays the role of $\sigma_i^2$, and `weights[i]` $= 1/\sigma_i^
 
 **Bootstrap confidence intervals.** To assess the reliability of the learned metric, draw $B$ bootstrap samples from the targets (sampling with replacement), fit $\Sigma^{-1}$ to each bootstrap sample, and examine the distribution of the resulting parameters. Dimensions whose precision estimates have tight bootstrap intervals are reliably important. Dimensions with wide intervals are uncertain -- the data does not strongly constrain their contribution to the metric.
 
-For the `eris-econ` model, bootstrap analysis reveals that dimensions 0 (Consequences), 2 (Fairness), and 4 (Trust) consistently receive high precision across bootstrap samples, while dimensions 3 (Autonomy) and 7 (Legitimacy) are unstable. This aligns with the structural fuzzing results from Chapter 11: the Pareto frontier is dominated by subsets containing Consequences and Fairness.
+The `eris-econ` package implements these bootstrap intervals (`calibration_v2.py` and `joint_calibration.py`). No recorded run of them is cited in this book, so which of its nine dimensions they find stable is left as a measurement for the reader; a dimension whose interval spans zero precision is one the data do not constrain.
 
 
 ## 2.7 Putting It Together: From Distance to Decision

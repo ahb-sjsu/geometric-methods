@@ -72,7 +72,7 @@ A *state* is a vector $\mathbf{s} = (s_1, s_2, \ldots, s_n) \in \mathbb{R}^n$ wh
 | $s_4$ | Object-orientation | Coupling, cohesion, inheritance depth |
 | $s_5$ | Process | Revisions, distinct authors, code churn |
 
-Each dimension is not a single feature but a *group* of related features that collectively describe one aspect of the system. The grouping itself is a modeling decision, and it matters: the geometry of the resulting space depends on which features share a dimension and which are separated. Chapter 1 develops systematic methods for constructing these dimension groupings.
+Each dimension is not a single feature but a *group* of related features that collectively describe one aspect of the system. The grouping itself is a modeling decision, and it matters: the geometry of the resulting space depends on which features share a dimension and which are separated. Section 16.5 shows how these groupings are built into an evaluation function.
 
 ### 1.2.2 Design Patterns for State Vectors
 
@@ -80,7 +80,7 @@ Working with multi-dimensional state vectors requires disciplined engineering. T
 
 **Immutable state vectors.** A state vector, once constructed, should not be modified in place. Operations that transform states---perturbation, projection, interpolation---produce new vectors. Immutability prevents an entire class of bugs where shared references to a state vector produce unexpected aliasing, and it makes state trajectories trivially reproducible.
 
-**Dimension enumerations.** Each dimension of the state space is named, not numbered. Rather than referring to "dimension 3," the framework refers to "Halstead" or "vocabulary complexity." Named dimensions make code self-documenting, prevent off-by-one errors in dimension indexing, and enable operations like "activate all dimensions except OO" to be expressed declaratively. Chapter 1 introduces the dimension enumeration pattern used throughout the structural fuzzing framework.
+**Dimension enumerations.** Each dimension of the state space is named, not numbered. Rather than referring to "dimension 3," the framework refers to "Halstead" or "vocabulary complexity." Named dimensions make code self-documenting, prevent off-by-one errors in dimension indexing, and enable operations like "activate all dimensions except OO" to be expressed declaratively. This is the dimension enumeration pattern used throughout the structural fuzzing framework.
 
 **Attribute encoding conventions.** Each component $s_i$ requires a consistent encoding. For real-valued attributes, the convention is log-space encoding: parameter values are drawn from $[\epsilon, M]$ on a logarithmic scale, with a sentinel value (typically $10^6$) indicating that a dimension is *inactive*. This encoding provides uniform resolution across orders of magnitude and naturally handles the "off/on" semantics needed for subset enumeration (Chapter 11). For categorical or ordinal attributes, one-hot or thermometer encoding maps discrete values into the continuous space while preserving ordering relationships.
 
@@ -148,7 +148,7 @@ For computational modeling, persistent homology reveals structural properties th
 - A parameter space may contain voids---regions where no valid configuration exists---that exhaustive search must navigate around.
 - The loss landscape may have topological complexity (multiple basins, saddle connections) that curvature analysis alone cannot detect.
 
-Chapter 5 introduces persistent homology for practitioners and applies it to structural fuzzing, using topological features of the perturbation response surface to detect fragility patterns that the Model Robustness Index (Chapter 9) would miss.
+Chapter 5 introduces persistent homology for practitioners and applies it to the dynamics of cetacean click sequences.
 
 ---
 
@@ -178,7 +178,7 @@ The toolchain is not tied to any particular domain. It applies wherever a model 
 
 ## 1.5 A Motivating Example
 
-To make the preceding ideas concrete, consider a scenario that will recur in various forms throughout the book: validating a defect prediction model for a software engineering team.
+To make the preceding ideas concrete, consider a scenario that will recur in various forms throughout the book: validating a defect prediction model for a software engineering team. The numbers in this section are invented to show what each step produces. Chapter 19 runs the campaign on the book's synthetic defect data and reports what it measured, which is less tidy and more instructive.
 
 ### 1.5.1 The Standard Approach
 
@@ -226,7 +226,7 @@ Adding OO and Halstead to the three-group configuration reduces MAE from 1.7 to 
 | 95th percentile | 3.1 |
 | MRI (composite) | 1.43 |
 
-The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations, the model's error nearly doubles. This tail behavior is invisible to mean-based metrics. The MRI's weighted combination of mean, P75, and P95 provides a single robustness score *that explicitly accounts for tail risk*, unlike standard deviation which treats all deviations symmetrically.
+The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations, the model's error moves by about twice the whole error of the best configuration (1.5). This tail behavior is invisible to mean-based metrics. The MRI's weighted combination of mean, P75, and P95 provides a single robustness score *that explicitly accounts for tail risk*, unlike standard deviation which treats all deviations symmetrically.
 
 **Step 5: Adversarial threshold search (Chapter 9).** Binary search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity---it is *brittle* with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model's real-world performance.
 
@@ -252,6 +252,8 @@ Part II (Chapters 6--10) develops the geometric algorithms themselves, from path
 Part III (Chapters 11--15) presents design patterns: the subset enumeration pattern, compositional testing, group-theoretic data augmentation, gradient reversal and invariance training, and Cholesky parameterization for positive-definiteness.
 
 Part IV (Chapters 16--20) addresses systems-level concerns: building geometric pipelines, scaling to high-dimensional spaces, deploying geometric validation in production, and two complete case studies in software defect prediction and cetacean bioacoustics.
+
+Part V (Chapter 21) states the measurement discipline: the rules under which a number produced by any of these instruments may be called a result, and the status of each result in this volume under those rules.
 
 The thread that connects all of this is the conviction that *geometry is not a metaphor*. When we say that two model configurations are "far apart" or that a configuration is "near a boundary," we mean this literally, with precise distances computed in well-defined spaces. The power of the geometric approach comes from this precision: it transforms vague intuitions about model behavior into exact, computable quantities that can be tested, compared, optimized, and monitored.
 

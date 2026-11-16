@@ -5,7 +5,7 @@
 
 Chapter 1 opened this book with a motivating example: a defect prediction model evaluated at 84% accuracy, and the long list of questions that scalar metric could not answer. The intervening chapters developed the geometric tools---subset enumeration, Pareto frontier analysis, sensitivity profiling, the Model Robustness Index, adversarial threshold search---needed to ask and answer those questions rigorously. This chapter brings the full toolchain to bear on a single, complete worked example. We start with a dataset, build an evaluation function, run the entire structural fuzzing campaign, and interpret every output. The goal is not merely to demonstrate the API but to show how geometric reasoning transforms the practice of model validation: from a single number to a multi-dimensional portrait of model behavior, fragility, and opportunity.
 
-The dataset is a synthetic analogue of the KC1 module from the NASA Metrics Data Program, distributed through the PROMISE repository. KC1 contains software metrics---lines of code, cyclomatic complexity, Halstead measures, object-oriented coupling and cohesion, process history---for roughly 2,000 C++ modules, each labeled as defective or clean. We use a synthetic generator that preserves the statistical structure and known causal relationships of KC1 while ensuring full reproducibility without external data dependencies. The generator lives in the framework's example directory and is designed to be a faithful stand-in for pedagogical purposes.
+The dataset is a synthetic analogue of the KC1 module from the NASA Metrics Data Program, distributed through the PROMISE repository. KC1 contains software metrics---lines of code, cyclomatic complexity, Halstead measures, object-oriented coupling and cohesion, process history---for roughly 2,000 C++ modules, each labeled as defective or clean. We use a synthetic generator whose feature families follow KC1's and whose causal structure is set by hand (Section 19.1.2), which makes the example fully reproducible without external data. It is not fitted to KC1. The generator lives in the framework's example directory.
 
 ---
 
@@ -45,7 +45,9 @@ The defect probability for each module is computed via a logistic model:
 
 $$p(\text{defect}) = \sigma\!\left(-3 + 0.10\log(1 + \text{cyc}) + 0.15\log(1 + \text{ess}) + 0.05\log(1 + \text{des}) + 0.12\log(1 + \text{rev}) + 0.10\log(1 + \text{auth}) + 0.08\log(1 + \text{churn}/100) + 0.03\log(1 + \text{loc}/1000) + \varepsilon\right)$$
 
-where $\sigma$ is the sigmoid function and $\varepsilon \sim \mathcal{N}(0, 0.25)$. The coefficients make the ground truth explicit: Complexity and Process dominate, Size contributes marginally, OO contributes nothing. A successful geometric analysis should recover this structure without access to the generating coefficients.
+where $\sigma$ is the sigmoid function and $\varepsilon \sim \mathcal{N}(0, 0.25)$, a variance of 0.25 and a standard deviation of 0.5. The coefficients make the ground truth explicit: Complexity and Process dominate, Size contributes marginally, OO contributes nothing.
+
+The coefficients are also small. Across the 1,000 modules, the part of the logit that the features determine has mean $-1.99$ and standard deviation 0.11, against noise with standard deviation 0.5. No module's defect probability, as far as its features determine it, exceeds 0.16. Used as an oracle on the test split of Section 19.2.2, the generator's own formula reaches an AUC of 0.545 (`formal/runs/ch19_oracle.py`). The structure is real but faint. Whether a campaign can recover it from 1,000 modules is an empirical question, and Section 19.5 answers it.
 
 ### 19.1.3 Generating the Data
 
@@ -54,17 +56,17 @@ from examples.defect_prediction.model import generate_defect_data, FEATURE_NAMES
 
 X, y = generate_defect_data(n_samples=1000, seed=42)
 print(f"Features: {X.shape}")       # (1000, 16)
-print(f"Defect rate: {y.mean():.2%}")  # ~30-35%
+print(f"Defect rate: {y.mean():.2%}")  # 12.10%
 print(f"Feature names: {FEATURE_NAMES}")
 ```
 
-The generator produces 1,000 modules with 16 features each and a binary defect label. The defect rate is approximately 30--35%, reflecting the class imbalance typical of real defect datasets. The `seed` parameter ensures exact reproducibility.
+The generator produces 1,000 modules with 16 features each and a binary defect label. The defect rate is 12.1%. Of the 300 test modules, 36 are defective, so a model that predicts "no defect" for every module is 88% accurate. The `seed` parameter ensures exact reproducibility.
 
 ---
 
 ## 19.2 Building the Evaluation Function
 
-The structural fuzzing framework communicates with models through a single interface: the *evaluation function*. This function takes a parameter vector $\mathbf{p} \in \mathbb{R}^n$ (one entry per dimension) and returns a scalar MAE along with a dictionary of per-target errors. The design of this interface is discussed in Chapter 1; here we implement it for defect prediction.
+The structural fuzzing framework communicates with models through a single interface: the *evaluation function*. This function takes a parameter vector $\mathbf{p} \in \mathbb{R}^n$ (one entry per dimension) and returns a scalar MAE along with a dictionary of per-target errors. The design of this interface is discussed in Chapter 16; here we implement it for defect prediction.
 
 ### 19.2.1 The evaluate_fn Contract
 
@@ -127,7 +129,9 @@ mae_oo, errors_oo = evaluate_fn(params_oo)
 print(f"OO only: MAE={mae_oo:.4f}")
 ```
 
-If the data generator and evaluation function are working correctly, the all-groups configuration should achieve the lowest MAE, the Complexity-only configuration should perform reasonably well, and the OO-only configuration should perform poorly. These spot checks catch wiring errors before they propagate into a multi-hour campaign.
+The expectation was that the all-groups configuration would score best, Complexity alone reasonably well, and OO alone poorly. The recorded run gives MAEs of 48.27, 47.34 and 48.84: the three are within 1.5 points of one another, and Complexity alone beats the full model. That is the first sign of what Section 19.5 explains. The checks pass in the sense that nothing fails to run, and fail in the sense that they cannot tell a useful configuration from a useless one. A spot check is only a check if it states in advance what result would count as failure; here a sensible rule would be that OO alone must score clearly worse than Complexity alone, and it does not.
+
+A second check belongs here too: that the parameter values, and not only their on/off pattern, reach the model. Evaluate `params_all` with every entry set to 1.0 and again with every entry set to 50.0. This function returns the same score for both, which Section 19.7 shows is decisive for the robustness stages.
 
 ---
 
@@ -155,7 +159,7 @@ report = run_campaign(
 )
 ```
 
-The `max_subset_dims=4` setting enumerates all subsets of size 1 through 4 out of 5 dimensions. This produces $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} = 5 + 10 + 10 + 5 = 30$ configurations, plus the single size-5 configuration tested during sensitivity profiling. Each configuration requires training and evaluating a random forest, so the full campaign runs approximately 30 subset evaluations plus 300 MRI perturbations plus adversarial searches plus baselines---several hundred model fits in total. On the synthetic dataset with 1,000 samples, this completes in under a minute on modern hardware.
+The `max_subset_dims=4` setting enumerates all subsets of size 1 through 4 out of 5 dimensions. This produces $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} = 5 + 10 + 10 + 5 = 30$ configurations, plus the single size-5 configuration tested during sensitivity profiling. The subset search optimizes the parameter values of each configuration as well (Chapter 11), with grid or random search, and the other stages add their own evaluations. The recorded campaign called the evaluation function 189,462 times. Each call fits a 50-tree random forest, so run naively the campaign takes hours. But this evaluation function depends only on which groups are active, so the calls reduce to the 32 on/off patterns, and the recorded run caches on that pattern; the cache was checked against 400 uncached calls on random parameter vectors, with no difference (`formal/runs/ch19_defect_campaign.py`). With the cache the campaign took 2.5 seconds.
 
 ### 19.3.2 The Six-Stage Pipeline
 
@@ -163,354 +167,108 @@ The campaign executes the following stages, each corresponding to a technique de
 
 | Stage | Chapter | Operation |
 |-------|---------|-----------|
-| 1. Subset enumeration | Ch 4 | Test all $\binom{5}{k}$ subsets for $k = 1, \ldots, 4$ |
-| 2. Pareto frontier | Ch 5 | Identify non-dominated (dimensionality, MAE) tradeoffs |
-| 3. Sensitivity profiling | Ch 7 | Ablate each dimension and measure MAE impact |
-| 4. Model Robustness Index | Ch 7 | Perturb baseline 300 times, compute MRI |
-| 5. Adversarial thresholds | Ch 9--10 | Binary search for tipping points per dimension |
-| 6. Compositional testing | Ch 4 | Greedy dimension-addition sequence |
+| 1. Subset enumeration | Ch 11 | Test all $\binom{5}{k}$ subsets for $k = 1, \ldots, 4$ |
+| 2. Pareto frontier | Ch 8 | Identify non-dominated (dimensionality, MAE) tradeoffs |
+| 3. Sensitivity profiling | Ch 9 | Ablate each dimension and measure MAE impact |
+| 4. Model Robustness Index | Ch 9 | Perturb baseline 300 times, compute MRI |
+| 5. Adversarial thresholds | Ch 9 | Search for tipping points per dimension |
+| 6. Compositional testing | Ch 12 | Greedy dimension-addition sequence |
 
 The `StructuralFuzzReport` dataclass returned by `run_campaign` contains the complete results from all six stages, along with optional forward-selection and backward-elimination baselines. The report's `summary()` method produces a formatted text output, and the `report` module provides LaTeX table generation for publication.
 
 ---
 
-## 19.4 Interpreting Subset Enumeration Results
+## 19.4 The Recorded Run
 
-### 19.4.1 The Full Enumeration Table
+Every number in Sections 19.4 to 19.9 comes from runs recorded on 16 November 2026 with `structural-fuzzing` 0.4.0, scikit-learn 1.8.0, NumPy 2.4.4 and Python 3.12.3, using the configuration of Section 19.3.1. The scripts are in `formal/runs/` (`ch19_defect_campaign.py`, `ch19_oracle.py`, `ch19_redraw.py`) and their outputs in the JSON files beside them. An earlier version of this chapter printed "typical output" that no run had produced. The recorded output differs from it in almost every respect, and the differences are the lessons of the chapter.
 
-The first stage produces 30 `SubsetResult` objects, sorted by MAE ascending. The top of the list reveals which feature group combinations achieve the best prediction quality:
+### 19.4.1 The Enumeration Table
 
-```python
-print(f"Total configurations evaluated: {len(report.subset_results)}")
-print("\nTop 10 configurations by MAE:")
-for i, r in enumerate(report.subset_results[:10], 1):
-    dims = ", ".join(r.dim_names)
-    print(f"  {i:2d}. [{dims}] (k={r.n_dims}) MAE={r.mae:.4f}")
-```
+The best five of the 30 configurations, with the five single groups and the full model for comparison. Metrics are percentages on the 300 test modules; the MAE is the mean absolute distance from the five targets.
 
-Typical output:
+| Configuration | MAE | Accuracy | Precision | Recall | F1 | AUC |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| {OO, Process} | 39.40 | 88.3 | 100.0 | 2.8 | 5.4 | 50.2 |
+| {Size, Complexity} | 47.23 | 87.7 | 0.0 | 0.0 | 0.0 | 58.5 |
+| {Complexity, Halstead, Process} | 47.25 | 87.7 | 0.0 | 0.0 | 0.0 | 58.4 |
+| {Complexity} | 47.34 | 83.3 | 0.0 | 0.0 | 0.0 | 53.6 |
+| {Size, Complexity, Halstead} | 47.45 | 88.0 | 0.0 | 0.0 | 0.0 | 57.7 |
+| {Size} alone | 49.22 | | | | | |
+| {Halstead} alone | 48.80 | | | | | |
+| {OO} alone | 48.84 | | | | | |
+| {Process} alone | 48.27 | | | | | |
+| All five groups | 48.27 | 87.7 | 0.0 | 0.0 | 0.0 | 53.3 |
+| No groups | 71.40 | | | | | |
 
-```
-Total configurations evaluated: 30
+Two things are wrong with this table before any geometry is applied. Every configuration but one has precision, recall and F1 of zero: it finds none of the 36 defective test modules. And the one exception, the best configuration, contains the OO group, which the generator makes pure noise.
 
-Top 10 configurations by MAE:
-   1. [Size, Complexity, Halstead, Process] (k=4) MAE=1.3842
-   2. [Complexity, Halstead, Process] (k=3) MAE=1.5917
-   3. [Size, Complexity, Process] (k=3) MAE=1.6203
-   4. [Complexity, Halstead, OO, Process] (k=4) MAE=1.6519
-   5. [Size, Complexity, Halstead, OO] (k=4) MAE=2.0301
-   6. [Complexity, Process] (k=2) MAE=2.1044
-   7. [Size, Complexity, Halstead] (k=3) MAE=2.1538
-   8. [Complexity, OO, Process] (k=3) MAE=2.2105
-   9. [Halstead, Process] (k=2) MAE=2.4812
-  10. [Size, Complexity] (k=2) MAE=2.5539
-```
+## 19.5 Why Every Configuration Scores Alike
 
-### 19.4.2 Reading the Enumeration
+### 19.5.1 The Targets Cannot Be Met
 
-Several patterns emerge immediately:
+The defect rate is 12.1%, so a model that predicts "no defect" for every test module is 88.0% accurate. The random forest predicts a defect when its estimated probability exceeds one half, and Section 19.1.2 showed that no module's defect probability, as far as its features determine it, exceeds 0.16. A classifier that has learned the generator correctly should therefore predict "no defect" almost everywhere. Thirty of the 31 configurations find none of the 36 defective modules: their recall is zero, and so are their precision and F1, since any defects they do predict are wrong. Each of them has an MAE of at least $(70 + 65 + 67)/5 = 40.4$, whatever its accuracy and AUC. The targets of Section 19.2.2 ask for precision of 70%, recall of 65% and AUC of 80%. The generator's own formula, used as an oracle, reaches an AUC of 54.5% on the same test modules. No model can meet these targets on these data, including the true one.
 
-**Complexity and Process dominate.** Every top-performing configuration includes both Complexity and Process. The best 2-group configuration is {Complexity, Process} at MAE 2.10, confirming that these two dimension families carry the majority of the predictive signal.
+The differences that remain are in accuracy and AUC, and they are small against their noise. With 36 defective and 264 clean modules, the standard error of an AUC near 0.55 is about 0.05 (Hanley and McNeil, 1982). The 31 configurations span AUCs from 43% to 59%, all within two standard errors of chance.
 
-**Size adds modest value.** Adding Size to {Complexity, Process} reduces MAE from approximately 1.59 to 1.38---a meaningful but not dramatic improvement. This is consistent with the ground truth: size has a small positive coefficient in the generating logit.
+### 19.5.2 The Winner Is a Draw
 
-**Halstead is a proxy for Size.** {Complexity, Halstead, Process} and {Size, Complexity, Process} achieve similar MAE (around 1.59 and 1.62 respectively). This suggests that Halstead and Size carry overlapping information, which is expected: Halstead volume is defined as a function of program length.
+{OO, Process} wins because it made exactly one positive prediction and that prediction was right: precision 100%, recall one in 36. That single module lowers its MAE by eight points and puts it first. It was chosen on the same 300 modules that score it, so its rank is a property of those modules.
 
-**OO metrics hurt more than they help.** Comparing {Complexity, Process} (MAE 2.10) with {Complexity, OO, Process} (MAE 2.21) shows that adding OO features *increases* error. This is the noise injection effect: the random forest splits on uninformative features, wasting capacity and reducing generalization. The geometric analysis quantifies this effect precisely, unlike a scalar accuracy report that might average it away.
+That can be tested directly by drawing the data again. Over 20 seeds of the same generator, each giving a new dataset and a new split, 15 different configurations win. The most frequent winner, Process alone, wins three times. Eight of the 20 winners contain OO, close to what chance gives, since OO appears in 16 of the 31 configurations (`ch19_redraw.json`). The campaign's choice of best configuration carries no information about the generator.
 
-### 19.4.3 The Per-Target Error Vectors
+## 19.6 Pareto, Sensitivity and Composition
 
-Each `SubsetResult` contains not just the scalar MAE but the full error vector across all five quality targets. These vectors reveal *how* configurations differ, not just *how much*:
+**Pareto frontier.** Two points: {Complexity} at MAE 47.34 with one group, and {OO, Process} at 39.40 with two. The second is the draw of Section 19.5.2.
 
-```python
-best = report.subset_results[0]
-print(f"Best configuration: {', '.join(best.dim_names)}")
-print(f"Per-target errors (predicted - target):")
-for name, err in sorted(best.errors.items()):
-    print(f"  {name}: {err:+.2f}")
-```
+**Sensitivity.** The profile ablates each group from the best configuration. Removing Process raises the MAE to 48.84 (+9.44) and removing OO raises it to 48.27 (+8.87); Size, Complexity and Halstead are already off, so removing them changes nothing. The profile ranks OO as the second most important group. That is true of this test set and false of the generator.
 
-A configuration might achieve low MAE overall but fall short on Recall while exceeding the Accuracy target. The error vector makes these tradeoffs explicit. This is precisely the information that the Scalar Irrecoverability Theorem (Chapter 1, Section 1.1.1) proves cannot be recovered from a single aggregate metric.
-
----
-
-## 19.5 Analyzing the Pareto Frontier
-
-### 19.5.1 Extracting the Frontier
-
-The Pareto frontier identifies configurations where no other configuration achieves both fewer dimensions *and* lower MAE. These are the non-dominated tradeoffs between model simplicity (fewer feature groups) and prediction quality (lower error):
-
-```python
-print(f"Pareto frontier: {len(report.pareto_results)} points")
-print()
-for pr in report.pareto_results:
-    dims = ", ".join(pr.dim_names)
-    print(f"  k={pr.n_dims}: MAE={pr.mae:.4f} [{dims}]")
-```
-
-Typical output:
-
-```
-Pareto frontier: 4 points
-
-  k=1: MAE=3.7502 [Complexity]
-  k=2: MAE=2.1044 [Complexity, Process]
-  k=3: MAE=1.5917 [Complexity, Halstead, Process]
-  k=4: MAE=1.3842 [Size, Complexity, Halstead, Process]
-```
-
-### 19.5.2 Reading the Frontier
-
-The Pareto frontier tells a story of diminishing returns:
-
-- **$k = 1 \to 2$:** Adding Process to Complexity reduces MAE by 1.65 (from 3.75 to 2.10), a 44% improvement. This is the single most valuable dimension addition.
-- **$k = 2 \to 3$:** Adding Halstead reduces MAE by 0.51 (from 2.10 to 1.59), a 24% improvement. Substantial but less dramatic.
-- **$k = 3 \to 4$:** Adding Size reduces MAE by 0.21 (from 1.59 to 1.38), a 13% improvement. Modest.
-
-Note that OO does not appear on the Pareto frontier at any dimensionality. There is no value of $k$ at which including OO metrics produces a non-dominated configuration. This is a strong geometric statement: OO is Pareto-dominated at *every* complexity level.
-
-The Pareto analysis directly addresses the question that the project manager asked in Chapter 1: "Is 84% accuracy good?" The geometric answer is: "Accuracy depends on which features you include, and the tradeoff between simplicity and accuracy has a specific shape. With two feature groups you can achieve MAE 2.1; with four groups you can achieve MAE 1.4. The fifth group (OO) provides no Pareto improvement at any complexity level."
-
-### 19.5.3 The Marginal Value Curve
-
-Plotting the Pareto frontier as a curve of MAE versus $k$ reveals the "elbow" that separates high-value dimension additions from low-value ones:
-
-```python
-import matplotlib.pyplot as plt
-
-ks = [pr.n_dims for pr in report.pareto_results]
-maes = [pr.mae for pr in report.pareto_results]
-
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.plot(ks, maes, "o-", color="steelblue", linewidth=2, markersize=8)
-ax.set_xlabel("Number of Feature Groups (k)")
-ax.set_ylabel("MAE")
-ax.set_title("Pareto Frontier: Simplicity vs. Prediction Quality")
-ax.set_xticks(range(1, 6))
-ax.grid(True, alpha=0.3)
-plt.tight_layout()
-plt.savefig("pareto_frontier.png", dpi=150)
-```
-
-The elbow at $k = 2$ is the key finding. A team with limited feature engineering capacity should invest in Complexity and Process metrics first. Size and Halstead provide incremental gains. OO metrics can be safely omitted.
-
----
-
-## 19.6 Sensitivity Profiling Results
-
-### 19.6.1 Ablation Rankings
-
-Sensitivity profiling (Chapter 9) ablates each dimension from the best baseline configuration and measures the resulting increase in MAE. The ranking reveals which dimensions the model depends on most:
-
-```python
-print("Sensitivity ranking (ablation from best configuration):")
-for sr in report.sensitivity_results:
-    print(
-        f"  {sr.importance_rank}. {sr.dim_name}: "
-        f"delta_MAE = {sr.delta_mae:+.4f} "
-        f"(with={sr.mae_with:.4f}, without={sr.mae_without:.4f})"
-    )
-```
-
-Typical output:
-
-```
-Sensitivity ranking (ablation from best configuration):
-  1. Complexity: delta_MAE = +1.8721 (with=1.3842, without=3.2563)
-  2. Process:    delta_MAE = +1.2104 (with=1.3842, without=2.5946)
-  3. Size:       delta_MAE = +0.5831 (with=1.3842, without=1.9673)
-  4. Halstead:   delta_MAE = +0.2075 (with=1.3842, without=1.5917)
-  5. OO:         delta_MAE = -0.0412 (with=1.3842, without=1.3430)
-```
-
-### 19.6.2 Interpreting the Profile
-
-The sensitivity profile confirms and extends the subset enumeration findings:
-
-**Complexity is critical.** Removing Complexity from the best configuration increases MAE by 1.87---more than any other single ablation. The model's predictive power is overwhelmingly concentrated in this dimension.
-
-**Process is the second pillar.** Removing Process increases MAE by 1.21. Together, Complexity and Process account for the model's core predictive capability.
-
-**Size contributes modestly.** A delta of 0.58 indicates meaningful but secondary importance.
-
-**Halstead is marginally useful.** A delta of 0.21 is near the noise floor for this dataset. Halstead contributes, but the contribution is small enough that removing it has limited practical impact.
-
-**OO is actively harmful.** The negative delta ($-0.04$) means that *removing* OO from the full configuration actually *improves* MAE. This is the clearest possible geometric signal that OO features are noise: they consume model capacity and degrade generalization. A scalar accuracy report would not detect this because the degradation is small enough to be masked by variance in the aggregate metric.
-
-### 19.6.3 Sensitivity vs. Subset Enumeration
-
-Sensitivity profiling and subset enumeration provide complementary information. Subset enumeration answers: "Which combinations work well?" Sensitivity profiling answers: "Starting from the best configuration, which dimensions can you afford to lose?" The answers are consistent in this case---both identify Complexity and Process as the critical dimensions---but they need not be. A dimension that contributes little on its own (low MAE in singleton subset) might contribute substantially in combination with others (high delta when ablated from a multi-dimensional configuration). The geometric analysis captures both perspectives.
-
----
+**Composition and the baselines.** Starting from Size, the compositional test adds Complexity (47.23), Halstead (47.45), Process (48.13) and OO (48.27). Forward selection starts from Complexity (47.34) and adds Size (47.23), Halstead (47.45) and Process (48.13). Backward elimination starts from all five (48.27) and removes Halstead (47.47), OO (48.24), Process (47.23) and Size (47.34). None of the three greedy paths ever reaches {OO, Process}. The exhaustive optimum is an isolated point whose neighbours score like everything else, which is the signature of a lucky draw and not of structure in the data. When exhaustive and greedy searches disagree this sharply, the disagreement is itself a diagnostic.
 
 ## 19.7 The Model Robustness Index
 
-### 19.7.1 MRI Computation
+The recorded MRI is $0.0000$, with mean, 75th-percentile and 95th-percentile deviations all exactly zero, and a worst-case MAE of 39.40, the baseline itself.
 
-The Model Robustness Index (Chapter 9) quantifies how sensitive the best configuration is to parameter perturbations. The framework perturbs the baseline parameters 300 times in log-space and measures the distribution of MAE deviations:
+This is not robustness. The evaluation function reads each parameter only to ask whether it is below 1000, so its value depends only on which groups are on. The MRI multiplies the parameters by $e^{\varepsilon}$ with $\varepsilon \sim \mathcal{N}(0, 0.5^2)$. The active groups of the best configuration sit at 0.01 and would need a factor of $10^5$ to reach 1000; the inactive ones sit at $10^6$ and would need a factor of $10^{-3}$. Neither happened in 300 draws, and neither will in practice. Even if the function did use the values, scaling a feature by a constant does not change any split of a random forest, so it could not have mattered. The campaign called the evaluation function 189,462 times, and those calls produced 32 distinct models, one for each on/off pattern.
 
-```python
-mri = report.mri_result
-print(f"Model Robustness Index: {mri.mri:.4f}")
-print(f"  Mean deviation (omega):   {mri.mean_omega:.4f}")
-print(f"  75th percentile (omega):  {mri.p75_omega:.4f}")
-print(f"  95th percentile (omega):  {mri.p95_omega:.4f}")
-print(f"  Worst-case MAE:           {mri.worst_case_mae:.4f}")
-print(f"  Perturbations:            {mri.n_perturbations}")
-```
+An MRI of zero therefore says that the evaluation function cannot see the perturbation, not that the model withstands it. Section 21.4 calls this a design that cannot fail, and gives the one-line test that catches it.
 
-Typical output:
+## 19.8 Adversarial Thresholds
 
-```
-Model Robustness Index: 1.4287
-  Mean deviation (omega):   0.8134
-  75th percentile (omega):  1.3951
-  95th percentile (omega):  3.0822
-  Worst-case MAE:           5.6714
-  Perturbations:            300
-```
+The search found no thresholds. It scales each parameter by up to a factor of 1000 in each direction and records the first value at which any metric moves by more than 0.5. Every value scored alike, so the subset optimizer kept the first grid point, 0.01, for each active group; a thousandfold increase reaches 10, still below the 1000 that switches a group off. For an inactive group, a thousandfold decrease of $10^6$ reaches exactly 1000, which still counts as off. No step crosses the only boundary the function can see.
 
-### 19.7.2 Interpreting the MRI
+## 19.9 Making the Parameter Matter
 
-The MRI is a weighted combination of three statistics:
-
-$$\text{MRI} = 0.5 \cdot \overline{\omega} + 0.3 \cdot \omega_{75} + 0.2 \cdot \omega_{95}$$
-
-where $\omega_i = |\text{MAE}_{\text{perturbed},i} - \text{MAE}_{\text{base}}|$. The weights give diminishing emphasis to the tails, but the tail terms ensure that worst-case behavior is not ignored.
-
-**Mean deviation of 0.81** indicates that on average, perturbations shift the MAE by approximately 0.81 units. For a baseline MAE of 1.38, this means the average perturbation changes the error by roughly 59%---a substantial sensitivity.
-
-**P95 deviation of 3.08** means that in the worst 5% of perturbations, the MAE increases by more than 3 units. This represents a catastrophic degradation: the model's error more than triples. A deployment relying on this model would experience severe prediction failures one time in twenty under random parameter perturbation.
-
-**Worst-case MAE of 5.67** is nearly four times the baseline. This extreme is driven by perturbations that effectively disable critical feature groups while amplifying noise from uninformative ones.
-
-### 19.7.3 The Perturbation Distribution
-
-The full list of perturbation errors is available in `mri.perturbation_errors` and can be visualized as a histogram:
+The robustness stages of Sections 19.7 and 19.8 had nothing to measure, because the package's evaluation function cannot see the parameter values. A small change gives it something to see. In the variant below, each feature is log-transformed and standardized on the training split, group $g$ is scaled by $1/\sqrt{p_g}$, and an $L^2$-penalized logistic regression is fitted, with classes weighted to balance them. Scaling a feature by $1/\sqrt{p}$ under an $L^2$ penalty is the same as giving its coefficient a Gaussian prior with precision proportional to $p$, so each parameter is the prior precision of its group's coefficients, which is the meaning Chapter 2 gives to a weight. The sentinel still switches a group off. Data, split, targets and campaign are those of Section 19.3.
 
 ```python
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.hist(mri.perturbation_errors, bins=30, color="steelblue", edgecolor="white", alpha=0.8)
-ax.axvline(mri.mean_omega, color="red", linestyle="--", label=f"Mean = {mri.mean_omega:.2f}")
-ax.axvline(mri.p95_omega, color="orange", linestyle="--", label=f"P95 = {mri.p95_omega:.2f}")
-ax.set_xlabel("Absolute MAE Deviation (omega)")
-ax.set_ylabel("Count")
-ax.set_title("MRI Perturbation Distribution")
-ax.legend()
-plt.tight_layout()
-plt.savefig("mri_distribution.png", dpi=150)
+def evaluate_fn(params):
+    cols, scale = [], []
+    for g, members in enumerate(FEATURE_GROUPS.values()):
+        if params[g] < 1000:
+            cols += members
+            scale += [1.0 / np.sqrt(params[g])] * len(members)
+    if not cols:
+        ...                                    # as in the package example
+    A = Z[:, cols] * np.asarray(scale)         # Z: log1p features, standardized on train
+    m = LogisticRegression(C=1.0, class_weight="balanced", max_iter=2000)
+    m.fit(A[train], y[train])
+    ...                                        # metrics and errors as before
 ```
 
-The distribution is typically right-skewed: most perturbations produce modest changes, but a heavy right tail extends to large deviations. This skewness is precisely why the MRI includes the P75 and P95 terms rather than relying solely on the mean. Standard deviation would treat this tail symmetrically with left-tail deviations (improvements under perturbation), but in practice we care asymmetrically about degradation.
+The full function is `weighted_evaluate_fn` in `formal/runs/ch19_defect_campaign.py`. With it, the same campaign made 189,094 evaluations, each a fresh fit, in 72 minutes.
 
----
+| Stage | Recorded result |
+|---|---|
+| Best configuration | {Size, Complexity, Halstead, OO}, MAE 25.80, with precisions 69.1, 67.0, 6.6 and 11.0 |
+| Pareto frontier | {Complexity} 28.37; {Complexity, OO} 27.49; {Complexity, Halstead, OO} 26.17; the best configuration, 25.80 |
+| Sensitivity (removing each group) | Complexity +9.68, OO +5.34, Halstead +3.65, Size +0.76, Process 0 (already off) |
+| MRI | 2.06 (mean 1.55, 75th percentile 2.18, 95th percentile 3.15); worst case 30.26 |
+| Thresholds | Size and Complexity at $\times 1.15$ and $\times 0.87$; Halstead at $\times 3.09$ and $\times 0.57$; OO at $\times 2.02$ and $\times 0.66$ |
+| Composition from Size | 32.83, 28.40, 27.34, 25.92, 29.27 (adding Complexity, OO, Halstead, Process) |
 
-## 19.8 Adversarial Threshold Discovery
+Every stage now reports something, and the reports agree with one another: the configuration found by the search is fragile, its two largest parameters tip within 15% of their tuned values, and the MRI is large. What they agree about is the search, not the generator. The parameters were tuned on the 300 test modules that also score them, and a 0.5-point change in accuracy, the threshold tolerance, is two of those modules. The thresholds measure how finely the tuning has fitted this test set. OO, which the generator makes pure noise, again ranks second in the sensitivity profile, and Process, which drives the generator, is switched off in the best configuration.
 
-### 19.8.1 Finding Tipping Points
-
-The adversarial threshold search (Chapters 9--10) goes beyond aggregate robustness to find *specific* parameter values where model behavior changes qualitatively. For each dimension, the framework searches in both directions (increase and decrease) from the baseline, looking for the first perturbation that changes any quality metric by more than the tolerance (0.5 in this campaign):
-
-```python
-print(f"Adversarial thresholds found: {len(report.adversarial_results)}")
-for ar in report.adversarial_results:
-    print(
-        f"  {ar.dim_name} ({ar.direction}): "
-        f"baseline={ar.base_value:.4f} -> threshold={ar.threshold_value:.4f} "
-        f"(ratio={ar.threshold_ratio:.2f}x, flips '{ar.target_flipped}')"
-    )
-```
-
-Typical output:
-
-```
-Adversarial thresholds found: 6
-  Size (increase):       baseline=1.0000 -> threshold=12.3285 (ratio=12.33x, flips 'Recall')
-  Size (decrease):       baseline=1.0000 -> threshold=0.0631  (ratio=0.06x, flips 'Accuracy')
-  Complexity (decrease): baseline=1.0000 -> threshold=0.2783  (ratio=0.28x, flips 'Recall')
-  Halstead (increase):   baseline=1.0000 -> threshold=45.7088 (ratio=45.71x, flips 'Precision')
-  Process (increase):    baseline=1.0000 -> threshold=8.5214  (ratio=8.52x, flips 'F1')
-  Process (decrease):    baseline=1.0000 -> threshold=0.1468  (ratio=0.15x, flips 'Recall')
-```
-
-### 19.8.2 Interpreting the Thresholds
-
-Each adversarial result identifies a *boundary* in the parameter space: a specific value beyond which a quality metric degrades by more than the tolerance. These boundaries define the operational envelope of the model.
-
-**Complexity has the tightest threshold.** A decrease of just 3.6x (ratio 0.28) from the baseline causes Recall to flip. This means that if the complexity distribution of incoming code shifts---as might happen during a refactoring initiative that simplifies code structure---the model's ability to detect defects could collapse. This is the most actionable finding from the adversarial analysis: the model is brittle with respect to the very feature family it depends on most.
-
-**Process has asymmetric boundaries.** Increasing Process by 8.5x flips F1, while decreasing it by 6.8x (ratio 0.15) flips Recall. This asymmetry is informative: the model is more sensitive to the *removal* of process information than to its amplification.
-
-**Size and Halstead have wide thresholds.** Size requires a 16x decrease to cause trouble; Halstead requires a 46x increase. These wide margins confirm that the model is robust with respect to these less-important dimensions.
-
-**OO has no threshold.** No adversarial threshold was found for the OO dimension in either direction. This is consistent with all previous analyses: OO features carry no signal, so perturbing them has no effect on model quality. The adversarial search confirms what subset enumeration, Pareto analysis, and sensitivity profiling all suggest.
-
-### 19.8.3 From Thresholds to Deployment Constraints
-
-The adversarial thresholds translate directly into deployment constraints. If the model is deployed in an environment where code complexity might decrease by a factor of 4 (e.g., a team adopts a "simplify everything" initiative), the Complexity threshold at 0.28x will be crossed and Recall will degrade. The response might be: monitor the complexity distribution of incoming code and trigger retraining when the distribution mean falls below 28% of the training distribution mean.
-
-This kind of *conditional deployment guidance* is impossible to derive from a scalar accuracy metric. It requires knowing not just "how good is the model?" but "under what conditions does the model fail, and on which specific quality dimension?"
-
----
-
-## 19.9 Compositional Testing
-
-### 19.9.1 The Build Sequence
-
-The compositional test (Chapter 12) constructs a greedy dimension-addition sequence, starting from a single dimension and iteratively adding the candidate that produces the largest MAE reduction:
-
-```python
-comp = report.composition_result
-print(f"Build order: {' -> '.join(comp.order_names)}")
-print()
-for i, (name, mae) in enumerate(zip(comp.order_names, comp.mae_sequence)):
-    dims_so_far = " + ".join(comp.order_names[:i + 1])
-    print(f"  Step {i + 1}: +{name} => MAE={mae:.4f} [{dims_so_far}]")
-```
-
-Typical output (starting from Size):
-
-```
-Build order: Size -> Complexity -> Process -> Halstead -> OO
-
-  Step 1: +Size       => MAE=3.9102 [Size]
-  Step 2: +Complexity => MAE=2.5539 [Size + Complexity]
-  Step 3: +Process    => MAE=1.6203 [Size + Complexity + Process]
-  Step 4: +Halstead   => MAE=1.3842 [Size + Complexity + Process + Halstead]
-  Step 5: +OO         => MAE=1.4127 [Size + Complexity + Process + Halstead + OO]
-```
-
-### 19.9.2 Interpreting the Sequence
-
-The compositional sequence reveals the *marginal contribution* of each dimension when added to an expanding context:
-
-- **Step 1 (Size alone):** MAE 3.91. Size by itself provides limited predictive power.
-- **Step 2 (+Complexity):** MAE drops to 2.55, a reduction of 1.36. Complexity is the most valuable addition to Size.
-- **Step 3 (+Process):** MAE drops to 1.62, a reduction of 0.93. Process is the most valuable addition to {Size, Complexity}.
-- **Step 4 (+Halstead):** MAE drops to 1.38, a reduction of 0.24. Halstead provides a small incremental benefit.
-- **Step 5 (+OO):** MAE *increases* to 1.41. Adding OO actively degrades performance, confirming the noise finding from sensitivity profiling.
-
-The compositional test provides information that subset enumeration alone does not: the *order* in which dimensions should be added to maximize the rate of improvement. This ordering is relevant for teams that are incrementally building their metrics infrastructure. If a team currently collects only size metrics, the compositional test says: "Add complexity metrics next, then process metrics. Do not invest in OO metrics."
-
-### 19.9.3 Comparing with Baselines
-
-The campaign also runs forward selection and backward elimination as baselines:
-
-```python
-if report.forward_results:
-    print("Forward selection:")
-    for fr in report.forward_results:
-        dims = ", ".join(fr.dim_names)
-        print(f"  k={fr.n_dims}: MAE={fr.mae:.4f} [{dims}]")
-
-if report.backward_results:
-    print("\nBackward elimination:")
-    for br in report.backward_results:
-        dims = ", ".join(br.dim_names)
-        print(f"  k={br.n_dims}: MAE={br.mae:.4f} [{dims}]")
-```
-
-Forward selection typically produces a greedy sequence similar to the compositional test but may differ in ordering because it does not re-optimize all active dimensions at each step. Backward elimination starts with all dimensions and removes the least important one at each step, providing a complementary view. When forward and backward selection agree on the ranking (as they typically do for this dataset), confidence in the structural findings increases.
+The variant therefore shows what the stages are for once they can see the parameter, and it shows the lesson of Section 19.5 a second time. A robustness analysis of a configuration chosen on its test data measures the choice. To measure the model, tune on one split and run the campaign's robustness stages on another.
 
 ---
 
@@ -552,7 +310,7 @@ report = run_campaign(
 print(report.summary())
 ```
 
-This is 20 lines of code, excluding imports. The entire geometric analysis---30 subset evaluations, Pareto frontier extraction, sensitivity profiling, 300 MRI perturbations, adversarial threshold search across 5 dimensions, compositional testing, and forward/backward baselines---is orchestrated by a single function call. The `summary()` method produces a complete text report suitable for stakeholder communication.
+The entire analysis---subset enumeration with the parameter search inside each subset, Pareto frontier extraction, sensitivity profiling, 300 MRI perturbations, threshold search across 5 dimensions, compositional testing, and forward/backward baselines---is one function call, which made 189,462 calls to the evaluation function in the recorded run. The `summary()` method produces a complete text report suitable for stakeholder communication.
 
 ### 19.10.2 Generating LaTeX Output
 
@@ -568,47 +326,38 @@ with open("defect_prediction_tables.tex", "w") as f:
 
 This produces three tables: the Pareto frontier, the sensitivity ranking, and the MRI summary, each with proper `\toprule`/`\midrule`/`\bottomrule` formatting and descriptive captions.
 
-### 19.10.3 The Actionable Insights
+### 19.10.3 What the Campaign Actually Supports
 
-Synthesizing all six analysis stages, the geometric analysis of the defect prediction model yields the following actionable conclusions:
+Read with Sections 19.5 to 19.9 in hand, the campaign supports four conclusions, and none of them is about which feature groups to use.
 
-1. **Feature group priority.** Invest in Complexity and Process metrics. These two groups together achieve MAE 2.10, capturing the majority of the model's predictive power. Size adds modest value (MAE drops to 1.62 with three groups). Halstead provides diminishing returns. OO metrics should be excluded---they inject noise and actively degrade performance.
-
-2. **Deployment envelope.** The model is brittle with respect to Complexity: a 3.6x decrease in complexity feature values triggers a Recall collapse. Monitor the complexity distribution of incoming code. If the mean cyclomatic complexity of production modules falls below 28% of the training distribution, schedule retraining.
-
-3. **Robustness budget.** The MRI of 1.43 with a P95 deviation of 3.08 indicates substantial sensitivity to parameter perturbation. The worst 5% of perturbation scenarios nearly triple the model's error. This tail risk should be factored into any SLA or reliability commitment.
-
-4. **Simplification opportunity.** A two-group model ({Complexity, Process}) achieves MAE 2.10 with only 6 features. A four-group model ({Size, Complexity, Halstead, Process}) achieves MAE 1.38 with 13 features. The choice between them is a cost-benefit decision that the Pareto frontier makes explicit: each additional feature group costs engineering effort to collect and maintain, and the MAE benefit of each addition is precisely quantified.
-
-5. **What not to do.** Do not include OO metrics. Do not report overall accuracy without decomposing it across quality dimensions. Do not assume the model is robust because it achieves 84% accuracy at the operating point---the 95th percentile perturbation scenario tells a different story.
+1. **Compute what the best possible model scores before setting targets.** Here the generator's own formula reaches an AUC of 0.545 and predicts no defects at a threshold of one half. Targets of 80% AUC, 70% precision and 65% recall cannot be met, so the MAE ranks configurations by noise.
+2. **Choose a configuration on data that do not score it.** The best configuration won on one test module, and over 20 redraws of the same generator 15 different configurations won. Report how often the winner wins across redraws, or select on a validation split and score on a test split.
+3. **Check that the parameters reach the model.** In the package's evaluation function they do not, so the robustness index and the threshold search are zero and empty by construction (Sections 19.7 and 19.8). The variant of Section 19.9 shows what the same stages report once they do.
+4. **Let the stages check each other.** The signs were there in the campaign's own output: three greedy searches that never reach the exhaustive optimum, an AUC spread within two standard errors of chance, and a robustness index of exactly zero.
 
 ---
 
 ## 19.11 Lessons Learned
 
-This case study illustrates several principles that generalize beyond defect prediction to any domain where the structural fuzzing framework is applied.
+### 19.11.1 The Campaign Did Not Recover the Ground Truth, and Could Not
 
-### 19.11.1 Geometric Analysis Recovers Ground Truth
-
-The synthetic data generator embedded a specific causal structure: Complexity and Process drive defects, Size contributes weakly, OO is noise. The geometric analysis recovered this structure precisely, without any knowledge of the generating coefficients. Subset enumeration identified the correct top groups. Sensitivity profiling ranked them in the correct order. The Pareto frontier correctly excluded OO at every complexity level. Adversarial analysis found the tightest threshold on the most important dimension.
-
-This recovery is not coincidence. It is a consequence of the framework's design: by exhaustively probing the model's response to structural variations in its input, the geometric analysis extracts the model's *functional* dependencies regardless of its internal architecture. The random forest is a black box to the framework. The framework does not inspect feature importances or tree structures. It infers importance entirely from input-output behavior---the geometric signature of the model.
+The generator says that Complexity and Process drive defects and OO is noise. The campaign put OO in its best configuration and ranked it second in importance. This is not a fault of the geometry. With 36 defective test modules and a signal whose standard deviation is less than a quarter of the noise's, no procedure that ranks configurations by their score on one test set can recover a ranking of groups. A campaign is an instrument, and an instrument has a resolution. Before reading a campaign's ranking as a finding, compare the differences it reports with the noise in the score; here the noise is about five AUC points and the differences are smaller.
 
 ### 19.11.2 Negative Results Are Results
 
-The finding that OO metrics are uninformative is as valuable as the finding that Complexity is critical. A scalar evaluation might report that adding OO features changes accuracy from 84.2% to 83.9%---a difference that most practitioners would dismiss as noise. The geometric analysis is more precise: OO increases MAE by 0.04 in sensitivity profiling, increases MAE by 0.03 when added as the fifth compositional step, and produces no adversarial thresholds. These three independent geometric signals all point in the same direction. The confidence in the negative finding is high.
+An earlier version of this chapter reported that the analysis recovered the generator's structure precisely. It did not, and the record now says so. The negative result is more useful than the invented positive one: it identifies three checks, on the targets, on the selection and on the parameters, that a reader can apply to any campaign before trusting it.
 
-### 19.11.3 Tail Risk Matters
+### 19.11.3 Zero Is Not Robustness
 
-The MRI reveals that 5% of perturbation scenarios produce catastrophic degradation. A mean-based robustness metric (e.g., mean accuracy across perturbations) would obscure this tail. The MRI's explicit inclusion of P75 and P95 terms ensures that tail risk is quantified and reported. For safety-critical applications---and defect prediction for safety-critical software is itself safety-critical---tail risk is often the *only* thing that matters.
+A robustness index of zero is the best possible score, and here it means that the evaluation function cannot see the perturbation. Every robustness statistic is a measurement of a function, and a function that ignores its argument is perfectly robust. The witness of Section 21.4, two parameter vectors that must give different scores, separates the two cases in one line.
 
-### 19.11.4 Geometry Composes
+### 19.11.4 Geometry Composes, and So Do Its Failures
 
-Each analysis stage in the campaign builds on the others. Subset enumeration identifies the best configuration. Sensitivity profiling ablates from that configuration. MRI perturbs around it. Adversarial search finds boundaries near it. Compositional testing constructs it incrementally. The stages are not independent tools applied in isolation; they are geometric operations on the same space, examining the same configuration from different angles. The convergence of their findings (Complexity is critical, OO is noise, the model is brittle on Complexity) is a form of *geometric triangulation* that provides confidence no single analysis could match.
+Each stage anchors on the best configuration: sensitivity ablates from it, the MRI perturbs around it, the threshold search moves away from it. When that configuration is a draw, every stage inherits the draw, and their agreement adds nothing. Agreement between stages is evidence only when the stages could have disagreed.
 
 ### 19.11.5 The Framework Scales
 
-The five-dimensional case study in this chapter is deliberately small, chosen for pedagogical clarity. The framework's architecture scales to higher-dimensional spaces. For $n$ dimensions with `max_subset_dims = k`, the enumeration cost is $\sum_{j=1}^{k} \binom{n}{j}$, which grows polynomially for fixed $k$. With $k = 3$ and $n = 10$, this is $10 + 45 + 120 = 175$ subsets---still feasible. For $n = 20$ or beyond, the enumeration becomes expensive and the greedy approaches (forward selection, backward elimination, compositional testing) serve as practical approximations. Chapter 17 discusses scaling strategies for high-dimensional analysis spaces in detail.
+The five-dimensional case study in this chapter is deliberately small. For $n$ dimensions with `max_subset_dims = k`, the enumeration cost is $\sum_{j=1}^{k} \binom{n}{j}$ configurations, which grows polynomially for fixed $k$. With $k = 3$ and $n = 10$ this is $10 + 45 + 120 = 175$ configurations, still feasible. For $n = 20$ or beyond, the greedy approaches (forward selection, backward elimination, compositional testing) serve as practical approximations; Chapter 17 discusses scaling strategies. What does not scale away is the resolution problem of Section 19.11.1: more dimensions make it worse, because more configurations compete for the same noisy score.
 
 ---
 
@@ -616,6 +365,6 @@ The five-dimensional case study in this chapter is deliberately small, chosen fo
 
 This chapter demonstrated the complete geometric toolchain on a single domain. The analysis followed a fixed protocol: build an evaluation function, run the campaign, interpret the results. But the protocol itself raises questions that the remaining chapters address.
 
-Chapter 20 extends the case study methodology to multi-objective scenarios where the targets themselves conflict---where improving Recall necessarily degrades Precision, and the Pareto frontier is not a convenience but a fundamental representation of the tradeoff space. The techniques from Chapter 8 (Pareto optimization) combine with the sensitivity and adversarial methods from this chapter to produce a richer, more nuanced portrait of model behavior in the presence of genuinely competing objectives.
+Chapter 20 carries the same campaign to a different domain and a different kind of model: a decoder of sperm whale codas built from the SPD, topological and hyperbolic methods of Part I, and validated with the robustness and probing tools of Part II.
 
-The defect prediction example showed what geometry reveals when applied to a single model in a single domain. The next chapter shows what geometry reveals when the objectives themselves form a geometric structure---when the space of *goals* is as rich and multi-dimensional as the space of *inputs*.
+The defect prediction example showed what geometry reveals when applied to a single model in a single domain. The next chapter shows what the same tools reveal when the features themselves are geometric objects.

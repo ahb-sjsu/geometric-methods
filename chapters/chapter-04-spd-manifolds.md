@@ -4,7 +4,7 @@
 
 ---
 
-In the preceding chapters, we established the vocabulary of manifolds, tangent spaces, and geodesics. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example --- covariance analysis of cetacean vocalizations --- illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.
+Chapter 3 worked on one curved space, the Poincaré ball. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example --- covariance analysis of cetacean vocalizations --- illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.
 
 ## 4.1 The Manifold of Positive Definite Matrices
 
@@ -126,7 +126,7 @@ The Frobenius distance is $\|S_1 - S_2\|_F = \sqrt{(0.01 - 100)^2} = 99.99$. Now
 
 $$S_3 = \begin{pmatrix} 1 & 0 \\ 0 & 10000 \end{pmatrix}.$$
 
-The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though both pairs differ by a factor of $10{,}000$ in one eigenvalue.
+The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though the second pair differs by the smaller multiplicative factor in that eigenvalue ($100$ against $10{,}000$).
 
 The log-Euclidean distances tell a different story. We have $\log(\lambda)$ values of $\log(0.01) \approx -4.6$, $\log(100) \approx 4.6$, and $\log(10000) \approx 9.2$. So $d_{LE}(S_1, S_2) \approx |{-4.6} - 4.6| = 9.2$ and $d_{LE}(S_2, S_3) \approx |4.6 - 9.2| = 4.6$. The log-Euclidean metric correctly reports that the multiplicative change from $S_2$ to $S_3$ (a factor of 100) is smaller than the change from $S_1$ to $S_2$ (a factor of 10,000). This scale-sensitivity is essential when eigenvalues span many orders of magnitude, as they do in covariance matrices from real-world signals.
 
@@ -400,7 +400,7 @@ The main parameters governing the covariance extraction are:
 
 - **$\epsilon$ (regularization)**: Must be large enough to prevent numerical issues in the eigendecomposition but small enough not to dominate the covariance structure. The default $\epsilon = 10^{-4}$ is appropriate when spectrogram values are in the range $[0, 1]$ or $[-1, 1]$. For log-scaled spectrograms with values in $[-10, 0]$, covariance entries are on the order of $1$ to $10$, so $10^{-4}$ is safely negligible.
 
-- **Window and hop sizes** (for trajectory analysis): The window must be large enough to estimate a reliable covariance matrix ($\geq 3 \cdot n_\text{bands}$ frames, as above) and small enough to capture temporal variation. The hop size controls temporal resolution versus computational cost.
+- **Window and hop sizes** (for trajectory analysis): The window must be large enough to estimate a reliable covariance matrix ($\geq 3 \cdot n_\text{bands}$ frames, as above) and small enough to capture temporal variation. The hop size controls temporal resolution versus computational cost. The default `window_frames=32` in `compute_spectral_trajectory` is below this rule for 16 bands (48 frames); the regularization term keeps each window's matrix positive definite, but its estimates are noisy, so pass `window_frames=48` or more when the trajectory's fine structure matters.
 
 ## 4.7 Connections and Extensions
 
@@ -410,11 +410,11 @@ The log-Euclidean metric is one of several Riemannian metrics on SPD(n). The mos
 
 - **Affine-invariant metric**: $d_{AI}(S_1, S_2) = \|\log(S_1^{-1/2} S_2 S_1^{-1/2})\|_F$. This is invariant under congruence transformations $S \mapsto A S A^\top$ and is the "natural" Riemannian metric on SPD(n). However, computing the Frechet mean requires iterative optimization, making it more expensive.
 
-- **Bures-Wasserstein metric**: Related to optimal transport between Gaussian distributions. The distance $d_{BW}(S_1, S_2) = \text{tr}(S_1) + \text{tr}(S_2) - 2\text{tr}(S_1^{1/2} S_2 S_1^{1/2})^{1/2}$ arises in quantum information theory and has connections to the Wasserstein-2 distance.
+- **Bures-Wasserstein metric**: Related to optimal transport between Gaussian distributions. The squared distance $d_{BW}^2(S_1, S_2) = \text{tr}(S_1) + \text{tr}(S_2) - 2\text{tr}(S_1^{1/2} S_2 S_1^{1/2})^{1/2}$ arises in quantum information theory and has connections to the Wasserstein-2 distance.
 
 - **Power-Euclidean metrics**: $d_\alpha(S_1, S_2) = \frac{1}{\alpha}\|S_1^\alpha - S_2^\alpha\|_F$ for $\alpha \in (0, 1]$. The log-Euclidean metric is the limit as $\alpha \to 0$.
 
-The log-Euclidean metric is preferred in computational settings for three reasons: (1) the Frechet mean is closed-form, (2) the log map provides a global diffeomorphism to a vector space where standard algorithms apply, and (3) it is computationally no more expensive than Frobenius distance (one eigendecomposition per matrix).
+The log-Euclidean metric is preferred in computational settings for three reasons: (1) the Frechet mean is closed-form, (2) the log map provides a global diffeomorphism to a vector space where standard algorithms apply, and (3) its cost is one eigendecomposition per matrix, after which every distance is a Frobenius distance between stored logarithms.
 
 ### Diffusion Tensor Imaging
 
@@ -450,6 +450,6 @@ The log-Euclidean framework for SPD matrices was introduced by Arsigny, Fillard,
 
 For covariance descriptors in computer vision, see Tuzel, Porikli, and Meer, "Region covariance: A fast descriptor for detection and classification," *ECCV* 2006. The application to brain-computer interfaces is surveyed in Barachant, Bonnet, Congedo, and Jutten, "Riemannian geometry applied to BCI classification," *LVA/ICA* 2010.
 
-The discovery of vowel-like spectral structure in sperm whale clicks is reported in Begus, Leban, Silov, Gero, and Sprague, "Vowels and diphthongs in sperm whale vocalization," *Open Mind* 9, 2025. The SPD manifold analysis of cetacean codas using the methods described in this chapter is implemented in the `eris-ketos` package (Bond, 2026).
+The discovery of vowel-like spectral structure in sperm whale clicks is reported in Begus, Leban, Silov, Gero, and Sprague, "Vowel- and diphthong-like spectral patterns in sperm whale codas," *Open Mind* 9, 2025. The SPD manifold analysis of cetacean codas using the methods described in this chapter is implemented in the `eris-ketos` package (Bond, 2026).
 
 The connection between SPD geometry and information geometry is developed in Amari, *Information Geometry and Its Applications*, Springer, 2016. For optimal transport on SPD matrices, see Bhatia, Jain, and Lim, "On the Bures-Wasserstein distance between positive definite matrices," *Expositiones Mathematicae* 37(2), 2019.

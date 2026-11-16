@@ -1,0 +1,73 @@
+grid head: [0.01 0.0162 0.0264 0.0428 0.0695]
+grid tail: [14.4 23.4 37.9 61.6 100]
+step n=20: 1.6238   step n=50: 1.2068
+PASS  grid step for n = 20 rounds to 1.62
+PASS  grid step for n = 50 rounds to 1.21
+offer  0%: distance 0.9462  penalty 0.0  weight 0.9462
+offer 10%: distance 0.5379  penalty 0.0  weight 0.5379
+offer 20%: distance 0.4175  penalty 0.0  weight 0.4175
+offer 30%: distance 0.7418  penalty 0.0  weight 0.7418
+offer 40%: distance 1.1904  penalty 0.0  weight 1.1904
+offer 50%: distance 1.6658  penalty 0.0  weight 1.6658
+least-cost offer as printed: 20%
+PASS  ch6: exploitation penalty fires on no offer (money never rises)
+PASS  ch6: least-cost offer under the printed code is 20%
+least-cost offer with +5 on the 0% offer: 20%
+PASS  ch6: still 20% if the 0% offer is penalised by 5
+PASS  ch9: E[omega] = (s^2/2) tr(H)
+PASS  ch9: E[omega^2] = (s^4/4)(tr(H)^2 + 2 tr(H^2))
+PASS  ch9: E[omega^2] is NOT (s^2/2) tr(H)
+omega ornamentation 0.5435, rhythm alone 0.7174
+PASS  ch10: ornamentation change gives 0.54
+PASS  ch10: rhythm change alone gives 0.72, not 0.93
+PASS  ch13: s r s = r^-1
+PASS  ch13: s r   = transpose matrix [0 1; 1 0]
+PASS  ch13: s r^2 = flip across the horizontal axis [1 0; 0 -1]
+PASS  ch13: s r^3 = anti-transpose [0 -1; -1 0]
+PASS  ch13: fixed-cell orbit counts, n = 3 (r 3, r2 5, axis 6, diag 6)
+PASS  ch13: fixed-cell orbit counts, n = 4 (r 4, r2 8, axis 8, diag 10)
+PASS  ch13: fixed-cell orbit counts, n = 5 (r 7, r2 13, axis 15, diag 15)
+3x3: 125512750 classes; at most 0.41% of grids have a nontrivial stabiliser
+PASS  ch13: 3x3 class count is an integer
+PASS  ch13: under 0.5% of 3x3 grids have a nontrivial stabiliser
+ch19 arm A: recorded MRI 0.000000, recomputed 0.000000
+PASS  ch19 arm A: MRI recomputes from its deviations
+ch19 arm B: recorded MRI 2.056380, recomputed 2.056380
+PASS  ch19 arm B: MRI recomputes from its deviations
+PASS  C.1: kernel of (a,b,0) has dimension 2
+PASS  C.1: (b,-a,1) is in the kernel of (a,b,0)
+PASS  C.1: every kernel vector of e_1 has first entry 0
+PASS  ch3: k = lambda x / (lambda - 1)
+PASS  ch3: gamma(k) = lambda - 1
+PASS  ch3: tanh(artanh(s)/2) = s/(1+sqrt(1-s^2)) on (0,1)
+ch3: Einstein midpoint 0.6268, naive gamma-weighted 0.7563, geodesic midpoint 0.6268
+PASS  ch3: Einstein midpoint of (0.9,0) and 0 is at radius 0.627
+PASS  ch3: naive formula gives 0.756
+ch3: worst midpoint error over 600 random pairs: 2.84e-14
+PASS  ch3: two-point Einstein midpoint is the geodesic midpoint (c = 0.5, 1, 2)
+PASS  ch3: midpoint of 200 random weighted clouds lies in the ball
+PASS  C.3.1: |(-x)+y|^2 (1 - 2c<x,y> + c^2|x|^2|y|^2) = |x-y|^2
+PASS  C.3.1: regrouping of the denominator
+PASS  C.3.1: 2 artanh(sqrt(t/(1+t))) = arccosh(1+2t) for t in (0, 50]
+ch18: hypervolume worst error 2.84e-14 over 500 sets; previous version wrong on 500 of 500
+PASS  ch18: corrected hypervolume equals the exact area
+PASS  ch18: previously printed hypervolume is wrong on most sets
+ch19: AUC standard error 0.0523; 43.07% is 1.32 SE below chance, 58.51% is 1.63 SE above
+PASS  ch19: AUC standard error rounds to 0.05
+PASS  ch19: AUC range lies within two standard errors of 0.5
+PASS  ch19: MAE floor with zero precision, recall and F1 is 40.4
+PASS  ch12: Phi_ij = r_ij (positive = overlap)
+PASS  ch12: G_j(S) - G_j(empty) = -sum_{k in S} Phi_jk
+PASS  ch12: G_j(S) - Delta_j = sum_{k not in S, k ~= j} Phi_jk
+PASS  ch12: two copies of one signal give Phi = +1
+PASS  ch12: two halves of an exclusive-or give Phi = -1
+ch7: lambda at the printed coefficients: 2.2217 (magnitude 1), 2.2217 (magnitude 7.5)
+ch7: secondary loss coefficients x 0.00 -> lambda 0.8819
+ch7: secondary loss coefficients x 0.25 -> lambda 0.9896
+ch7: secondary loss coefficients x 0.50 -> lambda 1.3189
+ch7: secondary loss coefficients x 1.00 -> lambda 2.2217
+ch7: secondary loss coefficients x 2.00 -> lambda 4.2466
+PASS  ch7: lambda at printed coefficients rounds to 2.22
+PASS  ch7: lambda does not depend on the magnitude
+PASS  ch7: with no secondary loss displacement lambda is below 1.1
+TALLY: 47 PASS, 0 FAIL

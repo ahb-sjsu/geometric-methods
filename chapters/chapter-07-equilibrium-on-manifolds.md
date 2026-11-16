@@ -80,7 +80,7 @@ def ultimatum_game(
 
 The resolution is structural. Each possible offer is not a scalar payoff but a point in $\mathbb{R}^9$. Offering \$0 keeps the full \$10 on the consequences dimension ($d_1$), but it pushes fairness ($d_3$) down to 0.1, identity ($d_7$) down to 0.3, and social impact ($d_6$) to $-0.2$. Offering \$5 sacrifices half the monetary value but achieves fairness of 0.9, identity of 0.8, and social impact of 0.4. The Mahalanobis distance from the starting state to the low-offer vertex is *larger* than the distance to the equal-split vertex, because the low offer activates large displacements across multiple non-monetary dimensions. The exploitation boundary penalty ($\beta = 5.0$) adds a further discrete cost when fairness drops sharply while consequences improve---precisely the condition that characterizes exploitative offers.
 
-The Bond Geodesic---the minimum-cost path through this decision complex---leads to offers in the 40--50% range. This is not because the model has been calibrated to reproduce the experimental data. It is because the geometry of a 9-dimensional decision space, with a Mahalanobis metric that weights fairness, identity, and social impact alongside monetary consequences, naturally produces this outcome. The equal-split offer is *closer* to the starting state on the manifold than the greedy offer, despite being farther away on the scalar monetary axis.
+The Bond Geodesic---the minimum-cost path through this decision complex---leads to a positive offer. With the default covariance of Chapter 6 the least-cost offer is 20% (Section 6.6.1). The zero offer that the Nash analysis predicts costs more than twice as much, because of what it does to fairness, identity, and social impact. The offers observed in experiments are higher, 40--50%. The model gets the direction right without calibration; matching the level requires a covariance fitted to data, which remains open.
 
 This is the pattern that Section 1.1.2 identified and that this chapter now formalizes: a scalar metric declares one configuration optimal; the geometry reveals a different optimum because it accounts for dimensions the scalar projection discarded.
 
@@ -293,9 +293,9 @@ Non-convergence (hitting the 100-iteration limit) is diagnostic: it typically in
 
 The existence of mixed BGE follows from a reduction argument to finite Nash equilibrium. Given a finite graph with finitely many paths, the set of mixed strategies (probability distributions over paths) forms a compact convex set. The best-response correspondence inherits the upper hemicontinuity and convex-valuedness properties required by Kakutani's fixed-point theorem. Therefore:
 
-**Theorem 7.2 (Existence of Mixed BGE).** Every finite game on Economic Decision Complexes admits at least one mixed Bond Geodesic Equilibrium.
+**Theorem 7.1 (Existence of Mixed BGE).** Every finite game on Economic Decision Complexes admits at least one mixed Bond Geodesic Equilibrium.
 
-The proof is constructive: enumerate all paths for each agent, construct the augmented finite game where each path is a pure strategy, and apply Nash's existence theorem to the augmented game. The BGE of the original game corresponds to the Nash equilibrium of the augmented game. This reduction preserves the full multi-dimensional cost structure---the payoff of a path in the augmented game is its total Mahalanobis-plus-boundary cost, not a scalar projection.
+The proof is a reduction: enumerate all paths for each agent, construct the augmented finite game where each path is a pure strategy, and apply Nash's existence theorem to the augmented game. Nash's theorem rests on a fixed-point theorem, so the argument shows that an equilibrium exists without saying how to find one. The BGE of the original game corresponds to the Nash equilibrium of the augmented game. This reduction preserves the full multi-dimensional cost structure---the payoff of a path in the augmented game is its total Mahalanobis-plus-boundary cost, not a scalar projection.
 
 ---
 
@@ -303,17 +303,17 @@ The proof is constructive: enumerate all paths for each agent, construct the aug
 
 The most important theoretical property of BGE is that it generalizes Nash equilibrium rather than replacing it. This is not merely an aesthetic desideratum---it means that the entire apparatus of classical game theory remains available as a special case.
 
-**Theorem 7.1 (Reduction to Nash).** Let $(p_1^*, p_2^*, \ldots, p_n^*)$ be a Bond Geodesic Equilibrium on decision complexes $\{\mathcal{E}_i\}$. If the precision matrix $\Sigma^{-1}$ assigns zero weight to all dimensions except $d_1$ (consequences), i.e.,
+**Theorem 7.2 (Reduction to Nash).** Let $(p_1^*, p_2^*, \ldots, p_n^*)$ be a Bond Geodesic Equilibrium on decision complexes $\{\mathcal{E}_i\}$. If the precision matrix $\Sigma^{-1}$ weights only $d_1$ (consequences), in the limit
 
-$$(\Sigma^{-1})_{jj} = 0 \quad \forall j \neq 0$$
+$$(\Sigma^{-1})_{jk} \to 0 \quad \text{whenever } j \neq 1 \text{ or } k \neq 1,$$
 
-then the path costs reduce to monetary costs, and the BGE corresponds to a Nash equilibrium of the game with payoff functions $u_i(\sigma) = -\text{cost}_{d_1}(p_i)$.
+and no boundary penalty is active, then the path costs reduce to monetary costs, and the BGE corresponds to a Nash equilibrium of the game with payoff functions $u_i(\sigma) = -\text{cost}_{d_1}(p_i)$.
 
 *Proof sketch.* When only $d_1$ is active, the Mahalanobis distance between two states reduces to the scalar difference in the consequences dimension, scaled by $(\Sigma^{-1})_{00}$:
 
 $$d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top \Sigma^{-1} (\mathbf{a} - \mathbf{b})} = \sqrt{(\Sigma^{-1})_{00}} \cdot |a_0 - b_0|$$
 
-All boundary penalties that depend on non-monetary dimensions ($d_2$ through $d_9$) become inactive, because the transitions along those dimensions have zero weight. The path cost reduces to the sum of scaled monetary differences along the path, which is proportional to the total monetary change from start to goal. Minimizing path cost is therefore equivalent to minimizing monetary cost, which is equivalent to maximizing monetary payoff. The fixed-point condition of the BGE becomes: no agent can increase their monetary payoff by unilaterally changing their strategy---which is precisely the Nash equilibrium condition. $\square$
+Boundary penalties are excluded by hypothesis. They are computed from raw changes of state and do not depend on $\Sigma^{-1}$, so a vanishing precision alone would not remove them. The path cost reduces to the sum of scaled monetary differences along the path, which is proportional to the total monetary change from start to goal. Minimizing path cost is therefore equivalent to minimizing monetary cost, which is equivalent to maximizing monetary payoff. The fixed-point condition of the BGE becomes: no agent can increase their monetary payoff by unilaterally changing their strategy---which is precisely the Nash equilibrium condition. $\square$
 
 The implementation provides a `nash_projection` function that performs this reduction on a computed BGE:
 
@@ -321,7 +321,7 @@ The implementation provides a `nash_projection` function that performs this redu
 def nash_projection(bge_result: BGEResult) -> Dict[str, float]:
     """Project BGE to Nash-like monetary costs (d_1 only).
 
-    Demonstrates Theorem 7.1: BGE reduces to Nash when only
+    Demonstrates Theorem 7.2: BGE reduces to Nash when only
     the consequences dimension is active.
     """
     return {aid: path.total_cost for aid, path in bge_result.agent_paths.items()}
@@ -421,7 +421,7 @@ def compute_loss_aversion(sigma: np.ndarray, magnitude: float = 1.0) -> float:
     return loss_aversion_ratio(gain, loss, reference, sigma_inv)
 ```
 
-The key insight is structural: gains traverse roughly 1--2 dimensions (consequences and a small social impact), while losses traverse 5 dimensions (consequences, rights, fairness, social impact, and identity). Even if each additional dimension contributes a modest displacement, the Mahalanobis distance formula---which computes the square root of a sum of squared terms, each weighted by the precision matrix---ensures that activating more dimensions increases the total distance. The ratio $\lambda$ falls in the range $2.0$--$2.5$ for reasonable covariance structures, matching the empirical estimates without any explicit "loss aversion parameter" in the model.
+The key insight is structural: gains traverse roughly 1--2 dimensions (consequences and a small social impact), while losses traverse 5 dimensions (consequences, rights, fairness, social impact, and identity). Even if each additional dimension contributes a modest displacement, the Mahalanobis distance formula---which computes the square root of a sum of squared terms, each weighted by the precision matrix---ensures that activating more dimensions increases the total distance. With the default covariance of Section 6.6.1 the ratio is $\lambda = 2.22$, within the empirical range of $2.0$--$2.5$, and it does not depend on the size of the loss, because every displacement scales with it.
 
 The underlying `loss_aversion_ratio` function in the metrics module makes the geometric nature transparent:
 
@@ -439,7 +439,13 @@ def loss_aversion_ratio(gain_state, loss_state, reference, sigma_inv) -> float:
     return d_loss / d_gain
 ```
 
-There is nothing in this computation that imposes loss aversion. It is a *consequence* of the geometry: losses are farther from the reference point than gains in a multi-dimensional space because they activate more dimensions.
+The model has no parameter named loss aversion, but the value of $\lambda$ is not free of assumptions. It is set by the coefficients that say how far a loss moves the non-monetary dimensions: $0.15$ for rights and $0.1$ for fairness, social impact and identity, against $0.05$ on social impact for a gain. These are chosen by hand. Scaling all four loss coefficients by a common factor gives:
+
+| Scale of the loss coefficients | $0$ | $0.25$ | $0.5$ | $1$ | $2$ |
+|---|:---:|:---:|:---:|:---:|:---:|
+| $\lambda$ | $0.88$ | $0.99$ | $1.32$ | $2.22$ | $4.25$ |
+
+With no non-monetary displacement a loss is slightly *less* costly than a gain, because the gain's small social term is the only one present. The geometry supplies the mechanism: a loss that moves more dimensions is farther away. The size of the effect comes from the displacement coefficients, and the empirical value is reproduced by choosing them. The table is computed in `formal/matlab/volume_checks.m`. Measuring those displacements, for example from how people rate losses and gains on each dimension, would turn this from a construction into a test.
 
 ### 7.7.2 The Endowment Effect
 
@@ -497,15 +503,15 @@ Section 7.7.1 showed that loss aversion emerges from the asymmetry between the d
 
 ### 7.8.1 The Dimensional Multiplier
 
-Consider three scenarios involving a loss of equal monetary magnitude ($M$):
+Consider three scenarios involving a loss of equal monetary magnitude ($M$). The values of $\lambda$ quoted for them are illustrations of the direction of the effect, not computations: the chapter does not specify the displacement vectors, and by the table in Section 7.7.1 the value depends on them.
 
 **Scenario 1: Pure cash loss.** You discover that a \$20 bill fell out of your pocket. The loss is purely monetary---no one took it from you (no rights violation), no one cheated you (no fairness injury), your identity is unaffected. The displacement vector is approximately $\Delta = (-M, 0, 0, 0, 0, 0, 0, 0, 0)$, activating only $d_1$. The loss aversion ratio:
 
-$$\lambda_{\text{cash}} = \frac{d_M(\text{ref}, \text{ref} + \Delta_{\text{loss}})}{d_M(\text{ref}, \text{ref} + \Delta_{\text{gain}})} \approx 1.0\text{--}1.2$$
+$$\lambda_{\text{cash}} = \frac{d_M(\text{ref}, \text{ref} + \Delta_{\text{loss}})}{d_M(\text{ref}, \text{ref} + \Delta_{\text{gain}})} \approx 1$$
 
 The loss is barely more painful than the gain is pleasant, because only one dimension is traversed.
 
-**Scenario 2: Gift from a friend.** A friend gave you a \$20 book that you then lose. Now the loss activates social impact ($d_6$: the friend's gift carried social meaning) and identity ($d_7$: it was "a gift from Sarah, part of my collection"). The displacement activates four dimensions. The loss aversion ratio:
+**Scenario 2: Gift from a friend.** A friend gave you a \$20 book that you then lose. Now the loss activates social impact ($d_6$: the friend's gift carried social meaning) and identity ($d_7$: it was "a gift from Sarah, part of my collection"). The displacement activates three dimensions: money, social impact and identity. The loss aversion ratio:
 
 $$\lambda_{\text{gift}} \approx 2.0$$
 
@@ -543,7 +549,7 @@ Concretely:
 
 The BGE computation depends critically on the covariance matrix $\Sigma$, which determines the Mahalanobis metric and therefore the relative importance of each dimension and the coupling between dimensions. The `eris-econ` framework provides a default covariance matrix (`_default_sigma()` in `games.py`) with an empirically motivated structure. The key design choice is the asymmetry between monetary and moral dimensions: the consequences dimension has variance 25.0, meaning that a unit change in monetary value is relatively low-cost in Mahalanobis terms---money varies on a large scale, so each dollar matters less. The moral dimensions ($d_2$ through $d_9$) each have variance 0.25, meaning that small changes in fairness, identity, or rights are high-cost---these dimensions vary on a small scale, so each increment matters more.
 
-The off-diagonal entries encode dimensional couplings well-documented in the behavioral economics literature: consequences-fairness ($\rho = 0.5$, because fair outcomes tend to be mutually beneficial), rights-legitimacy ($\rho = 0.15$, because rights violations undermine institutional trust), identity-social impact ($\rho = 0.1$, because self-image and social reputation covary), and trust-epistemic ($\rho = 0.1$, because low-trust environments produce poor information).
+The off-diagonal entries encode dimensional couplings well-documented in the behavioral economics literature: consequences-fairness (covariance $0.5$, because fair outcomes tend to be mutually beneficial), rights-legitimacy (covariance $0.15$, because rights violations undermine institutional trust), identity-social impact (covariance $0.1$, because self-image and social reputation covary), and trust-epistemic (covariance $0.1$, because low-trust environments produce poor information).
 
 These couplings mean that the Mahalanobis distance is not a simple weighted Euclidean distance. Cross-dimensional terms contribute to the metric, capturing the fact that a simultaneous change in rights *and* legitimacy is not the same as the sum of independent changes in each. The joint displacement may be more or less costly than the sum of marginal displacements, depending on the sign of the correlation. This is not a parametric assumption imposed to generate behavioral phenomena; it is an empirical observation about the *scales* at which economic dimensions naturally vary. The precision matrix $\Sigma^{-1}$ inverts these scales, and the behavioral properties documented in Sections 7.7--7.8 emerge as consequences of that inversion.
 
@@ -555,7 +561,7 @@ This chapter developed the Bond Geodesic Equilibrium as a multi-dimensional gene
 
 1. **BGE is a fixed-point condition on paths**, not payoffs. Each agent minimizes total path cost through their decision complex, where cost integrates all nine dimensions via the Mahalanobis metric plus boundary penalties. The iterated best response algorithm in `compute_bge()` finds this fixed point by cycling through agents, updating each agent's complex based on others' strategies, and re-running A* (Chapter 6) until convergence.
 
-2. **BGE reduces to Nash** when all non-monetary dimensions are deactivated (Theorem 7.1). This validates BGE as a proper generalization: classical results are a special case, not a competing framework.
+2. **BGE reduces to Nash** when all non-monetary dimensions are deactivated (Theorem 7.2). This validates BGE as a proper generalization: classical results are a special case, not a competing framework.
 
 3. **Convergence** is promoted by metric smoothness (Lipschitz contraction of the best-response mapping) and boundary penalty discreteness (attractor regions that partition the strategy space). Mixed BGE existence follows from reduction to finite Nash equilibrium on the augmented game (Theorem 7.2).
 
@@ -565,6 +571,6 @@ This chapter developed the Bond Geodesic Equilibrium as a multi-dimensional gene
 
 6. **Dimensional loss aversion** provides a unified explanation for why loss aversion varies by context: $\lambda$ is determined by the number and weight of dimensions activated by the loss. Pure cash losses produce $\lambda \approx 1.2$; sentimental goods produce $\lambda \approx 3.0$; the variation is continuous, predictable, and measurable.
 
-7. **The ultimatum game** (Chapter 1) is resolved naturally: the BGE predicts 40--50% offers because the manifold distance to a fair split is shorter than the distance to a greedy offer, once fairness, identity, and social dimensions are accounted for.
+7. **The ultimatum game** (Chapter 1) is resolved naturally: the BGE predicts a positive offer, 20% under the default covariance against the 40--50% observed, because the manifold distance to a zero offer is more than twice the distance to a moderate one once fairness, identity, and social dimensions are accounted for.
 
 Chapter 8 turns from equilibrium to optimization: given a model with multiple dimensions, how do we find the Pareto frontier of configurations that optimally trade off accuracy against complexity? Where this chapter used the manifold structure of the decision space to generalize equilibrium, Chapter 8 applies multi-objective optimization across varying numbers of active dimensions---a different algorithmic problem, but one that shares the same foundational commitment to treating multi-dimensional structure as the primary object of analysis rather than collapsing it to a scalar.
