@@ -1,0 +1,177 @@
+# Chapter 22: The Read Metric
+
+> *"The fundamental problem of communication is that of reproducing at one point either exactly or approximately a message selected at another point."*
+> --- Claude Shannon, *A Mathematical Theory of Communication* (1948)
+
+Chapter 2 measured distance with a matrix that was either set by hand or fitted to choices. This chapter gives a third source for that matrix. When the data are going to be used by a known procedure, the procedure itself determines which displacements matter, and the matrix can be computed from it or estimated by querying it. The procedure is called the **consumer** and the matrix its **read metric**. The method comes from Volume 14 of this series, *Geometric Observation*, where the theory is developed and where the status of each theorem is kept in a ledger. This chapter states the parts that work as a tool, with their conditions, and records one run.
+
+The chapter has four steps. Compute the metric from the consumer. Estimate it when the consumer can only be queried. Spend a description budget against it. Know when one averaged matrix is the wrong object.
+
+---
+
+## 22.1 A Distance Defined by What Is Done With the Data
+
+Let $x \in \mathbb{R}^p$ be a data point and let a consumer map it to an output $c(x) \in \mathbb{R}^k$. The consumer may be a classifier's logits, a retrieval score, a control law, or a physical measurement. Let the output space carry its own metric, a symmetric positive semidefinite matrix $G$, so that two outputs $u$ and $u'$ differ by $(u-u')^{\mathsf T} G (u-u')$. Write $g = G^{1/2} c$ for the weighted map. The loss the consumer suffers when it is given $\hat{x}$ in place of $x$ is
+
+$$\ell(x, \hat{x}) = \lVert g(\hat{x}) - g(x) \rVert^2 .$$
+
+If $g$ is differentiable with Jacobian $J_g(x)$, then for a small displacement $\delta = \hat{x} - x$,
+
+$$\ell(x, x+\delta) = \delta^{\mathsf T} P(x)\, \delta + O(\lVert\delta\rVert^3), \qquad P(x) = J_g(x)^{\mathsf T} J_g(x) = J_c(x)^{\mathsf T} G\, J_c(x).$$
+
+The matrix $P(x)$ is the **read metric** of the consumer at $x$. It is the pullback of the output metric through the consumer, the same construction as the Fisher information metric of a statistical model, with the consumer in place of the model. Three properties follow from the definition and need no measurement.
+
+1. $P(x)$ is symmetric and positive semidefinite, with rank at most $k$.
+2. Its kernel is the kernel of $J_g(x)$. A displacement in the kernel does not change the output to first order. These are the directions the consumer does not read.
+3. A linear consumer $c(x) = Cx$ has the constant read metric $C^{\mathsf T} G C$, and the expansion is then exact.
+
+**Mahalanobis distance as a special case.** Take the consumer to be the whitening map $c(x) = \Sigma^{-1/2}(x - \mu)$ with $G = I$. Its read metric is $\Sigma^{-1}$, and $\ell$ is the squared Mahalanobis distance of Chapter 2. The inverse covariance is the read metric of a consumer that standardizes its input. Any other consumer gives a different matrix, which in general has a kernel, and the Mahalanobis matrix has none.
+
+For an error that is random with mean zero and covariance $\Delta$, independent of $x$, the expected loss to second order is
+
+$$\mathbb{E}\,\ell \approx \operatorname{tr}(Q \Delta), \qquad Q = \mathbb{E}\, P(X).$$
+
+The scalar $\operatorname{tr}(Q\Delta)$ replaces the reconstruction error $\operatorname{tr}(\Delta)$, which is the same expression with $Q = I$. Section 22.5 states when replacing $P(x)$ by its average $Q$ loses something.
+
+---
+
+## 22.2 Computing the Metric When the Consumer Can Only Be Queried
+
+When the consumer is available as code with automatic differentiation, $P(x)$ costs one Jacobian. When it is a black box, central differences recover the Jacobian column by column:
+
+$$J_g(x)\, e_j \approx \frac{g(x + h e_j) - g(x - h e_j)}{2h}, \qquad j = 1, \dots, p .$$
+
+This costs $2p$ queries for each probe point, and the error of each column is of order $h^2$ times a bound on the third derivative. Averaging $P$ over $m$ probe points drawn from the data gives an estimate $\hat{Q}$ at a cost of $2pm$ queries.
+
+```python
+import numpy as np
+
+def probe_metric(consumer, x, h=1e-4):
+    """Average read metric over the rows of x, from 2p queries per row.
+
+    consumer maps an (n, p) array to an (n, k) array of weighted outputs.
+    """
+    n, p = x.shape
+    cols = []
+    for j in range(p):
+        e = np.zeros(p)
+        e[j] = h
+        cols.append((consumer(x + e) - consumer(x - e)) / (2 * h))
+    jac = np.stack(cols, axis=2)                      # (n, k, p)
+    return np.einsum("nki,nkj->ij", jac, jac) / n     # (p, p)
+```
+
+**How many probe points.** The estimate is an average of independent positive semidefinite matrices, so a matrix concentration bound applies. The learn-then-serve note of Volume 14 states one. If every $P(x)$ satisfies $P(x) \preceq \nu_+ Q$ and the lower spread is bounded by $\nu_-$ in the same relative sense, then with probability at least $1 - \delta$
+
+$$(1 - \varepsilon_-)\, Q \preceq \hat{Q} \preceq (1 + \varepsilon_+)\, Q, \qquad \varepsilon_\pm = \sqrt{\frac{2 \nu_+ \nu_- L}{m}} + \frac{2 \nu_\pm L}{3m}, \qquad L = \ln\frac{2p}{\delta}.$$
+
+The error falls as $1/\sqrt{m}$ and grows only with the logarithm of the dimension. The constant $\nu_+$ measures how far the local metric can exceed its average, and a consumer whose sensitivity is concentrated on rare inputs needs many more probe points. In the ledger of Volume 14 this bound belongs to a row classed exploratory: it has a written proof and independent audits, and no sealed numerical test. Use it to choose $m$, and check the estimate against a held-out set of probe points.
+
+**Two limits of the method.** Probing with small steps recovers the local metric. It says nothing about displacements large enough to leave the region where the expansion holds. And the bound above controls $\hat{Q}$ on the range of $Q$. Whether a direction is unread, or only weakly read, cannot be settled by a finite number of probes. A direction that $\hat{Q}$ assigns no weight receives no protection in the next section, so an error there is not a small one.
+
+---
+
+## 22.3 Spending a Budget Against the Metric
+
+Suppose the data are Gaussian with covariance $\Sigma \succ 0$ and are to be described at a limited rate, by quantization, a low-rank code, or a noisy channel. A description is summarized by its error covariance $\Delta$, with $0 \preceq \Delta \preceq \Sigma$. A Gaussian description with that error costs the rate
+
+$$r(\Delta) = \tfrac12 \log\det \Sigma - \tfrac12 \log\det \Delta$$
+
+in nats per vector. The allocation problem is to find the error covariance with the least rate whose weighted error meets a target $D$:
+
+$$\max_{\Delta}\ \log\det \Delta \qquad \text{subject to} \qquad 0 \preceq \Delta \preceq \Sigma, \quad \operatorname{tr}(Q\Delta) \le D .$$
+
+The solution is reverse water-filling in the basis that whitens the source. Let $\gamma_1, \dots, \gamma_p \ge 0$ be the eigenvalues of $A = \Sigma^{1/2} Q\, \Sigma^{1/2}$ with eigenvectors $v_1, \dots, v_p$. Then
+
+$$\Delta^\star = \Sigma^{1/2} \Bigl( \sum_{i} \min\bigl(1, \theta / \gamma_i\bigr)\, v_i v_i^{\mathsf T} \Bigr) \Sigma^{1/2}, \qquad \sum_i \min(\gamma_i, \theta) = D, \qquad r(\Delta^\star) = \frac12 \sum_i \Bigl[ \log \frac{\gamma_i}{\theta} \Bigr]_+ .$$
+
+The number $\theta$ is the water level. A mode with $\gamma_i \le \theta$ is not described at all, and a mode with $\gamma_i = 0$ is never described at any budget. With $Q = I$ the modes are the principal components of $\Sigma$ and this is the classical reverse water-filling of rate–distortion theory. With a general $Q$ the modes are neither the principal components of the data nor the eigenvectors of $Q$. They are the eigenvectors of the product $\Sigma^{1/2} Q \Sigma^{1/2}$, which weighs how much a direction varies against how much the consumer reads it.
+
+This statement is proved. In the ledger of Volume 14 it is row PAPER-III.a, with a written proof, independent audits, and a numerical net in continuous integration that was built to fail on a wrong water level. The row covers the maximization above and the rate identity. That the same rate is achieved by codes for a consumer that is not linear is a separate claim, and in that ledger it is exploratory.
+
+```python
+def water_fill(sigma, weight, rate):
+    """Error covariance of least tr(weight @ delta) at a given rate (nats)."""
+    val, vec = np.linalg.eigh(sigma)
+    s_half = (vec * np.sqrt(val)) @ vec.T
+    gamma, v = np.linalg.eigh(s_half @ weight @ s_half)
+    gamma = np.clip(gamma, 0.0, None)
+    lo, hi = 1e-300, gamma.max()
+    for _ in range(400):                      # bisection on the water level
+        theta = np.sqrt(lo * hi)
+        r = 0.5 * np.sum(np.log(np.maximum(gamma / theta, 1.0)))
+        lo, hi = (theta, hi) if r > rate else (lo, theta)
+    frac = np.minimum(1.0, theta / np.maximum(gamma, 1e-300))
+    return s_half @ (v * frac) @ v.T @ s_half
+```
+
+The same allocation applies outside coding. Any procedure that must decide where to tolerate error under a single budget, such as a sensor schedule, a pruning mask, or a quantizer's bit assignment, faces the same program with its own $\Sigma$. Volume 14 reports, in its chapter on estimation and control, sensor schedules chosen by $\operatorname{tr}(\hat{Q}\,\Sigma)$ with the probing cost charged.
+
+---
+
+## 22.4 A Recorded Run
+
+The script `formal/runs/ch22_read_metric.py` applies the two functions above to a consumer $g(x) = W \tanh(Bx)$ that reads $k = 3$ directions of a $p = 8$ dimensional Gaussian source with variances $1, \tfrac12, \dots, \tfrac1{128}$ in a random orientation. It estimates $\hat{Q}$ from 200 probe points (3,200 queries), allocates a description at three rates for the identity weight and for $\hat{Q}$, and measures the consumer loss of each allocation on 200,000 simulated vectors. Three predictions were written in the script, and the script was committed, before it ran. The run was made on 25 November 2026 with NumPy 2.4.6 and Python 3.12.3, and its output is `formal/runs/ch22_read_metric.json`.
+
+| Rate (nats) | Weight | Modes described | Reconstruction error $\operatorname{tr}\Delta$ | Consumer loss | $\operatorname{tr}(Q\Delta)$ |
+|---|---|---|---|---|---|
+| 1 | identity | 2 | 1.012 | 0.630 | 0.643 |
+| 1 | estimated $\hat{Q}$ | 2 | 1.414 | 0.300 | 0.305 |
+| 2 | identity | 3 | 0.638 | 0.388 | 0.394 |
+| 2 | estimated $\hat{Q}$ | 2 | 1.002 | 0.129 | 0.130 |
+| 4 | identity | 5 | 0.307 | 0.170 | 0.171 |
+| 4 | estimated $\hat{Q}$ | 3 | 0.722 | 0.033 | 0.033 |
+
+| Prediction | Pass mark | Result | Outcome |
+|---|---|---|---|
+| P1. The weighted allocation has at most half the consumer loss of the identity allocation at every rate | ratio at most 0.5 | 0.476, 0.334, 0.196 | passed |
+| P2. At 4 nats, $\operatorname{tr}(Q\Delta)$ is within 10% of the measured loss of the weighted allocation | at most 0.10 | 0.0006 | passed |
+| P3. The estimate from 200 probe points is within 20% of a reference from 200,000 analytic Jacobians, in Frobenius norm | at most 0.20 | 0.037 | passed |
+
+At every rate the weighted allocation has the larger reconstruction error and the smaller consumer loss. At 4 nats its reconstruction error is 2.4 times that of the identity allocation and its consumer loss is one fifth. A comparison of the two descriptions by reconstruction error would choose the one that serves this consumer worse. The first prediction passed at 1 nat with little room, 0.476 against a mark of 0.5.
+
+**Status.** The result is exploratory in the sense of Chapter 21. The predictions were fixed before the run and the script precedes its output in the version history, but there is one synthetic consumer, one seed, and no registration outside the script. The standard errors of the measured losses are below 0.002. The consumer was built with a kernel that is the same at every point, which is the favorable case for an averaged metric. The measured cases on real consumers, with their failures, are in Volume 14.
+
+---
+
+## 22.5 When One Averaged Matrix Is the Wrong Object
+
+Replacing $P(x)$ by $Q = \mathbb{E}\,P(X)$ is harmless when the unread directions are the same at every point. It is not harmless when they turn. If the kernel of $P(x)$ changes with $x$, the average $Q$ can have rank $q$ larger than the number $k$ of quantities the consumer reads, because a direction that is ignored at one point is read at another. An allocation built from $Q$ then protects $q$ directions everywhere.
+
+The example of Volume 14 is $g(x_1, x_2) = x_1 + a \sin x_2$ with a standard Gaussian source. The consumer reads one number, so $k = 1$. Its Jacobian $(1,\ a \cos x_2)$ turns with $x_2$, and
+
+$$Q = \begin{pmatrix} 1 & a e^{-1/2} \\ a e^{-1/2} & \tfrac{a^2}{2}(1 + e^{-2}) \end{pmatrix}$$
+
+has rank 2. For descriptions whose error covariance does not depend on the point, the least rate at consumer loss $D$ behaves as $\tfrac{q}{2}\log\tfrac{1}{D}$ for small $D$, and when the consumer's output can be described directly the rate needed behaves as $\tfrac{k}{2}\log\tfrac{1}{D}$. The excess is $\tfrac{q-k}{2}\log\tfrac1D$ plus a bounded term, and it grows without limit as the target loss falls. In that ledger this is row T1-MK, classed exploratory, a statement about one family of Gaussian test channels and about information rates and not about every code.
+
+The practical test is cheap. Compute $P(x)$ at the probe points and compare the rank of the average with the rank of the individual matrices:
+
+- If $\operatorname{rank} \hat{Q}$ is close to the typical rank of $P(x)$, the unread directions are stable and the allocation of Section 22.3 is the right tool.
+- If $\operatorname{rank} \hat{Q}$ is clearly larger, the kernel moves. The better description then encodes the consumer's output, or uses a metric that varies with the point, and a single averaged matrix overpays.
+
+The second case meets Chapter 6, where the cost of a displacement depends on where it is made, and Section 17.11, where the intrinsic dimension of the data differs from the dimension of the space that holds it.
+
+---
+
+## 22.6 Checklist
+
+1. Name the consumer and the metric on its outputs before choosing a distance on the inputs. A distance chosen without a consumer is the read metric of some consumer that was not named.
+2. Compute $P(x) = J^{\mathsf T} G J$ by automatic differentiation where possible and by central differences where not. Record the step $h$ and the number of queries.
+3. Estimate $Q$ on one set of probe points and check it on another. Report the eigenvalues, including the ones near zero.
+4. Compare the rank of $\hat{Q}$ with the rank of the local matrices before using $\hat{Q}$ for allocation.
+5. Allocate by reverse water-filling on $\Sigma^{1/2} \hat{Q}\, \Sigma^{1/2}$, and report both the weighted error and the reconstruction error of the result.
+6. Measure the consumer's loss on held-out data. The expression $\operatorname{tr}(Q\Delta)$ is a second-order prediction of that loss and is to be tested, by the rules of Chapter 21, like any other.
+
+---
+
+## Summary
+
+A consumer $c$ with output metric $G$ induces the read metric $P(x) = J_c^{\mathsf T} G J_c$ on its inputs, and the Mahalanobis matrix is the read metric of the whitening map. The metric can be computed from a Jacobian or estimated with $2p$ queries for each probe point, and its average over $m$ points concentrates at the rate $1/\sqrt{m}$. Under a rate budget, the error covariance that minimizes the weighted error is reverse water-filling on the eigenvalues of $\Sigma^{1/2} Q \Sigma^{1/2}$, a proved statement. In one recorded run on a synthetic consumer the weighted allocation had between 0.48 and 0.20 of the consumer loss of the reconstruction allocation at equal rate, with a larger reconstruction error, an exploratory result. An averaged metric overpays when the unread directions change from point to point, and a comparison of ranks detects that case.
+
+---
+
+## Notes and Further Reading
+
+The theory is in Volume 14 of this series, *Geometric Observation*. Its chapter on the read metric and the quotient defines the object, its COST chapter and cost-ledger appendix hold the rate theorems, its chapter on the blind probe treats recovery of the read subspace from queries, and its chapter on open problems holds the learn-then-serve note and the case of a kernel that moves. The claim ledger of that volume (`claims/LEDGER.md` in the `geometric-observation` repository) holds the class of each statement cited here: PAPER-III.a for the water-filling program, T1 for the concentration bound, T1-MK for the moving kernel.
+
+Reverse water-filling for a Gaussian source under squared error is in Cover and Thomas, *Elements of Information Theory* (2006), Section 10.3. The pullback of a metric through a model is the construction of the Fisher information metric, for which see Amari and Nagaoka, *Methods of Information Geometry* (2000). Quantisation judged by the error of a function of the data is studied as functional quantization by Misra, Goyal and Varshney (2011). Weighting a sensitivity analysis by the gradient of a function of interest is the active-subspace method of Constantine (2015), which estimates the same averaged matrix $\mathbb{E}\,J^{\mathsf T} J$ for a scalar function.

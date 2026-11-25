@@ -21,12 +21,17 @@ https://erisml.org/geometric-methods/ via the erisml-lib `site` submodule.
 > and Section 20.9 (the numbers of the executed `eris-ketos` notebook). Mathematical errors were
 > corrected in Chapters 3 (Einstein midpoint), 7, 9, 12 (sign convention of interactions), 13
 > and 18 and in Appendix C, along with about a hundred cross-references and smaller defects.
+>
+> **Chapter 22 (2026-11-25).** The read metric: a distance on the inputs computed from the
+> procedure that will use them, its estimation by queries, and water-filling against it. The
+> method is from Volume 14, *Geometric Observation*. One recorded run, `formal/runs/ch22_read_metric.py`.
+>
 > Scripts and records: `formal/runs/` (Python, run on Atlas) and `formal/matlab/` (symbolic and
 > numerical checks).
 
 ## Structure
 
-- `chapters/*.md` — the book content (source of truth): 21 chapters + 3
+- `chapters/*.md` — the book content (source of truth): 22 chapters + 3
   appendices, one file each, `# Chapter N: Title` as the first line.
 - `assets/demos.js`, `assets/demos.css` — the interactive visualizations.
   `injectDemos(chapterId, element)` mounts a demo under the section listed in

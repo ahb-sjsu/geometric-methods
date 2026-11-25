@@ -253,7 +253,7 @@ Part III (Chapters 11--15) presents design patterns: the subset enumeration patt
 
 Part IV (Chapters 16--20) addresses systems-level concerns: building geometric pipelines, scaling to high-dimensional spaces, deploying geometric validation in production, and two complete case studies in software defect prediction and cetacean bioacoustics.
 
-Part V (Chapter 21) states the measurement discipline: the rules under which a number produced by any of these instruments may be called a result, and the status of each result in this volume under those rules.
+Part V (Chapters 21 and 22) states the measurement discipline: the rules under which a number produced by any of these instruments may be called a result, and the status of each result in this volume under those rules. Chapter 22 then takes the metric of Chapter 2 from a third source, the procedure that will use the data, and shows how to compute that read metric, estimate it by queries, and allocate a budget against it.
 
 The thread that connects all of this is the conviction that *geometry is not a metaphor*. When we say that two model configurations are "far apart" or that a configuration is "near a boundary," we mean this literally, with precise distances computed in well-defined spaces. The power of the geometric approach comes from this precision: it transforms vague intuitions about model behavior into exact, computable quantities that can be tested, compared, optimized, and monitored.
 

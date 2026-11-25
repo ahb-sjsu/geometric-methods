@@ -155,6 +155,9 @@ Applying Section 21.1 to the volume itself gives the following, as of November 2
 | Tables of Chapters 1, 8, 9, 11 and 12 | Posited; the text presents them as illustrations | None |
 | Results of Chapter 19 | Measured on one recorded run, with an oracle bound and a 20-seed redraw. Exploratory: no prediction was registered before the run | `formal/runs/ch19_*.py` and their JSON outputs |
 | Experiment of Section 14.9 | Three predictions registered in the script before it ran, graded on one recorded run | `formal/runs/ch14_shortcut_experiment.py` and its JSON output; priority shown by file hash, not by version-control ancestry |
+| Water-filling program of Section 22.3 | Proved, in the ledger of Volume 14 (row PAPER-III.a) | `geometric-observation`, `claims/LEDGER.md` |
+| Concentration bound of Section 22.2 and the rate statements of Section 22.5 | Exploratory in that ledger (rows T1 and T1-MK): written proofs and independent audits, no sealed numerical test | Same |
+| Run of Section 22.4 | Three predictions written in the script and committed before it ran, graded on one recorded run. Exploratory: one synthetic consumer, one seed | `formal/runs/ch22_read_metric.py` and its JSON output |
 | Results of Section 20.9 | Measured, but the executed notebook is not committed, so there is no public record | `eris-ketos` notebook, executed copy of 12 March 2026 |
 | Contributions claimed for the geometric layers in Sections 20.2 to 20.4 | Posited; the comparison of Section 20.9.4 has not been run | None |
 
