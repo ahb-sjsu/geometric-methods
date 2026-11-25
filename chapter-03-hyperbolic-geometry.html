@@ -64,7 +64,7 @@
 <h2 id="31-why-hyperbolic-space">3.1 Why Hyperbolic Space?</h2>
 <h3 id="311-the-exponential-growth-problem">3.1.1 The Exponential Growth Problem</h3>
 <p>Consider a complete binary tree of depth $d$. It contains $2^{d+1} - 1$ nodes and $2^d$ leaves. More generally, a $k$-ary tree of depth $d$ contains $\Theta(k^d)$ nodes. This exponential growth is not an inconvenience — it is the defining structural property of hierarchical data.</p>
-<p>Now suppose we wish to embed such a tree into a metric space $(X, d_X)$ so that the tree distance $d_T(u,v)$ between any two nodes $u,v$ is faithfully preserved. Formally, we seek a mapping $f: V \to X$ and constants $\alpha, \beta > 0$ such that for all $u,v \in V$:</p>
+<p>Now suppose we wish to embed such a tree into a metric space $(X, d_X)$ so that the tree distance $d_T(u,v)$ between any two nodes $u,v$ is faithfully preserved. Formally, we seek a mapping $f: V \to X$ and constants $\alpha, \beta &gt; 0$ such that for all $u,v \in V$:</p>
 <p>$$\alpha \cdot d_T(u,v) \;\leq\; d_X\bigl(f(u), f(v)\bigr) \;\leq\; \beta \cdot d_T(u,v)$$</p>
 <p>The <em>distortion</em> of the embedding is $\beta / \alpha$. The celebrated result of Bourgain (1985) shows that any $n$-point metric space embeds into $\ell_2$ with distortion $O(\log n)$. Trees do better than that worst case, but no Euclidean space holds them faithfully.</p>
 <p><strong>Theorem 3.1 (Bourgain, 1986).</strong> Any embedding of the complete binary tree with $n$ vertices into a Euclidean space, of any dimension, incurs distortion $\Omega\!\bigl(\sqrt{\log \log n}\,\bigr)$. In particular no Euclidean embedding has distortion bounded independently of the size of the tree. The bound is tight: Matoušek (1999) showed that every $n$-point tree embeds in Euclidean space with distortion $O(\sqrt{\log \log n})$. Theorem 3.2 below gives the contrast with hyperbolic space.</p>
@@ -73,12 +73,12 @@
 <p>Hyperbolic space $\mathbb{H}^k$ of constant sectional curvature $-1$ has a fundamentally different volume growth profile. The volume of a geodesic ball of radius $r$ in $\mathbb{H}^k$ satisfies:</p>
 <p>$$\text{Vol}\bigl(B_r^{\mathbb{H}^k}\bigr) \;=\; \omega_{k-1} \int_0^r \sinh^{k-1}(t)\, dt \;\sim\; C_k \, e^{(k-1)r}$$</p>
 <p>for large $r$, where $\omega_{k-1}$ is the volume of the unit $(k-1)$-sphere. The volume grows <em>exponentially</em> in the radius — exactly matching the branching pattern of trees.</p>
-<p><strong>Theorem 3.2 (Gromov, 1987; Sarkar, 2011).</strong> Any finite tree with $n$ nodes and weighted edges embeds into the Poincaré disk $\mathbb{H}^2$ with distortion $1 + \varepsilon$ for any $\varepsilon > 0$, using only two dimensions.</p>
+<p><strong>Theorem 3.2 (Gromov, 1987; Sarkar, 2011).</strong> Any finite tree with $n$ nodes and weighted edges embeds into the Poincaré disk $\mathbb{H}^2$ with distortion $1 + \varepsilon$ for any $\varepsilon &gt; 0$, using only two dimensions.</p>
 <p>This is a dramatic improvement: in Euclidean space no number of dimensions keeps the distortion of large trees bounded, while two hyperbolic dimensions bring it arbitrarily close to 1. In practice, one works with moderate dimensions ($d \in [16, 64]$) and adjustable curvature to balance fidelity against numerical stability.</p>
 <h3 id="313-the-poincare-ball-model">3.1.3 The Poincaré Ball Model</h3>
 <p>Among the five classical models of hyperbolic geometry (Poincaré ball, Poincaré half-space, Klein, hyperboloid, and hemisphere), the Poincaré ball is the most convenient for machine learning because it lives inside a bounded subset of $\mathbb{R}^d$ and thus interfaces cleanly with standard optimizers and neural network layers.</p>
-<p><strong>Definition 3.1 (Poincaré Ball).</strong> For curvature parameter $c > 0$, the Poincaré ball of dimension $d$ is the open ball</p>
-<p>$$\mathbb{B}^d_c \;=\; \bigl\{\, x \in \mathbb{R}^d \;:\; c\,\|x\|^2 < 1 \,\bigr\}$$</p>
+<p><strong>Definition 3.1 (Poincaré Ball).</strong> For curvature parameter $c &gt; 0$, the Poincaré ball of dimension $d$ is the open ball</p>
+<p>$$\mathbb{B}^d_c \;=\; \bigl\{\, x \in \mathbb{R}^d \;:\; c\,\|x\|^2 &lt; 1 \,\bigr\}$$</p>
 <p>equipped with the Riemannian metric tensor</p>
 <p>$$g_x^{\mathbb{B}} \;=\; \bigl(\lambda_x^c\bigr)^2 \, g^E, \qquad \lambda_x^c \;=\; \frac{2}{1 - c\,\|x\|^2}$$</p>
 <p>where $g^E$ is the Euclidean metric and $\lambda_x^c$ is the <em>conformal factor</em>. The sectional curvature is $-c$ everywhere.</p>
@@ -209,8 +209,8 @@
 <p>Together, the exponential and logarithmic maps provide a <em>Riemannian optimization</em> workflow: parameters live on the manifold, gradients are computed in the ambient Euclidean space, retracted to the tangent space via the Riemannian metric, and then mapped back to the manifold via $\exp_x^c$.</p>
 <h3 id="325-projection-onto-the-ball">3.2.5 Projection onto the Ball</h3>
 <p>Floating-point arithmetic can push points outside the open ball. Since operations on $\mathbb{B}^d_c$ are undefined for $c\|x\|^2 \geq 1$, we must project points back inside:</p>
-<p>$$\text{proj}(x) \;=\; \begin{cases} x & \text{if } \|x\| < \frac{r_{\max}}{\sqrt{c}} \\[4pt] \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x & \text{otherwise} \end{cases}$$</p>
-<p>where $r_{\max} < 1$ (typically 0.95) provides a safety margin:</p>
+<p>$$\text{proj}(x) \;=\; \begin{cases} x &amp; \text{if } \|x\| &lt; \frac{r_{\max}}{\sqrt{c}} \\[4pt] \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x &amp; \text{otherwise} \end{cases}$$</p>
+<p>where $r_{\max} &lt; 1$ (typically 0.95) provides a safety margin:</p>
 <pre><code class="language-python">    def project(self, x: torch.Tensor) -&gt; torch.Tensor:
         &quot;&quot;&quot;
         Project points back inside the Poincaré ball.
@@ -230,7 +230,7 @@
 <p>We now apply the Poincaré ball to a concrete task: embedding a biological taxonomy so that taxonomic distance is faithfully represented by geodesic distance.</p>
 <h3 id="331-problem-setup">3.3.1 Problem Setup</h3>
 <p>Let $\mathcal{T}$ be a taxonomy (a rooted tree) with $n$ species. Define the <em>taxonomic distance matrix</em> $D \in \mathbb{R}^{n \times n}$ where $D_{ij}$ is the number of edges on the path from species $i$ to species $j$ in $\mathcal{T}$. Our goal is to find an embedding $f: \{1, \ldots, n\} \to \mathbb{B}^d_c$ that minimizes the stress:</p>
-<p>$$\mathcal{L} \;=\; \sum_{i < j} \Bigl(d_c\bigl(f(i), f(j)\bigr) - D_{ij}\Bigr)^2$$</p>
+<p>$$\mathcal{L} \;=\; \sum_{i &lt; j} \Bigl(d_c\bigl(f(i), f(j)\bigr) - D_{ij}\Bigr)^2$$</p>
 <h3 id="332-spectral-initialization">3.3.2 Spectral Initialization</h3>
 <p>Random initialization in hyperbolic space converges slowly and often gets trapped in poor local minima. A spectral initialization based on the Gaussian kernel over $D$ provides a much better starting point.</p>
 <ol>
@@ -246,7 +246,7 @@
 <p><strong>Select the top $d$ eigenvectors:</strong> Form the initial coordinates as $X_0 = U_{:,1:d}\,\Lambda_{1:d}^{1/2}$, weighting each eigenvector by the square root of its eigenvalue.</p>
 </li>
 <li>
-<p><strong>Scale to fit inside the ball:</strong> Normalize so that $\max_i \|x_i\| < r_{\max}/\sqrt{c}$.</p>
+<p><strong>Scale to fit inside the ball:</strong> Normalize so that $\max_i \|x_i\| &lt; r_{\max}/\sqrt{c}$.</p>
 </li>
 </ol>
 <pre><code class="language-python">import numpy as np
@@ -303,7 +303,7 @@ def spectral_init(distance_matrix: np.ndarray, dim: int = 2,
 <p>where $p_k \in \mathbb{B}^d_c$ is the <em>prototype</em> for class $k$ and $a_k \in T_{p_k}\mathbb{B}^d_c$ is the normal direction.</p>
 <p>In practice, a simpler distance-based formulation often works as well or better:</p>
 <h3 id="342-prototype-based-classification">3.4.2 Prototype-Based Classification</h3>
-<p>For each class $k$, learn a prototype $p_k \in \mathbb{B}^d_c$ and a temperature $\tau_k > 0$. The logit for class $k$ is the negative scaled geodesic distance:</p>
+<p>For each class $k$, learn a prototype $p_k \in \mathbb{B}^d_c$ and a temperature $\tau_k &gt; 0$. The logit for class $k$ is the negative scaled geodesic distance:</p>
 <p>$$\ell_k(x) \;=\; -\frac{d_c(x, p_k)}{\tau_k}$$</p>
 <p>The class probabilities follow from a softmax:</p>
 <p>$$P(y = k \mid x) \;=\; \frac{\exp(\ell_k(x))}{\sum_{j=1}^{K} \exp(\ell_j(x))}$$</p>
@@ -467,13 +467,13 @@ class HyperbolicMLR(nn.Module):
 <li>A <strong>hierarchical regularizer</strong> that encourages parent rules to have smaller norm than their children:</li>
 </ul>
 <p>$$\mathcal{L}_{\text{hier}} \;=\; \sum_{(r, r') \in \text{parent-child}} \max\bigl(0,\; \|h_r\| - \|h_{r'}\| + \alpha\bigr)$$</p>
-<p>where $\alpha > 0$ is a margin ensuring children are at least $\alpha$ further from the origin than their parents.</p>
+<p>where $\alpha &gt; 0$ is a margin ensuring children are at least $\alpha$ further from the origin than their parents.</p>
 <hr />
 <h2 id="36-einstein-midpoint-for-aggregation">3.6 Einstein Midpoint for Aggregation</h2>
 <p>A recurring operation in hyperbolic neural networks is <em>weighted averaging</em> — computing the centroid of a set of points on the ball. The Euclidean weighted mean $\bar{x} = \sum_i w_i x_i / \sum_i w_i$ does not generalize directly because $\mathbb{B}^d_c$ is not a vector space.</p>
 <h3 id="361-derivation">3.6.1 Derivation</h3>
 <p>The <em>Einstein midpoint</em> provides a principled solution. It is defined in the Klein model of hyperbolic space, whose geodesics are straight chords, and then carried to the Poincaré ball.</p>
-<p>In the Klein model a point $k$ with $c\|k\|^2 < 1$ has the <em>Lorentz factor</em></p>
+<p>In the Klein model a point $k$ with $c\|k\|^2 &lt; 1$ has the <em>Lorentz factor</em></p>
 <p>$$\gamma_c(k) \;=\; \frac{1}{\sqrt{1 - c\,\|k\|^2}},$$</p>
 <p>and the Einstein midpoint of points $k_1, \ldots, k_N$ with non-negative weights $w_1, \ldots, w_N$ is the $\gamma$-weighted average</p>
 <p>$$\bar{k} \;=\; \frac{\sum_{i=1}^{N} w_i\, \gamma_c(k_i)\, k_i}{\sum_{i=1}^{N} w_i\, \gamma_c(k_i)}.$$</p>

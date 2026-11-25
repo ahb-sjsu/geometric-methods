@@ -108,7 +108,7 @@
 <p>$$\sqrt{\lambda_{\min}} \cdot \|\mathbf{b} - \mathbf{a}\|_2 \leq d_M(\mathbf{a}, \mathbf{b}) \leq \sqrt{\lambda_{\max}} \cdot \|\mathbf{b} - \mathbf{a}\|_2$$</p>
 <p><strong>Proposition 6.1.</strong> The Euclidean distance $\|\mathbf{b} - \mathbf{a}\|_2$ is an admissible heuristic for A* with Mahalanobis edge weights if and only if $\lambda_{\min} \geq 1$ &mdash; that is, if and only if every eigenvalue of $\Sigma^{-1}$ is at least 1.</p>
 <p><em>Proof.</em> The heuristic $h(n) = \|n - g\|_2$ is admissible when $h(n) \leq d_M(n, g)$ for all $n, g$. By the lower bound above, $d_M(n, g) \geq \sqrt{\lambda_{\min}} \cdot \|n - g\|_2$. Thus $\|n - g\|_2 \leq d_M(n, g)$ iff $\sqrt{\lambda_{\min}} \geq 1$, i.e., $\lambda_{\min} \geq 1$. $\square$</p>
-<p>For the <code>eris-econ</code> covariance matrix, $\Sigma$ has diagonal entries ranging from 0.25 to 25.0, so $\Sigma^{-1}$ has diagonal entries ranging from $1/25 = 0.04$ to $1/0.25 = 4.0$ (before accounting for off-diagonal corrections). Since $\lambda_{\min} < 1$, the Euclidean heuristic is <em>not</em> guaranteed admissible. In practice, it is admissible along most directions but can overestimate along the Consequences axis, where $\Sigma^{-1}$ assigns very low weight.</p>
+<p>For the <code>eris-econ</code> covariance matrix, $\Sigma$ has diagonal entries ranging from 0.25 to 25.0, so $\Sigma^{-1}$ has diagonal entries ranging from $1/25 = 0.04$ to $1/0.25 = 4.0$ (before accounting for off-diagonal corrections). Since $\lambda_{\min} &lt; 1$, the Euclidean heuristic is <em>not</em> guaranteed admissible. In practice, it is admissible along most directions but can overestimate along the Consequences axis, where $\Sigma^{-1}$ assigns very low weight.</p>
 <h3 id="622-corrected-euclidean-heuristic">6.2.2 Corrected Euclidean Heuristic</h3>
 <p>A simple fix is to scale the Euclidean heuristic by $\sqrt{\lambda_{\min}}$:</p>
 <p>$$h_{\text{scaled}}(n) = \sqrt{\lambda_{\min}} \cdot \|n - g\|_2$$</p>
@@ -260,19 +260,19 @@
 </tr>
 <tr>
 <td>Coercion</td>
-<td>$\Delta d_4 < -0.5$</td>
+<td>$\Delta d_4 &lt; -0.5$</td>
 <td>Large, finite</td>
 <td>Autonomy curtailment is costly but not sacred</td>
 </tr>
 <tr>
 <td>Deception</td>
-<td>$\Delta d_9 < -0.3$</td>
+<td>$\Delta d_9 &lt; -0.3$</td>
 <td>Finite</td>
 <td>Epistemic degradation has a price</td>
 </tr>
 <tr>
 <td>Exploitation</td>
-<td>$\Delta d_1 > 0$ <em>and</em> $\Delta d_3 < -0.3$</td>
+<td>$\Delta d_1 &gt; 0$ <em>and</em> $\Delta d_3 &lt; -0.3$</td>
 <td>Finite</td>
 <td>Profiting at the expense of fairness</td>
 </tr>
@@ -284,7 +284,7 @@
 </tr>
 <tr>
 <td>Promise breaking</td>
-<td>$\Delta d_8 < -0.5$</td>
+<td>$\Delta d_8 &lt; -0.5$</td>
 <td>Finite</td>
 <td>Legitimacy violations are costly</td>
 </tr>
@@ -296,7 +296,7 @@
 <p>Every boundary in the table above is a condition on the state: a dimension reaches zero, or a quantity changes sign. The coordinates used to describe the state can fail at exactly those places. When they do, a smooth model fitted across the boundary is not merely inaccurate there. Part of it is unidentified.</p>
 <p>The common case is a <em>balance coordinate</em>. Let $g \geq 0$ and $l \geq 0$ be two magnitudes that compete, such as benefit and harm or gain and loss, and define</p>
 <p>$$d = \frac{g - l}{g + l} \in [-1, 1].$$</p>
-<p>The endpoints $d = \pm 1$ are not extreme values of a balance. They are the states in which one magnitude is absent: $d = 1$ exactly when $l = 0$, and $d = -1$ exactly when $g = 0$. On each of those sets the coordinate is constant, so it carries no information, and any interaction term $d \cdot x$ equals $\pm x$. Its coefficient cannot be separated there from the coefficient of $x$ itself. A model that pools both sides reports one interaction coefficient, and that number mixes an effect inside the region $|d| < 1$ with a plain effect of $x$, entering with opposite signs, on the two endpoint sets.</p>
+<p>The endpoints $d = \pm 1$ are not extreme values of a balance. They are the states in which one magnitude is absent: $d = 1$ exactly when $l = 0$, and $d = -1$ exactly when $g = 0$. On each of those sets the coordinate is constant, so it carries no information, and any interaction term $d \cdot x$ equals $\pm x$. Its coefficient cannot be separated there from the coefficient of $x$ itself. A model that pools both sides reports one interaction coefficient, and that number mixes an effect inside the region $|d| &lt; 1$ with a plain effect of $x$, entering with opposite signs, on the two endpoint sets.</p>
 <p>But the set $l = 0$ is also where Section 6.4.3 places a boundary: a magnitude going from positive to zero is the sacred-value condition. The coordinate degenerates at the boundary it was supposed to help detect.</p>
 <p><strong>Chart-selection rule.</strong> Wherever a bounded balance coordinate is introduced, ask what its endpoints mean. If they mean absence and not extremity, they are a boundary in the sense of Section 6.4.3. Fit each side separately, and do not read an interaction coefficient estimated across an endpoint as a property of either side.</p>
 <blockquote>
@@ -525,7 +525,7 @@ print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
 </tr>
 </tbody>
 </table>
-<p>For &ldquo;offer 0%&rdquo;: the fairness drop ($0.5 \to 0.1$, $\Delta = -0.4$) on a dimension with variance 0.25 contributes $(-0.4)^2 / 0.25 = 0.64$ to the squared Mahalanobis distance. The identity drop ($0.5 \to 0.3$) adds $(-0.2)^2 / 0.25 = 0.16$, and the social impact drop ($0.0 \to -0.2$) adds another $0.16$. The monetary term is zero, because the proposer keeps everything. The exploitation boundary does <em>not</em> fire: its condition requires the money to rise ($\Delta d_1 > 0$), and here $\Delta d_1 = 0$.</p>
+<p>For &ldquo;offer 0%&rdquo;: the fairness drop ($0.5 \to 0.1$, $\Delta = -0.4$) on a dimension with variance 0.25 contributes $(-0.4)^2 / 0.25 = 0.64$ to the squared Mahalanobis distance. The identity drop ($0.5 \to 0.3$) adds $(-0.2)^2 / 0.25 = 0.16$, and the social impact drop ($0.0 \to -0.2$) adds another $0.16$. The monetary term is zero, because the proposer keeps everything. The exploitation boundary does <em>not</em> fire: its condition requires the money to rise ($\Delta d_1 &gt; 0$), and here $\Delta d_1 = 0$.</p>
 <p>For &ldquo;offer 40%&rdquo;: fairness improves ($0.5 \to 0.74$), identity improves ($0.5 \to 0.7$) and social impact improves ($0.0 \to 0.28$). A Mahalanobis metric is symmetric, so a move toward more fairness costs as much as a move away from it: these three improvements add $0.23$, $0.16$ and $0.31$ to the squared distance, on top of $(-4)^2/25 = 0.64$ for the money given up.</p>
 <p>For &ldquo;offer 20%&rdquo;: the state hardly moves. Fairness goes from $0.5$ to $0.42$, identity stays at $0.5$, and the money term is $(-2)^2/25 = 0.16$.</p>
 <p>The result: the Bond Geodesic terminates at the 20% vertex. The model rejects the zero offer of the Nash analysis, which costs more than twice as much, but its least-cost offer is below the 40&ndash;50% that proposers actually make. Two features of the construction produce this. The starting state is placed at neutral fairness and identity ($0.5$), which a 20% offer nearly reproduces, and the metric charges for moral gain as well as moral loss. The <code>eris-econ</code> test suite records the same value: with the default covariance the model predicts 20%, the direction is right, and a quantitative match requires a covariance calibrated on experimental data. The six weights are recomputed in <code>formal/matlab/volume_checks.m</code>.</p>
@@ -553,7 +553,7 @@ print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
     B = make_player_complex(cooperate_money=3, defect_money=5)
     return A, B
 </code></pre>
-<p>The Nash equilibrium (projecting onto $d_1$ alone) predicts mutual defection: defecting yields \$5 vs. cooperating for \$3. But on the full 9D manifold, defection causes massive drops in fairness ($0.5 \to 0.1$), identity ($0.5 \to 0.2$), social impact ($0.0 \to -0.3$), and legitimacy ($0.5 \to 0.2$). The promise-breaking boundary ($\Delta d_8 = -0.3 < -0.5$? No &mdash; $\Delta d_8 = 0.2 - 0.5 = -0.3$, which does not trigger at the $-0.5$ threshold) does not fire here, but the accumulated Mahalanobis cost across four moral dimensions makes defection more expensive than cooperation on the full manifold. The Bond Geodesic predicts cooperation &mdash; consistent with empirical results showing significant cooperation rates in one-shot prisoner&rsquo;s dilemmas.</p>
+<p>The Nash equilibrium (projecting onto $d_1$ alone) predicts mutual defection: defecting yields \$5 vs. cooperating for \$3. But on the full 9D manifold, defection causes massive drops in fairness ($0.5 \to 0.1$), identity ($0.5 \to 0.2$), social impact ($0.0 \to -0.3$), and legitimacy ($0.5 \to 0.2$). The promise-breaking boundary ($\Delta d_8 = -0.3 &lt; -0.5$? No &mdash; $\Delta d_8 = 0.2 - 0.5 = -0.3$, which does not trigger at the $-0.5$ threshold) does not fire here, but the accumulated Mahalanobis cost across four moral dimensions makes defection more expensive than cooperation on the full manifold. The Bond Geodesic predicts cooperation &mdash; consistent with empirical results showing significant cooperation rates in one-shot prisoner&rsquo;s dilemmas.</p>
 <h3 id="663-the-public-goods-game">6.6.3 The Public Goods Game</h3>
 <p>The public goods game extends the pattern to many players. In a group of $n$ players, each decides how much of their endowment to contribute to a common pool, which is multiplied by a factor $m$ and divided equally. The Nash prediction: contribute nothing (free-ride). The empirical result: initial contributions are around 40&ndash;60%, declining over rounds but never reaching zero.</p>
 <p>The <code>eris-econ</code> implementation models a single player&rsquo;s decision:</p>

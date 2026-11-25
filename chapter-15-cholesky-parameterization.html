@@ -70,7 +70,7 @@
 <p>Suppose you want to learn a $9 \times 9$ covariance matrix $\Sigma$ that makes your model&rsquo;s predictions match empirical data. The naive approach is to treat the 81 entries of $\Sigma$ as free parameters and run gradient descent. This fails for three reasons.</p>
 <p><strong>Symmetry violation.</strong> An unconstrained update to an arbitrary $9 \times 9$ matrix will not preserve $\Sigma = \Sigma^\top$. You can enforce symmetry by parameterizing only the upper triangle and mirroring it, reducing the parameter count from 81 to $9 \times 10 / 2 = 45$. But this is the easy constraint.</p>
 <p><strong>Positive-definiteness violation.</strong> Even if $\Sigma$ starts SPD, a gradient step can push an eigenvalue through zero, producing a matrix that is positive <em>semi</em>-definite or indefinite. When this happens, the Mahalanobis distance $d_M(\mathbf{a}, \mathbf{b}) = \sqrt{(\mathbf{a} - \mathbf{b})^\top \Sigma^{-1} (\mathbf{a} - \mathbf{b})}$ involves the inverse of a singular or indefinite matrix, which is either undefined or yields imaginary distances. The optimizer has left the feasible set, and no amount of step-size tuning guarantees it will stay inside.</p>
-<p><strong>Projected gradient methods are fragile.</strong> One could project back onto the SPD cone after each gradient step &mdash; compute the eigendecomposition, clamp negative eigenvalues to some $\epsilon > 0$, and reconstruct the matrix. This works but is expensive ($O(n^3)$ per projection), introduces discontinuities in the optimization landscape at the boundary of the SPD cone, and can cause the optimizer to &ldquo;chatter&rdquo; along the boundary rather than converging smoothly.</p>
+<p><strong>Projected gradient methods are fragile.</strong> One could project back onto the SPD cone after each gradient step &mdash; compute the eigendecomposition, clamp negative eigenvalues to some $\epsilon &gt; 0$, and reconstruct the matrix. This works but is expensive ($O(n^3)$ per projection), introduces discontinuities in the optimization landscape at the boundary of the SPD cone, and can cause the optimizer to &ldquo;chatter&rdquo; along the boundary rather than converging smoothly.</p>
 <p>The right solution is to choose a parameterization that makes the constraint <em>impossible to violate</em>, so the optimizer never needs to worry about it. This is the Cholesky factorization.</p>
 <h3 id="1512-the-spd-cone">15.1.2 The SPD Cone</h3>
 <p>The set of $n \times n$ SPD matrices forms an open convex cone in the $n(n+1)/2$-dimensional space of symmetric matrices (Chapter 4, Definition 4.1). Its boundary consists of positive <em>semi</em>-definite matrices &mdash; those with at least one zero eigenvalue. The Cholesky factorization provides a bijection between the interior of this cone and the set of lower-triangular matrices with positive diagonals, mapping the curved boundary of the SPD cone to the simple constraint &ldquo;diagonal entries positive.&rdquo;</p>
@@ -86,7 +86,7 @@
 <p>The factorization&rsquo;s power for optimization comes from the converse direction. Given <em>any</em> lower-triangular matrix $L$ with strictly positive diagonal entries, the product $M = LL^\top$ is automatically:</p>
 <ol>
 <li><strong>Symmetric</strong>: $(LL^\top)^\top = (L^\top)^\top L^\top = LL^\top$.</li>
-<li><strong>Positive definite</strong>: for any $\mathbf{x} \neq 0$, $\mathbf{x}^\top LL^\top \mathbf{x} = \|L^\top \mathbf{x}\|^2 > 0$, since $L$ is invertible (positive diagonal implies nonzero determinant, so $L^\top \mathbf{x} \neq 0$).</li>
+<li><strong>Positive definite</strong>: for any $\mathbf{x} \neq 0$, $\mathbf{x}^\top LL^\top \mathbf{x} = \|L^\top \mathbf{x}\|^2 &gt; 0$, since $L$ is invertible (positive diagonal implies nonzero determinant, so $L^\top \mathbf{x} \neq 0$).</li>
 </ol>
 <p>This means we can parameterize our optimization over the entries of $L$ rather than the entries of $M$. The off-diagonal entries of $L$ are completely unconstrained &mdash; they can be any real numbers. The only constraint is that the diagonal entries must be positive.</p>
 <hr />
@@ -97,7 +97,7 @@
 <p>Since $\exp(\cdot) : \mathbb{R} \to (0, \infty)$ is a bijection, every real value of $\theta_i$ produces a valid positive diagonal entry. The full parameterization is now:</p>
 <ul>
 <li><strong>Diagonal parameters</strong> $\theta_1, \ldots, \theta_n \in \mathbb{R}$ (unconstrained)</li>
-<li><strong>Off-diagonal parameters</strong> $\ell_{ij}$ for $i > j$ (unconstrained)</li>
+<li><strong>Off-diagonal parameters</strong> $\ell_{ij}$ for $i &gt; j$ (unconstrained)</li>
 </ul>
 <p>Total: $n(n+1)/2$ unconstrained real parameters that bijectively correspond to the set of $n \times n$ SPD matrices. An optimizer can take gradient steps of any magnitude in any direction without ever leaving the feasible set.</p>
 <h3 id="1532-why-log-space-for-the-diagonal">15.3.2 Why Log-Space for the Diagonal</h3>
@@ -112,7 +112,7 @@
 <p>$$\boldsymbol{\phi} = (\theta_1, \ldots, \theta_n, \ell_{21}, \ell_{31}, \ell_{32}, \ell_{41}, \ldots, \ell_{n,n-1})$$</p>
 <p>The map $f : \mathbb{R}^{n(n+1)/2} \to \text{SPD}(n)$ is:</p>
 <ol>
-<li>Construct $L$ with $L_{ii} = \exp(\theta_i)$ and $L_{ij} = \ell_{ij}$ for $i > j$.</li>
+<li>Construct $L$ with $L_{ii} = \exp(\theta_i)$ and $L_{ij} = \ell_{ij}$ for $i &gt; j$.</li>
 <li>Return $M = LL^\top$.</li>
 </ol>
 <p>This map is smooth (infinitely differentiable), surjective onto SPD(n), and has a smooth inverse (the Cholesky decomposition followed by taking the log of the diagonal). It is therefore a diffeomorphism between $\mathbb{R}^{n(n+1)/2}$ and SPD(n), which means gradient-based optimization in parameter space $\mathbb{R}^{n(n+1)/2}$ corresponds to smooth navigation of the SPD manifold.</p>
@@ -423,7 +423,7 @@ for _ in range(n_samples):
 <hr />
 <h2 id="159-advanced-topics">15.9 Advanced Topics</h2>
 <h3 id="1591-the-cholesky-parameterization-and-riemannian-optimization">15.9.1 The Cholesky Parameterization and Riemannian Optimization</h3>
-<p>The Cholesky parameterization provides an alternative to explicit Riemannian optimization on the SPD manifold (Chapter 4). Instead of computing the Riemannian gradient and exponential map at each step (which requires eigendecompositions), we work in the flat parameter space of Cholesky entries and let the nonlinear map $L \mapsto LL^\top$ implicitly handle the manifold geometry. This is computationally cheaper per step, though the induced metric on the parameter space is not the Euclidean metric, so standard optimizers like Adam or L-BFGS are not doing true Riemannian descent. In practice, the Cholesky approach works well for most applications; explicit Riemannian methods become advantageous when $n > 50$ or the condition number is extreme.</p>
+<p>The Cholesky parameterization provides an alternative to explicit Riemannian optimization on the SPD manifold (Chapter 4). Instead of computing the Riemannian gradient and exponential map at each step (which requires eigendecompositions), we work in the flat parameter space of Cholesky entries and let the nonlinear map $L \mapsto LL^\top$ implicitly handle the manifold geometry. This is computationally cheaper per step, though the induced metric on the parameter space is not the Euclidean metric, so standard optimizers like Adam or L-BFGS are not doing true Riemannian descent. In practice, the Cholesky approach works well for most applications; explicit Riemannian methods become advantageous when $n &gt; 50$ or the condition number is extreme.</p>
 <h3 id="1592-determinant-and-log-likelihood">15.9.2 Determinant and Log-Likelihood</h3>
 <p>Many probabilistic models involve the log-determinant of the precision or covariance matrix. For a multivariate Gaussian, the log-likelihood of observing $\mathbf{x}$ given mean $\boldsymbol{\mu}$ and precision $\Lambda = \Sigma^{-1}$ is:</p>
 <p>$$\log p(\mathbf{x}) = \frac{1}{2}\log\det(\Lambda) - \frac{1}{2}(\mathbf{x} - \boldsymbol{\mu})^\top \Lambda (\mathbf{x} - \boldsymbol{\mu}) - \frac{n}{2}\log(2\pi)$$</p>
@@ -481,7 +481,7 @@ for _ in range(n_samples):
 <tr>
 <td style="text-align: left;">Sparse subset</td>
 <td style="text-align: left;">Diagonal with some $w_i = 0$</td>
-<td style="text-align: center;">$k < n$</td>
+<td style="text-align: center;">$k &lt; n$</td>
 <td style="text-align: left;">Active dimension selection</td>
 </tr>
 <tr>

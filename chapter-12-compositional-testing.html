@@ -135,12 +135,12 @@
 </tr>
 <tr>
 <td>Redundant</td>
-<td>$\Phi_{ij} > 0$</td>
+<td>$\Phi_{ij} &gt; 0$</td>
 <td>Removing both is worse than the single removals predict; each can stand in for the other</td>
 </tr>
 <tr>
 <td>Complementary</td>
-<td>$\Phi_{ij} < 0$</td>
+<td>$\Phi_{ij} &lt; 0$</td>
 <td>Removing both is less damaging than predicted; each needs the other, so removing either already loses their joint contribution</td>
 </tr>
 </tbody>
@@ -540,7 +540,7 @@ class StructuralFuzzReport:
 <ol>
 <li>Compute the marginal gain $G_j$ for each step.</li>
 <li>Compute the ratio $R_j = G_j / \Delta_j$ (gain relative to individual importance).</li>
-<li>Group consecutive dimensions with $R_j < 0.3$ (or another threshold) into clusters.</li>
+<li>Group consecutive dimensions with $R_j &lt; 0.3$ (or another threshold) into clusters.</li>
 </ol>
 <p>Each cluster represents a set of dimensions that are largely interchangeable. The model could use any one of them as a representative, reducing dimensionality without significant loss of information. This directly connects to the dimensionality reduction motivation of Chapter 8&rsquo;s Pareto analysis: redundancy clusters are the mechanism by which models achieve good performance with fewer dimensions.</p>
 <hr />
@@ -562,7 +562,7 @@ class StructuralFuzzReport:
 <p>There is a deeper geometric interpretation of the interaction matrix $\Phi$ that connects to the Riemannian framework of Chapters 6 and 9. Consider the space of <em>dimension activation vectors</em> $\mathbf{a} \in \{0, 1\}^n$, where $a_i = 1$ indicates that dimension $i$ is active. The evaluation function restricted to this discrete space defines a function $f : \{0, 1\}^n \to \mathbb{R}$.</p>
 <p>If we approximate $f$ by a second-order expansion around the all-active point $\mathbf{a} = \mathbf{1}$:</p>
 <p>$$f(\mathbf{a}) \approx f(\mathbf{1}) + \sum_i \Delta_i (1 - a_i) + \frac{1}{2} \sum_{i \neq j} \Phi_{ij} (1 - a_i)(1 - a_j)$$</p>
-<p>the interaction matrix $\Phi$ is the second-order term of the evaluation function on the activation space, the off-diagonal part of its Hessian. The expansion is exact for one or two removals: setting $a_i = 0$ gives $f + \Delta_i$, and setting $a_i = a_j = 0$ gives $f + \Delta_i + \Delta_j + \Phi_{ij}$. Redundant pairs ($\Phi_{ij} > 0$) are directions along which the evaluation landscape curves upward, since removing both is more damaging than expected; complementary pairs ($\Phi_{ij} < 0$) are directions along which it curves downward.</p>
+<p>the interaction matrix $\Phi$ is the second-order term of the evaluation function on the activation space, the off-diagonal part of its Hessian. The expansion is exact for one or two removals: setting $a_i = 0$ gives $f + \Delta_i$, and setting $a_i = a_j = 0$ gives $f + \Delta_i + \Delta_j + \Phi_{ij}$. Redundant pairs ($\Phi_{ij} &gt; 0$) are directions along which the evaluation landscape curves upward, since removing both is more damaging than expected; complementary pairs ($\Phi_{ij} &lt; 0$) are directions along which it curves downward.</p>
 <p>$\Phi$ is not a metric tensor. Its diagonal is zero and its entries take both signs, so it is not positive definite and does not define distances. When the activation space is relaxed to $\mathbf{a} \in [0, 1]^n$, replacing on and off with continuous weights, it becomes the off-diagonal part of the Hessian of $f$, and the compositional test is a greedy discrete descent on that landscape.</p>
 <hr />
 <h2 id="128-limitations-and-extensions">12.8 Limitations and Extensions</h2>

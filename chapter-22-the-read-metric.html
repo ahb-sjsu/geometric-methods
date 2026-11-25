@@ -229,7 +229,7 @@ def probe_metric(consumer, x, h=1e-4):
 <h2 id="225-when-one-averaged-matrix-is-the-wrong-object">22.5 When One Averaged Matrix Is the Wrong Object</h2>
 <p>Replacing $P(x)$ by $Q = \mathbb{E}\,P(X)$ is harmless when the unread directions are the same at every point. It is not harmless when they turn. If the kernel of $P(x)$ changes with $x$, the average $Q$ can have rank $q$ larger than the number $k$ of quantities the consumer reads, because a direction that is ignored at one point is read at another. An allocation built from $Q$ then protects $q$ directions everywhere.</p>
 <p>The example of Volume 14 is $g(x_1, x_2) = x_1 + a \sin x_2$ with a standard Gaussian source. The consumer reads one number, so $k = 1$. Its Jacobian $(1,\ a \cos x_2)$ turns with $x_2$, and</p>
-<p>$$Q = \begin{pmatrix} 1 & a e^{-1/2} \\ a e^{-1/2} & \tfrac{a^2}{2}(1 + e^{-2}) \end{pmatrix}$$</p>
+<p>$$Q = \begin{pmatrix} 1 &amp; a e^{-1/2} \\ a e^{-1/2} &amp; \tfrac{a^2}{2}(1 + e^{-2}) \end{pmatrix}$$</p>
 <p>has rank 2. For descriptions whose error covariance does not depend on the point, the least rate at consumer loss $D$ behaves as $\tfrac{q}{2}\log\tfrac{1}{D}$ for small $D$, and when the consumer&rsquo;s output can be described directly the rate needed behaves as $\tfrac{k}{2}\log\tfrac{1}{D}$. The excess is $\tfrac{q-k}{2}\log\tfrac1D$ plus a bounded term, and it grows without limit as the target loss falls. In that ledger this is row T1-MK, classed exploratory, a statement about one family of Gaussian test channels and about information rates and not about every code.</p>
 <p>The practical test is cheap. Compute $P(x)$ at the probe points and compare the rank of the average with the rank of the individual matrices:</p>
 <ul>

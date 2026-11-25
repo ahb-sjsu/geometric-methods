@@ -211,7 +211,7 @@ for _ in range(n_random):
 <p>A covariance matrix $\Sigma$ must be symmetric and positive-definite (SPD). Symmetry is easy to enforce &ndash; parameterize only the upper (or lower) triangle and mirror it. Positive-definiteness is harder. An unconstrained optimization over symmetric matrices will happily produce matrices with negative eigenvalues, which yield imaginary distances and meaningless metrics.</p>
 <p>The classical solution is the <strong>Cholesky decomposition</strong>. Every SPD matrix $M$ can be uniquely decomposed as:</p>
 <p>$$M = LL^\top$$</p>
-<p>where $L$ is a lower-triangular matrix with strictly positive diagonal entries. This decomposition is the matrix analogue of the fact that every positive real number $x$ can be written as $x = y^2$ for some $y > 0$.</p>
+<p>where $L$ is a lower-triangular matrix with strictly positive diagonal entries. This decomposition is the matrix analogue of the fact that every positive real number $x$ can be written as $x = y^2$ for some $y &gt; 0$.</p>
 <p>For metric learning, we apply this to the precision matrix rather than the covariance matrix:</p>
 <p>$$\Sigma^{-1} = LL^\top$$</p>
 <p>This is the parameterization used in the <code>eris-econ</code> calibration module. Instead of optimizing over $\Sigma^{-1}$ directly (which requires a positive-definiteness constraint), we optimize over the entries of $L$ (which is unconstrained except for positive diagonals). The product $LL^\top$ is automatically symmetric and positive-definite for any $L$ with positive diagonal entries.</p>

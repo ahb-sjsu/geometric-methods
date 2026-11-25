@@ -536,7 +536,7 @@ print(report.summary())
 <li>Adversarial search scales linearly: $O(n \log R)$ evaluations.</li>
 <li>Compositional testing scales quadratically in the worst case: $O(n^2 \cdot C(\cdot))$ evaluations.</li>
 </ul>
-<p>For problems with $n > 10$, subset enumeration up to $k = 4$ becomes expensive. Three mitigation strategies apply:</p>
+<p>For problems with $n &gt; 10$, subset enumeration up to $k = 4$ becomes expensive. Three mitigation strategies apply:</p>
 <ol>
 <li>
 <p><strong>Reduce <code>max_subset_dims</code>.</strong> Exploring only 1D and 2D subsets is often sufficient to identify the most important dimensions. Use the sensitivity profile to confirm the ranking.</p>

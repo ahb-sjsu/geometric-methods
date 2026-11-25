@@ -87,12 +87,12 @@
 </tr>
 <tr>
 <td>$\mathbb{B}^d_c$</td>
-<td>Poincare ball of dimension $d$ with curvature $-c$: $\{x \in \mathbb{R}^d : c\|x\|^2 < 1\}$</td>
+<td>Poincare ball of dimension $d$ with curvature $-c$: $\{x \in \mathbb{R}^d : c\|x\|^2 &lt; 1\}$</td>
 <td>Ch. 3</td>
 </tr>
 <tr>
 <td>$\mathbb{B}^n$</td>
-<td>Poincare ball with default curvature $c = 1$: $\{x \in \mathbb{R}^n : \|x\| < 1\}$</td>
+<td>Poincare ball with default curvature $c = 1$: $\{x \in \mathbb{R}^n : \|x\| &lt; 1\}$</td>
 <td>Ch. 1, 3</td>
 </tr>
 <tr>
@@ -343,7 +343,7 @@
 <p>Inverse of the exponential map. Returns the tangent vector at $x$ pointing toward $y$ with magnitude equal to the geodesic distance. Chapter 3.</p>
 <h3 id="a44-matrix-logarithm">A.4.4 Matrix Logarithm</h3>
 <p>$$\log(S) = U \cdot \text{diag}(\log \lambda_1, \ldots, \log \lambda_n) \cdot U^\top$$</p>
-<p>where $S = U\Lambda U^\top$ is the eigendecomposition of SPD matrix $S$ with eigenvalues $\lambda_i > 0$. Maps from SPD(n) to Sym(n) (the tangent space). Chapter 4.</p>
+<p>where $S = U\Lambda U^\top$ is the eigendecomposition of SPD matrix $S$ with eigenvalues $\lambda_i &gt; 0$. Maps from SPD(n) to Sym(n) (the tangent space). Chapter 4.</p>
 <h3 id="a45-matrix-exponential">A.4.5 Matrix Exponential</h3>
 <p>$$\exp(X) = U \cdot \text{diag}(e^{\mu_1}, \ldots, e^{\mu_n}) \cdot U^\top$$</p>
 <p>where $X = U \cdot \text{diag}(\mu_1, \ldots, \mu_n) \cdot U^\top$ is the eigendecomposition of symmetric matrix $X$. Maps from Sym(n) to SPD(n). The inverse of the matrix logarithm. Chapter 4.</p>
@@ -354,8 +354,8 @@
 <p>$$\gamma_c(k) = \frac{1}{\sqrt{1 - c\,\|k\|^2}}$$</p>
 <p>Defined for a point $k$ of the Klein model and used in the Einstein midpoint. If $k$ is the Klein image of the Poincaré point $x$, then $\gamma_c(k) = \lambda_x^c - 1$. Chapter 3.</p>
 <h3 id="a48-projection-onto-the-poincare-ball">A.4.8 Projection onto the Poincare Ball</h3>
-<p>$$\text{proj}(x) = \begin{cases} x & \text{if } \|x\| < r_{\max}/\sqrt{c} \\ \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x & \text{otherwise} \end{cases}$$</p>
-<p>Projects points back inside the open ball after floating-point drift. The parameter $r_{\max} < 1$ (typically $0.95$) provides a safety margin. Chapter 3.</p>
+<p>$$\text{proj}(x) = \begin{cases} x &amp; \text{if } \|x\| &lt; r_{\max}/\sqrt{c} \\ \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x &amp; \text{otherwise} \end{cases}$$</p>
+<p>Projects points back inside the open ball after floating-point drift. The parameter $r_{\max} &lt; 1$ (typically $0.95$) provides a safety margin. Chapter 3.</p>
 <h3 id="a49-scalar-projection">A.4.9 Scalar Projection</h3>
 <p>$$\phi : \mathbb{R}^n \to \mathbb{R}^1, \quad \phi(\mathbf{v}) = \mathbf{w}^\top \mathbf{v}$$</p>
 <p>Any linear projection from a multi-dimensional evaluation to a single scalar. The null space $\ker(\phi)$ has dimension $n - 1$, destroying $n - 1$ directions of information. Chapter 1.</p>
@@ -652,7 +652,7 @@
 </table>
 <h3 id="a83-sentinel-values">A.8.3 Sentinel Values</h3>
 <p>The sentinel value $10^6$ (denoted <code>inactive_value</code> in code) indicates that a dimension is <em>inactive</em> &mdash; its corresponding feature group is excluded from the metric. When a parameter value reaches a threshold, the evaluation function treats that dimension as off. The threshold is chosen by each evaluation function, not by the framework: the economics example uses $10^5$, as below, and the defect example of Chapter 19 uses $10^3$. In the economics example:</p>
-<p>$$w_i = \begin{cases} 1 / \max(p_i, 10^{-6}) & \text{if } p_i < 10^5 \\ 0 & \text{if } p_i \geq 10^5 \end{cases}$$</p>
+<p>$$w_i = \begin{cases} 1 / \max(p_i, 10^{-6}) &amp; \text{if } p_i &lt; 10^5 \\ 0 &amp; \text{if } p_i \geq 10^5 \end{cases}$$</p>
 <p>This mechanism enables subset enumeration: each combination of active/inactive dimensions defines a different sparsity pattern on $\Sigma^{-1}$. Chapters 1, 2.</p>
 <h3 id="a84-log-space-parameterization">A.8.4 Log-Space Parameterization</h3>
 <p>Parameter values are distributed on a logarithmic scale over $[\epsilon, M]$:</p>
@@ -709,7 +709,7 @@
 </tbody>
 </table>
 <h3 id="a86-curvature-convention">A.8.6 Curvature Convention</h3>
-<p>Hyperbolic curvature is parameterized as $-c$ where $c > 0$. The Poincare ball $\mathbb{B}^d_c$ has constant sectional curvature $-c$. Setting $c = 1$ gives standard hyperbolic geometry with curvature $-1$. Typical working range is $c \in [0.1, 2.0]$. Curvature may be treated as a learnable parameter. Chapter 3.</p>
+<p>Hyperbolic curvature is parameterized as $-c$ where $c &gt; 0$. The Poincare ball $\mathbb{B}^d_c$ has constant sectional curvature $-c$. Setting $c = 1$ gives standard hyperbolic geometry with curvature $-1$. Typical working range is $c \in [0.1, 2.0]$. Curvature may be treated as a learnable parameter. Chapter 3.</p>
 <h3 id="a87-immutability">A.8.7 Immutability</h3>
 <p>State vectors, once constructed, are not modified in place. All operations (perturbation, projection, interpolation) produce new vectors. This convention prevents aliasing bugs and ensures trajectory reproducibility. Chapter 1.</p>
 <h3 id="a88-function-signatures">A.8.8 Function Signatures</h3>

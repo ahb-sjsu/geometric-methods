@@ -106,7 +106,7 @@ result = dri.measure(decoder, signals, sr=32000)
 <p>The key innovation is the <strong>gradient reversal layer (GRL)</strong>, denoted by the $\times$ symbol in the diagram. During the forward pass, the GRL is the identity function: it passes $\mathbf{z}$ through unchanged. During the backward pass, it <em>negates</em> the gradient:</p>
 <p>$$\text{GRL}(\mathbf{z}) = \mathbf{z} \quad \text{(forward)}$$
 $$\frac{\partial \text{GRL}}{\partial \mathbf{z}} = -\lambda \mathbf{I} \quad \text{(backward)}$$</p>
-<p>where $\lambda > 0$ is a scaling factor that controls the strength of the adversarial signal.</p>
+<p>where $\lambda &gt; 0$ is a scaling factor that controls the strength of the adversarial signal.</p>
 <h3 id="1422-the-combined-loss">14.2.2 The Combined Loss</h3>
 <p>The full training objective is:</p>
 <p>$$\mathcal{L}(\theta, \phi, \psi) = \mathcal{L}_{\text{task}}(\theta, \phi) - \lambda \, \mathcal{L}_{\text{domain}}(\theta, \psi)$$</p>
@@ -702,7 +702,7 @@ invariant_transforms = [t for t in transforms if t.is_invariant]
 <p>Gradient reversal can fail in three ways:</p>
 <ol>
 <li>
-<p><strong>The nuisance and task subspaces coincide.</strong> If the only features predictive of the task are also predictive of the nuisance variable, enforcing invariance destroys task-relevant information. This is the $C > 0$ case in the Ben-David bound.</p>
+<p><strong>The nuisance and task subspaces coincide.</strong> If the only features predictive of the task are also predictive of the nuisance variable, enforcing invariance destroys task-relevant information. This is the $C &gt; 0$ case in the Ben-David bound.</p>
 </li>
 <li>
 <p><strong>The domain discriminator is too weak.</strong> If $h_\psi$ cannot detect nuisance information in $\mathbf{z}$, the reversed gradient is noise, and the encoder learns nothing about invariance. This is a practical failure, not a theoretical one.</p>

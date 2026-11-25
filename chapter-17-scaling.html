@@ -103,7 +103,7 @@
 <tr>
 <td>Pareto frontier extraction</td>
 <td>$O(m \cdot n)$</td>
-<td>$m > 10^6$</td>
+<td>$m &gt; 10^6$</td>
 <td>Dominance checks</td>
 </tr>
 <tr>
@@ -322,7 +322,7 @@
 <h3 id="1752-latin-hypercube-sampling">17.5.2 Latin Hypercube Sampling</h3>
 <p>LHS partitions each dimension&rsquo;s marginal distribution into $p$ equal-probability strata, ensuring each stratum is sampled exactly once. The resulting sample has better space-filling properties than independent sampling, providing approximately $1 + (1/p)$ variance reduction. For MRI, the modification replaces the independent normal draws with stratified draws via <code>scipy.stats.qmc.LatinHypercube</code>, transformed through the inverse normal CDF.</p>
 <h3 id="1753-quasi-random-sequences">17.5.3 Quasi-Random Sequences</h3>
-<p>Sobol and Halton sequences provide deterministic, low-discrepancy point sets. The Koksma&ndash;Hlawka inequality bounds integration error at $O((\log p)^n / p)$, tighter than random sampling&rsquo;s $O(1/\sqrt{p})$ when $n$ is moderate. Quasi-random sequences are most useful for $n < 40$; beyond this, a hybrid approach&mdash;Sobol for the most important dimensions, random for the rest&mdash;works well.</p>
+<p>Sobol and Halton sequences provide deterministic, low-discrepancy point sets. The Koksma&ndash;Hlawka inequality bounds integration error at $O((\log p)^n / p)$, tighter than random sampling&rsquo;s $O(1/\sqrt{p})$ when $n$ is moderate. Quasi-random sequences are most useful for $n &lt; 40$; beyond this, a hybrid approach&mdash;Sobol for the most important dimensions, random for the rest&mdash;works well.</p>
 <h3 id="1754-importance-sampling-along-sensitive-dimensions">17.5.4 Importance Sampling Along Sensitive Dimensions</h3>
 <p>Sensitivity profiling identifies which dimensions most influence MAE. Scaling perturbation variance by sensitivity rank concentrates samples where they matter:</p>
 <pre><code class="language-python">importance = np.array([sr.delta_mae for sr in sensitivity_results])
@@ -515,7 +515,7 @@ class CompactSubsetResult:
 <li>For each pair $(d_i, d_j)$, compute $\Delta_{ij} = \text{MAE}(\{d_i, d_j\}) - \min(\text{MAE}(\{d_i\}), \text{MAE}(\{d_j\}))$.</li>
 <li>Compute the interaction ratio $R = \max_{i,j} |\Delta_{ij}| / \text{MAE}(\{d_1\})$.</li>
 </ol>
-<p>If $R < 0.05$, interactions are weak and greedy methods suffice. If $R > 0.2$, interactions are strong and more thorough search is warranted.</p>
+<p>If $R &lt; 0.05$, interactions are weak and greedy methods suffice. If $R &gt; 0.2$, interactions are strong and more thorough search is warranted.</p>
 <h3 id="17103-the-decision-matrix">17.10.3 The Decision Matrix</h3>
 <table>
 <thead>
@@ -530,23 +530,23 @@ class CompactSubsetResult:
 <td>Exhaustive enumeration</td>
 </tr>
 <tr>
-<td>$15 < n \leq 50$, $E < 1$ms</td>
+<td>$15 &lt; n \leq 50$, $E &lt; 1$ms</td>
 <td>Exhaustive with $K \leq 3$</td>
 </tr>
 <tr>
-<td>$15 < n \leq 50$, $E > 1$ms</td>
+<td>$15 &lt; n \leq 50$, $E &gt; 1$ms</td>
 <td>LASSO screening + reduced enumeration</td>
 </tr>
 <tr>
-<td>$50 < n \leq 200$, weak interactions</td>
+<td>$50 &lt; n \leq 200$, weak interactions</td>
 <td>Forward + backward selection</td>
 </tr>
 <tr>
-<td>$50 < n \leq 200$, strong interactions</td>
+<td>$50 &lt; n \leq 200$, strong interactions</td>
 <td>LASSO screening + reduced enumeration</td>
 </tr>
 <tr>
-<td>$n > 200$</td>
+<td>$n &gt; 200$</td>
 <td>LASSO screening + forward selection only</td>
 </tr>
 </tbody>
@@ -593,7 +593,7 @@ reduced_results = enumerate_subsets(
 </blockquote>
 <h3 id="17111-intrinsic-dimension-by-the-two-nearest-neighbour-estimator">17.11.1 Intrinsic Dimension by the Two-Nearest-Neighbour Estimator</h3>
 <p>Let $r_1(x) \le r_2(x)$ be the distances from a point $x$ to its first and second nearest neighbours, and let $\mu = r_2 / r_1$. If the density is locally uniform on a $d$-dimensional manifold, the ratio is Pareto distributed with shape $d$, whatever the density is (Facco et al., 2017):</p>
-<p>$$\Pr(\mu > t) = t^{-d}, \qquad t \ge 1. \tag{17.1}$$</p>
+<p>$$\Pr(\mu &gt; t) = t^{-d}, \qquad t \ge 1. \tag{17.1}$$</p>
 <p>So $\ln \mu$ is exponential with rate $d$, and the maximum-likelihood estimate from $N$ points is</p>
 <p>$$\hat d = \frac{N}{\sum_{i=1}^{N} \ln \mu_i}. \tag{17.2}$$</p>
 <p>The estimator uses only the two nearest neighbours, so it reads the dimension <em>at the scale of the sampling density</em>. That is its strength and the source of everything that follows.</p>
@@ -799,14 +799,14 @@ reduced_results = enumerate_subsets(
 <p><strong>Non-linear dimension interactions.</strong> LASSO screening assesses dimensions individually via the $L^1$ penalty on each parameter. Dimensions whose importance emerges only through three-way or higher-order interactions may be incorrectly screened out. Developing screening methods that detect higher-order interactions without exhaustive search is an open problem in both the structural fuzzing framework and the broader feature selection literature.</p>
 <p><strong>Non-stationary evaluation costs.</strong> The cost model in Section 17.7 assumes that each evaluation has fixed cost $E$. In practice, evaluation cost may depend on the parameter values&mdash;some configurations cause the model to converge slowly or trigger expensive fallback computations. Adaptive budget allocation must account for this variance, potentially using multi-armed bandit strategies to estimate per-configuration cost online.</p>
 <p><strong>Theoretical guarantees.</strong> Forward selection provides an approximation ratio for submodular objectives, but the MAE-minimization objective in structural fuzzing is generally <em>not</em> submodular. Establishing theoretical guarantees for the approximation quality of greedy methods in this setting requires either proving submodularity under additional assumptions or developing alternative theoretical frameworks.</p>
-<p><strong>Distributed evaluation.</strong> For very high-dimensional problems ($n > 1{,}000$), even the $O(n^2)$ methods become slow. Distributed evaluation across a cluster introduces communication overhead, fault tolerance concerns, and load balancing challenges that are beyond the scope of this chapter but arise immediately in practice.</p>
+<p><strong>Distributed evaluation.</strong> For very high-dimensional problems ($n &gt; 1{,}000$), even the $O(n^2)$ methods become slow. Distributed evaluation across a cluster introduces communication overhead, fault tolerance concerns, and load balancing challenges that are beyond the scope of this chapter but arise immediately in practice.</p>
 <hr />
 <h2 id="1713-connection-to-chapter-18">17.13 Connection to Chapter 18</h2>
 <p>This chapter addressed scaling in the dimension of the <em>parameter space</em>&mdash;what happens when the model has many parameters and the geometric methods of earlier chapters encounter computational limits. The strategies developed here&mdash;LASSO screening, greedy alternatives, streaming evaluation, adaptive budget allocation&mdash;are each effective in isolation, but their true power emerges when they are composed into coherent workflows.</p>
 <p>Chapter 18 turns to exactly this challenge: composing geometric analyses into <em>pipelines</em> with conditional branching, iterative refinement, and feedback loops between stages. The linear six-stage chain in <code>run_campaign</code> is a starting point; Chapter 18 develops more sophisticated compositions where the output of LASSO screening determines whether to run exhaustive or greedy enumeration, where MRI results trigger additional adversarial testing on fragile configurations, and where the entire pipeline can be re-run with adapted parameters when initial results reveal unexpected structure. The scaling strategies of this chapter become building blocks in that larger architecture.</p>
 <hr />
 <h2 id="summary">Summary</h2>
-<p>High-dimensional parameter spaces challenge every stage of the structural fuzzing pipeline, but the challenges are unequal. Subset enumeration is the critical bottleneck, growing as $O(n^K)$ and becoming intractable for $n > 20$ at $K = 4$. Three families of strategies address this:</p>
+<p>High-dimensional parameter spaces challenge every stage of the structural fuzzing pipeline, but the challenges are unequal. Subset enumeration is the critical bottleneck, growing as $O(n^K)$ and becoming intractable for $n &gt; 20$ at $K = 4$. Three families of strategies address this:</p>
 <ol>
 <li><strong>Greedy methods</strong> (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ while typically finding configurations within 5&ndash;15% of the global optimum.</li>
 <li><strong>LASSO screening</strong> reduces effective dimensionality from $n$ to $n' \ll n$ at cost independent of $n$, enabling exhaustive enumeration on the reduced set.</li>

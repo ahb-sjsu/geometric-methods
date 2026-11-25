@@ -70,7 +70,7 @@
 <p>with at least one strict inequality. Dominance is a partial order: given two arbitrary configurations, it is entirely possible that neither dominates the other. Configuration $\mathbf{a}$ may excel on $f_1$ while $\mathbf{b}$ excels on $f_2$. In this case the two are <em>mutually non-dominated</em>, and no amount of algorithmic cleverness can rank one above the other without introducing a preference between the objectives.</p>
 <h3 id="812-the-general-case">8.1.2 The General Case</h3>
 <p>For $m$ objectives $f_1, f_2, \ldots, f_m$ (all to be minimized), dominance generalizes naturally:</p>
-<p>$$\mathbf{a} \prec \mathbf{b} \iff \forall\, i \in \{1, \ldots, m\}: f_i(\mathbf{a}) \leq f_i(\mathbf{b}) \;\;\text{and}\;\; \exists\, j: f_j(\mathbf{a}) < f_j(\mathbf{b})$$</p>
+<p>$$\mathbf{a} \prec \mathbf{b} \iff \forall\, i \in \{1, \ldots, m\}: f_i(\mathbf{a}) \leq f_i(\mathbf{b}) \;\;\text{and}\;\; \exists\, j: f_j(\mathbf{a}) &lt; f_j(\mathbf{b})$$</p>
 <p>The <em>Pareto frontier</em> (or Pareto front) is the set of all configurations that are not dominated by any other configuration in the search space:</p>
 <p>$$\mathcal{P} = \{\mathbf{a} \in \mathcal{S} : \nexists\, \mathbf{b} \in \mathcal{S} \;\text{such that}\; \mathbf{b} \prec \mathbf{a}\}$$</p>
 <p>Every configuration not on the Pareto frontier is strictly inferior to at least one configuration that is: it can be improved on one or more objectives without cost to any other. The frontier is the irreducible set of optimal tradeoffs&mdash;the &ldquo;efficient surface&rdquo; in Pareto&rsquo;s original terminology.</p>
@@ -191,7 +191,7 @@ class SubsetResult:
 <p><strong>Phase 1: Reduction to representatives.</strong> Among all subsets of size $k$, only the one with the lowest MAE can possibly be Pareto-optimal. If two configurations have the same dimensionality, the one with worse MAE is dominated by the one with better MAE (same $k$, higher error). The <code>best_at_k</code> dictionary selects a single representative for each dimensionality level, reducing potentially hundreds of candidates to at most $n$ representatives.</p>
 <p><strong>Phase 2: Sorting by dimensionality.</strong> The representatives are sorted in ascending order of <code>n_dims</code>. This ordering is critical because the Pareto condition involves comparing each candidate against all candidates of <em>lower</em> dimensionality. By processing candidates from lowest to highest dimensionality, we can maintain a running minimum and make the dominance check in constant time per candidate.</p>
 <p><strong>Phase 3: Forward sweep with tolerance.</strong> We scan the sorted candidates, maintaining <code>best_mae_so_far</code>&mdash;the lowest MAE achieved at any dimensionality already processed. A candidate at dimensionality $k$ enters the Pareto front only if its MAE strictly improves upon the running best by at least the tolerance threshold $\epsilon$:</p>
-<p>$$\text{MAE}(k) < \text{best\_mae\_so\_far} - \epsilon$$</p>
+<p>$$\text{MAE}(k) &lt; \text{best\_mae\_so\_far} - \epsilon$$</p>
 <p>The first candidate (lowest dimensionality) is always included, establishing the baseline. Each subsequent Pareto-optimal point must demonstrate that the additional complexity buys a meaningful improvement in accuracy.</p>
 <h3 id="842-complexity-analysis">8.4.2 Complexity Analysis</h3>
 <p>Phase 1 requires a single pass over all $m$ results: $O(m)$. Phase 2 sorts at most $n$ representatives: $O(n \log n)$, where $n$ is the number of distinct dimensionality levels. Phase 3 is a single linear scan: $O(n)$. The total complexity is $O(m + n \log n)$, which is dominated by the initial pass when $m \gg n$ (as is typical, since $m = \sum \binom{n}{j}$ grows combinatorially while $n$ is the number of dimensions).</p>
@@ -526,7 +526,7 @@ for r in frontier:
 <p><strong>Dominance relation properties.</strong> Prove that Pareto dominance is a strict partial order: it is irreflexive ($\mathbf{a} \nprec \mathbf{a}$), asymmetric ($\mathbf{a} \prec \mathbf{b} \implies \mathbf{b} \nprec \mathbf{a}$), and transitive ($\mathbf{a} \prec \mathbf{b}$ and $\mathbf{b} \prec \mathbf{c}$ imply $\mathbf{a} \prec \mathbf{c}$). Why is totality ($\mathbf{a} \prec \mathbf{b}$ or $\mathbf{b} \prec \mathbf{a}$ for all $\mathbf{a} \neq \mathbf{b}$) generally absent?</p>
 </li>
 <li>
-<p><strong>Convexity and scalarization.</strong> Construct a set of four points in $(k, \text{MAE})$ space such that the Pareto frontier is non-convex. Show that no positive weight vector $\mathbf{w} = (w_1, w_2)$ with $w_1, w_2 > 0$ recovers the complete frontier when used for scalarized optimization.</p>
+<p><strong>Convexity and scalarization.</strong> Construct a set of four points in $(k, \text{MAE})$ space such that the Pareto frontier is non-convex. Show that no positive weight vector $\mathbf{w} = (w_1, w_2)$ with $w_1, w_2 &gt; 0$ recovers the complete frontier when used for scalarized optimization.</p>
 </li>
 <li>
 <p><strong>Tolerance calibration.</strong> Run <code>pareto_frontier</code> on the defect prediction example with tolerance values $\epsilon \in \{0, 0.001, 0.01, 0.1, 1.0\}$. Plot the number of Pareto-optimal configurations as a function of $\epsilon$. At what value of $\epsilon$ does the frontier collapse to a single point? Relate this value to the range of MAE values in the subset results.</p>

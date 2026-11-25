@@ -61,11 +61,11 @@
 <p>Chapter 3 worked on one curved space, the Poincaré ball. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example &mdash; covariance analysis of cetacean vocalizations &mdash; illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.</p>
 <h2 id="41-the-manifold-of-positive-definite-matrices">4.1 The Manifold of Positive Definite Matrices</h2>
 <p><strong>Definition 4.1.</strong> The set of <em>n x n</em> symmetric positive definite matrices is</p>
-<p>$$\text{SPD}(n) = \{S \in \mathbb{R}^{n \times n} : S = S^\top,\; x^\top S x > 0 \;\forall x \neq 0\}.$$</p>
+<p>$$\text{SPD}(n) = \{S \in \mathbb{R}^{n \times n} : S = S^\top,\; x^\top S x &gt; 0 \;\forall x \neq 0\}.$$</p>
 <p>This set is open in the space of symmetric matrices: every SPD matrix has a neighborhood of SPD matrices around it. It is also a smooth manifold of dimension <em>n(n+1)/2</em>, since a symmetric matrix is determined by its upper triangle.</p>
 <h3 id="why-not-a-vector-space">Why Not a Vector Space?</h3>
 <p>At first glance, SPD(n) looks like it might be a vector subspace of $\mathbb{R}^{n \times n}$. After all, the sum of two SPD matrices is SPD. If $S_1$ and $S_2$ are both symmetric positive definite, then for any $x \neq 0$,</p>
-<p>$$x^\top(S_1 + S_2)x = x^\top S_1 x + x^\top S_2 x > 0.$$</p>
+<p>$$x^\top(S_1 + S_2)x = x^\top S_1 x + x^\top S_2 x &gt; 0.$$</p>
 <p>However, SPD(n) fails the scalar multiplication axiom. Multiplying an SPD matrix by $-1$ produces a negative definite matrix, which is not in SPD(n). More subtly, even restricting to positive scalars does not resolve the problem, because a vector space requires closure under <em>all</em> scalars, including zero (the zero matrix is not positive definite). Therefore SPD(n) is not a vector space.</p>
 <h3 id="why-not-just-use-euclidean-distance">Why Not Just Use Euclidean Distance?</h3>
 <p>One might try to measure distances between SPD matrices using the Frobenius norm:</p>
@@ -84,7 +84,7 @@
 <p><em>Proof sketch.</em> The matrix logarithm is a diffeomorphism from SPD(n) to the space Sym(n) of all <em>n x n</em> symmetric matrices. Since the Frobenius norm is a metric on Sym(n), composing with the diffeomorphism $\log$ yields a metric on SPD(n). $\square$</p>
 <p>The key insight is that the logarithm &ldquo;unfolds&rdquo; the curved SPD manifold into the flat vector space of symmetric matrices, where ordinary Euclidean geometry applies. This is analogous to how the logarithm maps the positive reals $(0, \infty)$ &mdash; which have a multiplicative structure &mdash; onto all of $\mathbb{R}$, where addition is the natural operation.</p>
 <h3 id="computing-the-matrix-logarithm">Computing the Matrix Logarithm</h3>
-<p>The matrix logarithm of an SPD matrix is computed via eigendecomposition. If $S = U \Lambda U^\top$ where $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$ with all $\lambda_i > 0$, then</p>
+<p>The matrix logarithm of an SPD matrix is computed via eigendecomposition. If $S = U \Lambda U^\top$ where $\Lambda = \text{diag}(\lambda_1, \ldots, \lambda_n)$ with all $\lambda_i &gt; 0$, then</p>
 <p>$$\log(S) = U \cdot \text{diag}(\log \lambda_1, \ldots, \log \lambda_n) \cdot U^\top.$$</p>
 <p>This is well-defined precisely because the eigenvalues of an SPD matrix are strictly positive, so their logarithms exist. The computational cost is dominated by the eigendecomposition, which is $O(n^3)$.</p>
 <p>The following implementation from the <code>eris-ketos</code> project encapsulates this operation as a method on an <code>SPDManifold</code> class:</p>
@@ -112,7 +112,7 @@
         eigvals, eigvecs = torch.linalg.eigh(X)
         return eigvecs @ torch.diag_embed(eigvals.exp()) @ eigvecs.transpose(-2, -1)
 </code></pre>
-<p>The exponential of any symmetric matrix is guaranteed to be SPD (since $e^{\mu_i} > 0$ for all real $\mu_i$), so the exp map always lands in SPD(n). Together, the log and exp maps form a diffeomorphism between SPD(n) and Sym(n), which is the foundation of the log-Euclidean framework.</p>
+<p>The exponential of any symmetric matrix is guaranteed to be SPD (since $e^{\mu_i} &gt; 0$ for all real $\mu_i$), so the exp map always lands in SPD(n). Together, the log and exp maps form a diffeomorphism between SPD(n) and Sym(n), which is the foundation of the log-Euclidean framework.</p>
 <h3 id="log-euclidean-distance-implementation">Log-Euclidean Distance Implementation</h3>
 <p>With the log map in hand, the distance computation is straightforward:</p>
 <pre><code class="language-python">    @staticmethod
@@ -127,9 +127,9 @@
 <p>The <code>flatten(-2)</code> call reshapes the <em>n x n</em> matrix into a vector of length $n^2$ before computing the norm. The <code>dim=-1</code> argument computes the norm along the last dimension, enabling batched computation. This entire operation supports arbitrary batch dimensions via PyTorch&rsquo;s broadcasting, so one can compute distances between batches of SPD matrices without explicit loops.</p>
 <h3 id="comparison-log-euclidean-vs-frobenius">Comparison: Log-Euclidean vs. Frobenius</h3>
 <p>To build intuition for why the log-Euclidean metric is more discriminative, consider two $2 \times 2$ covariance matrices:</p>
-<p>$$S_1 = \begin{pmatrix} 1 & 0 \\ 0 & 0.01 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 1 & 0 \\ 0 & 100 \end{pmatrix}.$$</p>
+<p>$$S_1 = \begin{pmatrix} 1 &amp; 0 \\ 0 &amp; 0.01 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 1 &amp; 0 \\ 0 &amp; 100 \end{pmatrix}.$$</p>
 <p>The Frobenius distance is $\|S_1 - S_2\|_F = \sqrt{(0.01 - 100)^2} = 99.99$. Now consider:</p>
-<p>$$S_3 = \begin{pmatrix} 1 & 0 \\ 0 & 10000 \end{pmatrix}.$$</p>
+<p>$$S_3 = \begin{pmatrix} 1 &amp; 0 \\ 0 &amp; 10000 \end{pmatrix}.$$</p>
 <p>The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though the second pair differs by the smaller multiplicative factor in that eigenvalue ($100$ against $10{,}000$).</p>
 <p>The log-Euclidean distances tell a different story. We have $\log(\lambda)$ values of $\log(0.01) \approx -4.6$, $\log(100) \approx 4.6$, and $\log(10000) \approx 9.2$. So $d_{LE}(S_1, S_2) \approx |{-4.6} - 4.6| = 9.2$ and $d_{LE}(S_2, S_3) \approx |4.6 - 9.2| = 4.6$. The log-Euclidean metric correctly reports that the multiplicative change from $S_2$ to $S_3$ (a factor of 100) is smaller than the change from $S_1$ to $S_2$ (a factor of 10,000). This scale-sensitivity is essential when eigenvalues span many orders of magnitude, as they do in covariance matrices from real-world signals.</p>
 <h2 id="43-the-frechet-mean-on-spdn">4.3 The Frechet Mean on SPD(n)</h2>
@@ -163,8 +163,8 @@
 </code></pre>
 <p>The implementation normalizes the weights to sum to one, broadcasts them across the matrix dimensions with <code>w.view(-1, 1, 1)</code>, and computes the weighted sum in log-space. The final <code>exp_map</code> call projects back onto the SPD manifold.</p>
 <p><strong>Example 4.1.</strong> <em>Consider two 2x2 covariance matrices representing &ldquo;narrow-band&rdquo; and &ldquo;broad-band&rdquo; spectral patterns:</em></p>
-<p>$$S_1 = \begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 4 & 0 \\ 0 & 4 \end{pmatrix}.$$</p>
-<p><em>The arithmetic mean is $\frac{1}{2}(S_1 + S_2) = \begin{pmatrix} 2.5 & 0.25 \\ 0.25 & 2.5 \end{pmatrix}$, which has eigenvalues $2.75$ and $2.25$. The log-Euclidean Frechet mean $\exp(\frac{1}{2}(\log(S_1) + \log(S_2)))$ yields a different matrix &mdash; one that better interpolates the geometric structure of the two covariances. The difference is most pronounced when the constituent matrices have eigenvalues spanning several orders of magnitude.</em></p>
+<p>$$S_1 = \begin{pmatrix} 1 &amp; 0.5 \\ 0.5 &amp; 1 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 4 &amp; 0 \\ 0 &amp; 4 \end{pmatrix}.$$</p>
+<p><em>The arithmetic mean is $\frac{1}{2}(S_1 + S_2) = \begin{pmatrix} 2.5 &amp; 0.25 \\ 0.25 &amp; 2.5 \end{pmatrix}$, which has eigenvalues $2.75$ and $2.25$. The log-Euclidean Frechet mean $\exp(\frac{1}{2}(\log(S_1) + \log(S_2)))$ yields a different matrix &mdash; one that better interpolates the geometric structure of the two covariances. The difference is most pronounced when the constituent matrices have eigenvalues spanning several orders of magnitude.</em></p>
 <h2 id="44-frequency-band-covariance-extraction">4.4 Frequency-Band Covariance Extraction</h2>
 <p>We now connect the abstract SPD machinery to concrete signal processing. Given a spectrogram &mdash; a time-frequency representation of an audio signal &mdash; we construct an SPD covariance matrix that encodes how frequency bands co-vary over time.</p>
 <h3 id="from-spectrograms-to-covariance-matrices">From Spectrograms to Covariance Matrices</h3>
@@ -187,7 +187,7 @@ $$\mathbf{C} = \frac{\tilde{\mathbf{B}} \tilde{\mathbf{B}}^\top}{n_\text{frames}
 $$\mathbf{C}_\text{reg} = \mathbf{C} + \epsilon \mathbf{I}, \quad \epsilon = 10^{-4}.$$</p>
 </li>
 </ol>
-<p>The regularization in step 4 is essential. The raw covariance matrix can be positive <em>semi</em>-definite (with zero eigenvalues) when $n_\text{frames} < n_\text{bands}$ or when frequency bands are linearly dependent. Adding $\epsilon \mathbf{I}$ shifts all eigenvalues by $\epsilon$, ensuring strict positive definiteness without materially altering the covariance structure.</p>
+<p>The regularization in step 4 is essential. The raw covariance matrix can be positive <em>semi</em>-definite (with zero eigenvalues) when $n_\text{frames} &lt; n_\text{bands}$ or when frequency bands are linearly dependent. Adding $\epsilon \mathbf{I}$ shifts all eigenvalues by $\epsilon$, ensuring strict positive definiteness without materially altering the covariance structure.</p>
 <pre><code class="language-python">def compute_covariance(
     spectrogram: np.ndarray,
     n_bands: int = 16,
@@ -241,7 +241,7 @@ $$\mathbf{C}_\text{reg} = \mathbf{C} + \epsilon \mathbf{I}, \quad \epsilon = 10^
 </code></pre>
 <p>The feature vector consists of:
 - <strong>Diagonal elements</strong> $(\log(\mathbf{C}))_{ii}$: the log-variance of each frequency band. These capture how much energy fluctuation occurs in each band over time.
-- <strong>Off-diagonal elements</strong> $(\log(\mathbf{C}))_{ij}$ for $i < j$: the log-domain cross-band correlations. These encode how frequency bands co-vary &mdash; whether they tend to increase and decrease together (positive), move inversely (negative), or behave independently (near zero).</p>
+- <strong>Off-diagonal elements</strong> $(\log(\mathbf{C}))_{ij}$ for $i &lt; j$: the log-domain cross-band correlations. These encode how frequency bands co-vary &mdash; whether they tend to increase and decrease together (positive), move inversely (negative), or behave independently (near zero).</p>
 <p>The off-diagonal elements are precisely what makes SPD features more informative than per-band energy statistics. A flat spectrogram representation captures the energy in each band independently but discards information about <em>relationships</em> between bands. The covariance matrix retains this information, and the log map ensures that distances between covariance matrices respect the manifold geometry.</p>
 <h2 id="45-spectral-trajectory-analysis">4.5 Spectral Trajectory Analysis</h2>
 <p>The covariance extraction described above produces a single SPD matrix summarizing an entire signal. But many signals of interest have time-varying spectral structure. A spoken vowel transitions into a consonant; a musical note evolves from attack to sustain to decay; a whale vocalization may shift its spectral content within a single click or across a coda sequence. To capture this temporal evolution, we extend the single-covariance analysis to a <em>trajectory</em> on the SPD manifold.</p>
