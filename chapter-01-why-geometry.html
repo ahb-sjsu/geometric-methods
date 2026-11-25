@@ -71,11 +71,11 @@
 <p>We can state this precisely. Let $\phi(\mathbf{v}) = \mathbf{w}^\top \mathbf{v}$ for some weight vector $\mathbf{w} \in \mathbb{R}^n$ with $n \geq 2$. The preimage $\phi^{-1}(c) = \{\mathbf{v} : \mathbf{w}^\top \mathbf{v} = c\}$ is a hyperplane of dimension $n - 1$. Any two points on this hyperplane are indistinguishable under $\phi$, yet they may differ arbitrarily in every component. The null space of the projection, $\ker(\phi) = \{\mathbf{v} : \mathbf{w}^\top \mathbf{v} = 0\}$, has dimension $n - 1$, which means the space of information destroyed by the projection <em>grows linearly with the dimensionality of the original space</em>. For a model evaluated on 16 features grouped into 5 dimensions, the null space is 4-dimensional: four independent directions of variation are invisible to any single scalar summary.</p>
 <p>This is not a matter of choosing the <em>wrong</em> scalar. It is a theorem about <em>all</em> scalars. No single number drawn from a 5-dimensional evaluation can preserve more than one dimension of information. The other four are gone.</p>
 <h3 id="112-a-concrete-example-the-ultimatum-game">1.1.2 A Concrete Example: The Ultimatum Game</h3>
-<p>The ultimatum game provides a clean illustration. Player A proposes a split of \$10 with Player B. If B accepts, both receive their shares. If B rejects, both receive nothing.</p>
+<p>The ultimatum game provides a clean illustration. Player A proposes a split of <span class="currency">&#36;</span>10 with Player B. If B accepts, both receive their shares. If B rejects, both receive nothing.</p>
 <p>Consider two offers:</p>
 <ul>
-<li><strong>Offer X</strong>: A keeps \$8, B gets \$2. Monetary cost to A: \$2.</li>
-<li><strong>Offer Y</strong>: A keeps \$5, B gets \$5. Monetary cost to A: \$5.</li>
+<li><strong>Offer X</strong>: A keeps <span class="currency">&#36;</span>8, B gets <span class="currency">&#36;</span>2. Monetary cost to A: <span class="currency">&#36;</span>2.</li>
+<li><strong>Offer Y</strong>: A keeps <span class="currency">&#36;</span>5, B gets <span class="currency">&#36;</span>5. Monetary cost to A: <span class="currency">&#36;</span>5.</li>
 </ul>
 <p>Traditional utility theory assigns a scalar value to each offer&mdash;typically the expected monetary payoff&mdash;and ranks them accordingly. Under this model, Offer X dominates because A pays less.</p>
 <p>But behavioral economics tells a different story. In experiments, B rejects Offer X roughly 50% of the time, while accepting Offer Y nearly always. The scalar model cannot explain this because it has discarded the <em>fairness dimension</em>. In a two-dimensional space with axes for monetary cost and fairness, the offers occupy distinct positions:</p>
