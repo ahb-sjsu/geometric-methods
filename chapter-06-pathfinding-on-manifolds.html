@@ -69,19 +69,20 @@
 <p>On a curved space, the straight-line distance is no longer the shortest path. The shortest path is a <em>geodesic</em> &mdash; a curve that locally minimizes arc length according to the Riemannian metric of the space. When the space has non-trivial curvature, the geodesic distance can differ substantially from the Euclidean distance, and the direction of the difference depends on the sign of the curvature:</p>
 <ul>
 <li>
-<p><strong>Positive curvature</strong> (e.g., the surface of a sphere): geodesics converge. The geodesic distance between two points is <em>less than</em> the Euclidean distance through the ambient space, but <em>greater than</em> the chord length. The Euclidean heuristic (using chord length) underestimates and remains admissible, but may be loose.</p>
+<p><strong>Positive curvature</strong> (e.g., the surface of a sphere): geodesics converge. The geodesic distance between two points is <em>greater than</em> the chord length, which is the straight-line distance through the ambient space. The Euclidean heuristic (using chord length) underestimates and remains admissible, but may be loose.</p>
 </li>
 <li>
 <p><strong>Negative curvature</strong> (e.g., hyperbolic space, as developed in Chapter 3): geodesics diverge. Two points that appear close in the ambient Euclidean coordinates can be far apart in geodesic distance, because the metric is stretched near the boundary of the Poincare ball. The Euclidean distance <em>underestimates</em> the geodesic distance, which means the Euclidean heuristic remains admissible but becomes increasingly uninformative &mdash; approaching the zero heuristic in the worst case.</p>
 </li>
 <li>
-<p><strong>Non-uniform curvature</strong> (e.g., the SPD manifold from Chapter 4, or a decision space with a Mahalanobis metric): the relationship between Euclidean and geodesic distance varies from point to point. In some regions the Euclidean heuristic is tight; in others it is arbitrarily loose. Worse, when the metric tensor $\Sigma^{-1}$ has large eigenvalues in some directions and small eigenvalues in others, the Euclidean heuristic can <em>overestimate</em> the Mahalanobis distance along low-precision directions while <em>underestimating</em> it along high-precision directions.</p>
+<p><strong>Non-uniform curvature</strong> (e.g., the SPD manifold from Chapter 4): the relationship between Euclidean and geodesic distance varies from point to point. In some regions the Euclidean heuristic is tight; in others it is arbitrarily loose.</p>
 </li>
+<li><strong>Anisotropy without curvature</strong> (a decision space with a Mahalanobis metric): the space is flat, so the relationship is the same everywhere, but it depends on direction. When the metric tensor $\Sigma^{-1}$ has large eigenvalues in some directions and small eigenvalues in others, the Euclidean heuristic can <em>overestimate</em> the Mahalanobis distance along low-precision directions while <em>underestimating</em> it along high-precision directions.</li>
 </ul>
-<p>The last case is the one that matters for this book. The 9-dimensional economic decision space of the <code>eris-econ</code> model has a covariance matrix $\Sigma$ with eigenvalues ranging from 0.25 (the Fairness dimension, tightly constrained) to 25.0 (the Consequences dimension, loosely constrained). A 1-unit Euclidean displacement along the Fairness axis corresponds to a Mahalanobis distance of $1/\sqrt{0.25} = 2.0$, while the same displacement along the Consequences axis corresponds to $1/\sqrt{25.0} = 0.2$. The Euclidean distance treats both displacements identically &mdash; a 10x error in relative weighting.</p>
+<p>The last case is the one that matters for this book. The 9-dimensional economic decision space of the <code>eris-econ</code> model has a covariance matrix $\Sigma$ whose diagonal entries range from 0.25 (the Fairness dimension, tightly constrained) to 25.0 (the Consequences dimension, loosely constrained). A 1-unit Euclidean displacement along the Fairness axis corresponds to a Mahalanobis distance of $1/\sqrt{0.25} = 2.0$, while the same displacement along the Consequences axis corresponds to $1/\sqrt{25.0} = 0.2$. The Euclidean distance treats both displacements identically &mdash; a 10x error in relative weighting.</p>
 <h3 id="612-the-boundary-discontinuity-problem">6.1.2 The Boundary Discontinuity Problem</h3>
 <p>Even if the curvature problem could be resolved by rescaling the heuristic, a deeper issue remains: the decision spaces we consider have <em>discontinuous</em> cost functions. Moral boundaries (Section 6.4) impose step-function penalties on certain transitions. A path that crosses a moral boundary incurs a finite or infinite additional cost that no smooth distance function can predict. The Euclidean heuristic, being smooth, has no mechanism to account for boundaries that may lie between the current state and the goal.</p>
-<p>This means that even a perfectly calibrated Euclidean heuristic &mdash; one that exactly matches the Mahalanobis distance &mdash; would still be inadmissible in the presence of boundary penalties, because it would underestimate the true cost by ignoring the penalties. The fix requires a fundamentally different kind of heuristic: one that estimates not geometric distance but <em>behavioral friction</em>, including both the smooth metric component and the discontinuous moral component. This is the moral heuristic developed in Section 6.5.</p>
+<p>This means that even a perfectly calibrated Euclidean heuristic &mdash; one that exactly matches the Mahalanobis distance &mdash; would still fail in the presence of boundary penalties. It stays admissible, because ignoring a non-negative penalty can only underestimate the true cost, but it carries no information about where the penalties are, so it cannot steer the search away from them. The fix requires a fundamentally different kind of heuristic: one that estimates not geometric distance but <em>behavioral friction</em>, including both the smooth metric component and the discontinuous moral component. This is the moral heuristic developed in Section 6.5.</p>
 <h3 id="613-consequences-for-pathfinding">6.1.3 Consequences for Pathfinding</h3>
 <p>When A* operates with an inadmissible or uninformative heuristic on a decision manifold, three failure modes arise:</p>
 <ol>
@@ -113,7 +114,7 @@
 <p>$$h_{\text{scaled}}(n) = \sqrt{\lambda_{\min}} \cdot \|n - g\|_2$$</p>
 <p>This is admissible by construction but often very loose (since $\lambda_{\min}$ may be much less than 1). A tighter approach uses the Mahalanobis distance directly as the heuristic:</p>
 <p>$$h_M(n) = d_M(n, g) = \sqrt{(g - n)^\top \Sigma^{-1} (g - n)}$$</p>
-<p>This is <em>exact</em> for the single-step case (when the goal is reachable in one edge) and provides a tight lower bound in the multi-step case, because the straight-line Mahalanobis distance is always less than or equal to the sum of edge weights along any path. However, it ignores boundary penalties, so it remains inadmissible in the presence of moral boundaries.</p>
+<p>This is <em>exact</em> for the single-step case (when the goal is reachable in one edge) and provides a tight lower bound in the multi-step case, because the straight-line Mahalanobis distance is always less than or equal to the sum of edge weights along any path. However, it ignores boundary penalties, so it can fall far below the true cost in the presence of moral boundaries.</p>
 <h3 id="623-the-hyperbolic-and-spd-cases">6.2.3 The Hyperbolic and SPD Cases</h3>
 <p>For completeness, we note the distortion bounds in the other geometric settings developed in this book.</p>
 <p>In hyperbolic space (Chapter 3), the geodesic distance on the Poincare ball is:</p>
@@ -291,6 +292,16 @@
 </table>
 <p>The exploitation boundary deserves special attention. It is a <em>conjunctive</em> condition: neither monetary gain alone nor fairness loss alone triggers the penalty. Only the <em>combination</em> of profit-seeking and fairness-reducing constitutes exploitation. This two-condition structure cannot be captured by any linear cost function on the state space &mdash; it requires the piecewise-smooth formulation that boundary penalties provide.</p>
 <p>When $\beta_k = \infty$ (a sacred boundary), the edge weight becomes infinite and A* skips the edge entirely via the check <code>if np.isinf(tentative_g): continue</code>. Sacred values are not preferences to be weighed against other considerations; they are hard constraints that eliminate certain paths from the search space.</p>
+<h3 id="644-coordinates-that-degenerate-at-a-boundary">6.4.4 Coordinates That Degenerate at a Boundary</h3>
+<p>Every boundary in the table above is a condition on the state: a dimension reaches zero, or a quantity changes sign. The coordinates used to describe the state can fail at exactly those places. When they do, a smooth model fitted across the boundary is not merely inaccurate there. Part of it is unidentified.</p>
+<p>The common case is a <em>balance coordinate</em>. Let $g \geq 0$ and $l \geq 0$ be two magnitudes that compete, such as benefit and harm or gain and loss, and define</p>
+<p>$$d = \frac{g - l}{g + l} \in [-1, 1].$$</p>
+<p>The endpoints $d = \pm 1$ are not extreme values of a balance. They are the states in which one magnitude is absent: $d = 1$ exactly when $l = 0$, and $d = -1$ exactly when $g = 0$. On each of those sets the coordinate is constant, so it carries no information, and any interaction term $d \cdot x$ equals $\pm x$. Its coefficient cannot be separated there from the coefficient of $x$ itself. A model that pools both sides reports one interaction coefficient, and that number mixes an effect inside the region $|d| < 1$ with a plain effect of $x$, entering with opposite signs, on the two endpoint sets.</p>
+<p>But the set $l = 0$ is also where Section 6.4.3 places a boundary: a magnitude going from positive to zero is the sacred-value condition. The coordinate degenerates at the boundary it was supposed to help detect.</p>
+<p><strong>Chart-selection rule.</strong> Wherever a bounded balance coordinate is introduced, ask what its endpoints mean. If they mean absence and not extremity, they are a boundary in the sense of Section 6.4.3. Fit each side separately, and do not read an interaction coefficient estimated across an endpoint as a property of either side.</p>
+<blockquote>
+<p><strong>Status of the evidence.</strong> The rule comes from a study of risky choice in the <code>geometric-economics</code> repository (draft <code>paper_04_stratified_kappa.md</code>, 2026-09-13). On 95,748 choice trials, $|d| = 1$ coincided, with no exceptions, with gambles that have no loss branch or no gain branch. A pooled interaction of $+0.25$ fell to about $-0.03$, within its noise, inside mixed gambles once the regions were separated. The same draft reports discontinuities in risk sensitivity at the two boundaries, $0.87 \pm 0.21$ where the loss branch is eliminated and $1.34 \pm 0.25$ where the gain branch is. These are the first boundary penalties in this programme taken from data and not stipulated, with two cautions: they are jumps in a risk-sensitivity term and not edge weights of the nine-dimensional complex, and they are two different boundaries, not one boundary crossed in two directions. The draft was archived on 2026-11-02 because the model it tested has a diagonal metric and hand-chosen coordinates, which the programme does not hold. The rule above is a statement about coordinates and does not depend on that model. The numbers are records of the version that was tested.</p>
+</blockquote>
 <hr />
 <h2 id="65-a-adaptation-for-manifold-heuristics">6.5 A* Adaptation for Manifold Heuristics</h2>
 <h3 id="651-the-core-algorithm">6.5.1 The Core Algorithm</h3>
@@ -420,6 +431,8 @@ class _Node:
     &quot;&quot;&quot;
 
     def h(vid: str, graph: EconomicDecisionComplex) -&gt; float:
+        if vid in goal_ids:
+            return 0.0  # no cost remains at a goal
         cost = 0.0
         for name, prob in boundary_probs.items():
             beta = boundary_penalties.get(name, 0.0)
@@ -430,6 +443,7 @@ class _Node:
     return h
 </code></pre>
 <p>The moral heuristic computes $h_M(n) = \sum_k \beta_k \cdot P(\text{cross boundary } k \text{ from } n)$, where $\beta_k$ is the penalty for crossing moral boundary $k$ and $P(\cdot)$ is the estimated probability that any path from $n$ to the goal will cross that boundary. This is System 1 in its purest form: a fast, emotion-based estimate of the moral cost of proceeding.</p>
+<p>As printed, the probabilities are fixed numbers supplied in advance, so <code>h</code> returns the same value at every vertex except a goal. That is the simplest version, not the intended one. A heuristic must be zero at a goal, where no cost remains, which is why the code returns zero there; without that line no positive penalty could be admissible. The intended version estimates each probability from the vertex, for example from whether the cheapest Mahalanobis step from $n$ toward a goal crosses boundary $k$.</p>
 <p><strong>Theorem 6.1</strong> (Moral heuristic admissibility). <em>The moral heuristic $h_M$ is admissible when $\beta_k \leq \beta_k^*$ for all $k$, where $\beta_k^*$ is the true minimum boundary penalty along any optimal path from $n$ to the goal.</em></p>
 <p>The cognitive interpretation is that moral intuitions must not <em>exaggerate</em> the moral cost of continuing. Well-calibrated intuitions ($\beta_k \leq \beta_k^*$) produce optimal decisions. Overestimated moral costs &mdash; moral hypervigilance &mdash; produce cautious but suboptimal behavior: the agent avoids some acceptable paths, ending up on a more expensive route.</p>
 <p>Note the asymmetry: infinite penalties (sacred values) are excluded from the heuristic calculation. Sacred boundaries produce infinite edge weights, which A* prunes via the <code>np.isinf(tentative_g)</code> check. Sacred values do not need to be estimated; they are enforced structurally.</p>
@@ -475,7 +489,7 @@ for give_pct in [0, 10, 20, 30, 40, 50]:
 
 E.compute_weights()
 </code></pre>
-<p>Each offer level affects <em>multiple</em> dimensions simultaneously. Offering 0% keeps all the money ($d_1 = 10$) but produces terrible fairness ($d_3 = 0.1$) and identity ($d_7 = 0.3$) scores. Offering 50% splits the money ($d_1 = 5$) but achieves maximum fairness ($d_3 = 0.9$) and strong identity ($d_7 = 0.8$). The linear scaling functions (e.g., $\text{fairness} = 0.1 + 0.8 \cdot (\text{give\_pct}/50)$) are calibrated to empirical data on perceived fairness.</p>
+<p>Each offer level affects <em>multiple</em> dimensions simultaneously. Offering 0% keeps all the money ($d_1 = 10$) but produces terrible fairness ($d_3 = 0.1$) and identity ($d_7 = 0.3$) scores. Offering 50% splits the money ($d_1 = 5$) but achieves maximum fairness ($d_3 = 0.9$) and strong identity ($d_7 = 0.8$). The linear scaling functions (e.g., $\text{fairness} = 0.1 + 0.8 \cdot (\text{give\_pct}/50)$) are set by hand; they are not fitted to data.</p>
 <p><strong>Running pathfinding.</strong> The Bond Geodesic is computed by:</p>
 <pre><code class="language-python">from eris_econ.pathfinding import astar
 
@@ -486,10 +500,35 @@ result = astar(E, start=&quot;start&quot;, goals=goals)
 print(f&quot;Optimal offer: {result.path[-1]}&quot;)
 print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
 </code></pre>
-<p><strong>Why the model predicts ~40%.</strong> Consider the edge weights for the extreme offers:</p>
-<p>For &ldquo;offer 0%&rdquo;: the fairness drop ($0.5 \to 0.1$, $\Delta = -0.4$) on a dimension with variance 0.25 contributes $(-0.4)^2 / 0.25 = 0.64$ to the squared Mahalanobis distance. The identity drop ($0.5 \to 0.3$, $\Delta = -0.2$) adds $(-0.2)^2 / 0.25 = 0.16$. The social impact drop ($0.0 \to -0.2$) adds another $(-0.2)^2 / 0.25 = 0.16$. The monetary gain ($10.0 \to 10.0$, $\Delta = 0$) contributes nothing because the proposer keeps everything &mdash; the same as the starting state. And the exploitation boundary fires ($\Delta d_1 > 0$ from the start&rsquo;s perspective combined with $\Delta d_3 < -0.3$), adding a penalty of 5.0.</p>
-<p>For &ldquo;offer 40%&rdquo;: fairness <em>improves</em> ($0.5 \to 0.74$), identity <em>improves</em> ($0.5 \to 0.7$), and the exploitation boundary is not crossed. The monetary loss ($10 \to 6$) contributes only $(-4)^2 / 25 = 0.64$ to the squared Mahalanobis distance &mdash; a modest cost because the Consequences dimension has high variance.</p>
-<p>The result: the 40% offer path has lower total behavioral friction than the 0% offer path. The Bond Geodesic terminates near the 40% vertex.</p>
+<p><strong>What the model predicts.</strong> The edge weights computed from the code above are:</p>
+<table>
+<thead>
+<tr>
+<th>Offer</th>
+<th style="text-align: center;">0%</th>
+<th style="text-align: center;">10%</th>
+<th style="text-align: center;">20%</th>
+<th style="text-align: center;">30%</th>
+<th style="text-align: center;">40%</th>
+<th style="text-align: center;">50%</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Edge weight</td>
+<td style="text-align: center;">0.95</td>
+<td style="text-align: center;">0.54</td>
+<td style="text-align: center;">0.42</td>
+<td style="text-align: center;">0.74</td>
+<td style="text-align: center;">1.19</td>
+<td style="text-align: center;">1.67</td>
+</tr>
+</tbody>
+</table>
+<p>For &ldquo;offer 0%&rdquo;: the fairness drop ($0.5 \to 0.1$, $\Delta = -0.4$) on a dimension with variance 0.25 contributes $(-0.4)^2 / 0.25 = 0.64$ to the squared Mahalanobis distance. The identity drop ($0.5 \to 0.3$) adds $(-0.2)^2 / 0.25 = 0.16$, and the social impact drop ($0.0 \to -0.2$) adds another $0.16$. The monetary term is zero, because the proposer keeps everything. The exploitation boundary does <em>not</em> fire: its condition requires the money to rise ($\Delta d_1 > 0$), and here $\Delta d_1 = 0$.</p>
+<p>For &ldquo;offer 40%&rdquo;: fairness improves ($0.5 \to 0.74$), identity improves ($0.5 \to 0.7$) and social impact improves ($0.0 \to 0.28$). A Mahalanobis metric is symmetric, so a move toward more fairness costs as much as a move away from it: these three improvements add $0.23$, $0.16$ and $0.31$ to the squared distance, on top of $(-4)^2/25 = 0.64$ for the money given up.</p>
+<p>For &ldquo;offer 20%&rdquo;: the state hardly moves. Fairness goes from $0.5$ to $0.42$, identity stays at $0.5$, and the money term is $(-2)^2/25 = 0.16$.</p>
+<p>The result: the Bond Geodesic terminates at the 20% vertex. The model rejects the zero offer of the Nash analysis, which costs more than twice as much, but its least-cost offer is below the 40&ndash;50% that proposers actually make. Two features of the construction produce this. The starting state is placed at neutral fairness and identity ($0.5$), which a 20% offer nearly reproduces, and the metric charges for moral gain as well as moral loss. The <code>eris-econ</code> test suite records the same value: with the default covariance the model predicts 20%, the direction is right, and a quantitative match requires a covariance calibrated on experimental data. The six weights are recomputed in <code>formal/matlab/volume_checks.m</code>.</p>
 <h3 id="662-the-prisoners-dilemma">6.6.2 The Prisoner&rsquo;s Dilemma</h3>
 <p>The prisoner&rsquo;s dilemma provides a complementary example where boundary penalties drive the qualitative prediction.</p>
 <pre><code class="language-python">def prisoners_dilemma(sigma=None):
@@ -516,7 +555,7 @@ print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
 </code></pre>
 <p>The Nash equilibrium (projecting onto $d_1$ alone) predicts mutual defection: defecting yields \$5 vs. cooperating for \$3. But on the full 9D manifold, defection causes massive drops in fairness ($0.5 \to 0.1$), identity ($0.5 \to 0.2$), social impact ($0.0 \to -0.3$), and legitimacy ($0.5 \to 0.2$). The promise-breaking boundary ($\Delta d_8 = -0.3 < -0.5$? No &mdash; $\Delta d_8 = 0.2 - 0.5 = -0.3$, which does not trigger at the $-0.5$ threshold) does not fire here, but the accumulated Mahalanobis cost across four moral dimensions makes defection more expensive than cooperation on the full manifold. The Bond Geodesic predicts cooperation &mdash; consistent with empirical results showing significant cooperation rates in one-shot prisoner&rsquo;s dilemmas.</p>
 <h3 id="663-the-public-goods-game">6.6.3 The Public Goods Game</h3>
-<p>The public goods game illustrates multi-step reasoning. In a group of $n$ players, each decides how much of their endowment to contribute to a common pool, which is multiplied by a factor $m$ and divided equally. The Nash prediction: contribute nothing (free-ride). The empirical result: initial contributions are around 40&ndash;60%, declining over rounds but never reaching zero.</p>
+<p>The public goods game extends the pattern to many players. In a group of $n$ players, each decides how much of their endowment to contribute to a common pool, which is multiplied by a factor $m$ and divided equally. The Nash prediction: contribute nothing (free-ride). The empirical result: initial contributions are around 40&ndash;60%, declining over rounds but never reaching zero.</p>
 <p>The <code>eris-econ</code> implementation models a single player&rsquo;s decision:</p>
 <pre><code class="language-python">for contrib_pct in [0, 25, 50, 75, 100]:
     contrib = endowment * contrib_pct / 100
@@ -565,7 +604,7 @@ print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
 <p><strong>A* with manifold heuristics</strong> adapts the classical algorithm to non-Euclidean edge weights. Three heuristics &mdash; zero (Dijkstra), Euclidean, and moral &mdash; encode different System 1 models within the dual-process cognitive framework. The moral heuristic $h_M(n) = \sum_k \beta_k \cdot P(\text{cross boundary } k)$ is the distinctive contribution, encoding fast emotional judgment as an A* heuristic with a precise admissibility condition. Section 6.5 developed this machinery.</p>
 </li>
 <li>
-<p><strong>Concrete examples</strong> from <code>eris-econ</code> demonstrated the framework&rsquo;s explanatory power. The ultimatum game prediction of ~40% offers, the prisoner&rsquo;s dilemma prediction of cooperation, and the public goods game prediction of moderate contributions all match empirical data and diverge from Nash equilibrium predictions. Section 6.6 traced the computations step by step.</p>
+<p><strong>Concrete examples</strong> from <code>eris-econ</code> demonstrated the framework&rsquo;s explanatory power. The ultimatum game prediction of a positive offer (20% under the default covariance, against the 40&ndash;50% observed), the prisoner&rsquo;s dilemma prediction of cooperation, and the public goods game prediction of moderate contributions all agree in direction with empirical data and diverge from Nash equilibrium predictions. Section 6.6 traced the computations step by step.</p>
 </li>
 </ol>
 <p>In Chapter 7, we extend from single-agent pathfinding to multi-agent interaction. When two or more decision complexes are coupled &mdash; when each agent&rsquo;s edge weights depend on the other agents&rsquo; chosen paths &mdash; the Bond Geodesic becomes a fixed point of a coupled optimization. The result is the <em>Bond Geodesic Equilibrium</em> (BGE): a strategy profile in which each agent&rsquo;s path is optimal given the paths of all others. We will prove that Nash equilibrium emerges as a special case &mdash; the projection of the BGE onto the $d_1$ (Consequences) axis alone. The geometric framework does not replace game theory; it <em>generalizes</em> it to the full decision manifold, recovering classical results as a degenerate case while explaining the behavioral anomalies that classical theory cannot.</p>
@@ -579,7 +618,7 @@ print(f&quot;Behavioral friction: {result.total_cost:.4f}&quot;)
 <p><strong>6.6.</strong> Implement a Mahalanobis heuristic $h_M(n) = d_M(n, g)$ that uses the precision matrix from the decision complex. Under what conditions is this heuristic admissible? Compare the number of vertices explored by A* using $h_M$ vs. the Euclidean heuristic on the ultimatum game complex.</p>
 <hr />
 <h3 id="bibliographic-notes">Bibliographic Notes</h3>
-<p>The A<em> algorithm was introduced by Hart, Nilsson, and Raphael (1968). The dual-process model of cognition (System 1 / System 2) is developed in Kahneman, </em>Thinking, Fast and Slow* (2011). The use of Mahalanobis distance in behavioral modeling connects to the broader metric learning literature surveyed by Kulis (2013). The ultimatum game data referenced throughout this chapter comes from the cross-cultural studies of Henrich et al. (2001, 2005) and the meta-analysis of Oosterbeek et al. (2004). Stake-size effects are documented in Slonim and Roth (1998). The framing effects referenced in Section 6.6 are from Liberman, Samuels, and Ross (2004). The connection between sacred values and deontological constraints is developed by Tetlock et al. (2000). The Bond Geodesic formulation and its application to behavioral economics are introduced in Bond (2026).</p>
+<p>The A<em> algorithm was introduced by Hart, Nilsson, and Raphael (1968). The dual-process model of cognition (System 1 / System 2) is developed in Kahneman, </em>Thinking, Fast and Slow* (2011). The use of Mahalanobis distance in behavioral modeling connects to the broader metric learning literature surveyed by Kulis (2013). The ultimatum game data referenced throughout this chapter comes from the cross-cultural studies of Henrich et al. (2001, 2005) and the meta-analysis of Oosterbeek et al. (2004). Stake-size effects are documented in Slonim and Roth (1998). The framing effects discussed in Section 7.7.4 are from Liberman, Samuels, and Ross (2004). The connection between sacred values and deontological constraints is developed by Tetlock et al. (2000). The Bond Geodesic formulation and its application to behavioral economics are introduced in Bond (2026).</p>
       </div>
 
       <div class="chapter-nav-bottom">

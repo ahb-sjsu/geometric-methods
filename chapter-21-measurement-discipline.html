@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chapter 21: The Measurement Discipline &mdash; Geometric Methods</title>
+  <meta name="description" content="Chapter 21: The Measurement Discipline from Geometric Methods: Computational Modeling, by Andrew H. Bond.">
+  <meta name="generator" content="geometric-series build kit">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="../book/book.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+  <link rel="stylesheet" href="assets/demos.css">
+  <script>
+    // Legacy single-page URLs were index.html#chapter-02-... ; forward them to
+    // the static per-chapter pages.
+    (function () {
+      var h = (location.hash || '').slice(1);
+      if (/^(chapter-\d{2}-|appendix-[a-z]-)[a-z0-9-]+$/.test(h)) {
+        location.replace(h + '.html');
+      }
+    })();
+  </script>
+</head>
+
+<body data-book-slug="geometric-methods" data-chapter-id="chapter-21-measurement-discipline">
+  <nav id="main-nav">
+    <div class="nav-inner">
+      <a href="../index.html" class="nav-brand">
+        <span class="brand-symbol">M</span>
+        <span class="brand-text">Geometric Methods</span>
+      </a>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="series-nav-list"></ul>
+    </div>
+  </nav>
+
+  <article class="book-chapter">
+    <div class="chapter-container">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="../index.html">Geometric Series</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <a href="index.html">Geometric Methods</a>
+        <span class="breadcrumb-sep">&rsaquo;</span>
+        <span class="breadcrumb-current">Chapter 21: The Measurement Discipline</span>
+      </nav>
+      <div class="chapter-nav-top">
+        <a href="chapter-20-case-study-bioacoustics.html" class="nav-prev">&larr; Chapter 20: Case Study --- Cetacean Bioacoustics</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-22-the-read-metric.html" class="nav-next">Chapter 22: The Read Metric &rarr;</a>
+      </div>
+
+      <div class="chapter-content">
+<h1 id="chapter-21-the-measurement-discipline">Chapter 21: The Measurement Discipline</h1>
+<blockquote>
+<p><em>&ldquo;The first principle is that you must not fool yourself, and you are the easiest person to fool.&rdquo;</em>
+&mdash; Richard Feynman, Caltech commencement address (1974)</p>
+</blockquote>
+<p>The first twenty chapters describe instruments: distances, manifolds, indices, searches. This chapter describes the rules under which a number produced by one of those instruments may be called a result. The rules are short. A claim is either <em>posited</em> or <em>measured</em>. It becomes measured only by surviving a test that was fixed before the data were seen, that could have failed, and whose record is kept whatever its outcome.</p>
+<p>The chapter exists because the instruments do not enforce this by themselves, and this volume is its own evidence. A review of the first twenty chapters in November 2026 found a worked example whose printed code gives a different answer from the prose around it (Section 6.6.1), an evaluation function whose output did not depend on its argument (Section 20.7.1), result tables that no run had produced (Chapters 19 and 20), and, in the campaign reported in Section 17.11, a statistic believed for a time to be free of a nuisance quantity that was not. None of these was caught by an accuracy number. Each would have been caught by one of the rules below.</p>
+<p>The normative source is the Claim Ledger Specification, PE-CLS-1.0, in the <code>philosophy-engineering</code> repository. This chapter is a reader&rsquo;s guide to it for users of geometric methods, with examples from this volume. Where the two differ, the specification governs.</p>
+<hr />
+<h2 id="211-posited-and-measured">21.1 Posited and Measured</h2>
+<p>A <strong>posited</strong> statement is one asserted because it follows from the construction, seems reasonable, or was observed once without a prior commitment. A <strong>measured</strong> statement is one that was put at risk: a prediction and a pass mark were written down first, the measurement was then made, and the outcome was recorded.</p>
+<p>Most of what a geometric model says is posited. The covariance matrix of Section 6.6.1 is posited. So are the boundary penalties of Section 6.4.3 and the tables in Chapters 8, 9, 11 and 12 that the text introduces with &ldquo;might look like&rdquo;. This is not a defect. A construction has to be stated before it can be tested. The defect is to cite a posited statement as if it were measured, and the remedy is to label every statement with its class.</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>What supports it</th>
+<th>Minimum evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Proved</td>
+<td>Deduction</td>
+<td>A complete written proof and one independent line-by-line check; machine-checked where feasible</td>
+</tr>
+<tr>
+<td>Replicated</td>
+<td>Several independent settings</td>
+<td>Two or more settings, each meeting its own registered pass mark</td>
+</tr>
+<tr>
+<td>Demonstrated</td>
+<td>One setting</td>
+<td>A registration that predates the run, a committed result, an instrument that can be rerun</td>
+</tr>
+<tr>
+<td>Predicted</td>
+<td>An out-of-sample forecast</td>
+<td>Registered before the data existed or before they were unblinded</td>
+</tr>
+<tr>
+<td>Definition</td>
+<td>Nothing; it is stipulated</td>
+<td>A construction or a name that asserts nothing about the world</td>
+</tr>
+<tr>
+<td>Exploratory</td>
+<td>A suggestive observation</td>
+<td>Labelled as such wherever it appears; may not support a claim of a higher class</td>
+</tr>
+<tr>
+<td>Refuted</td>
+<td>Valid evidence against</td>
+<td>The registered prediction failed on a valid measurement</td>
+</tr>
+<tr>
+<td>Withdrawn</td>
+<td>Nothing</td>
+<td>The supporting evidence was found to be defective</td>
+</tr>
+</tbody>
+</table>
+<p>&ldquo;Posited&rdquo; covers the definition and exploratory rows. &ldquo;Measured&rdquo; covers the first four.</p>
+<p><strong>Withdrawn is not refuted.</strong> A claim is refuted when a valid measurement contradicted it. The world answered, and its negation is now supported. A claim is withdrawn when its evidence turns out to be invalid: a broken instrument, a contaminated arm, a sampling rule that was not what it was thought to be. The world did not answer, the claim returns to unknown, and its negation gains nothing. Section 17.11.2 has an example. The statement that hubness in the real corpus rises with corpus size was withdrawn, not refuted, when the split between queries and corpus was found to follow file order. The corrected measurement is consistent with a rise and with none.</p>
+<hr />
+<h2 id="212-registration">21.2 Registration</h2>
+<p>A <strong>registration</strong> is a prediction recorded before the measurement that tests it. It contains five things:</p>
+<ol>
+<li>the prediction, stated so that it can fail as written;</li>
+<li>the <strong>bar</strong>, a numeric threshold that counts as success;</li>
+<li>how the bar was sized: from a power analysis, from a pilot value with a margin, or with an explicit statement that neither was done;</li>
+<li>the design: sample size, stopping rule, and the unit by which errors are clustered;</li>
+<li>a content hash of the registration and of the instrument code.</li>
+</ol>
+<p>A registration also separates two kinds of gate. A <strong>physics gate</strong> is one whose miss refutes the claim. An <strong>instrument gate</strong> is one whose miss voids the run, because the instrument was not measuring what it was meant to. If the two are not separated in advance, a failed experiment can be redescribed afterwards as a broken instrument.</p>
+<p><strong>Priority is shown by ancestry, not by date.</strong> A timestamp is written by the author. The position of a commit in a version-control graph is not. The registration must be an ancestor of the first commit that contains the result:</p>
+<pre><code class="language-bash">git merge-base --is-ancestor &lt;seal-commit&gt; &lt;first-commit-adding-result&gt;
+</code></pre>
+<p>This is evidence that is hard to tamper with. It is not proof of the time on the clock, and it is destroyed by rewriting history, so commits that carry a seal are never rebased.</p>
+<p><strong>Amendments</strong> are dated, state their reason, and come before the data are unblinded. A change of plan after the result is seen is a new registration.</p>
+<hr />
+<h2 id="213-frozen-null-gates">21.3 Frozen-Null Gates</h2>
+<p>A bar stated as an absolute number invites two errors. It can be set where chance already reaches it, and it can be moved after the result is known. A <strong>frozen-null gate</strong> avoids both. The bar is a margin over one or more <em>nulls</em>, which are versions of the instrument that cannot contain the effect, and the nulls, the margin and the date are committed before the run.</p>
+<p>Let $s$ be the score of the system under test and $s^{(1)}_0, \ldots, s^{(J)}_0$ the scores of $J$ nulls on the same held-out data. The gate passes when</p>
+<p>$$s - \max_{j} s^{(j)}_0 \;\geq\; \delta. \tag{21.1}$$</p>
+<p>The <code>xbse</code> instrument, which scores text on moral dimensions, uses two nulls: an encoder with untrained weights, and a bag-of-words classifier. A dimension is validated only if its cross-dataset score beats both by $\delta = 0.10$. Under that gate eight of nine dimensions pass and one fails, and the one that fails is reported with the others (<code>xbse</code> README, 2026-09-02). A bar of this kind may be tightened later. It may not be loosened.</p>
+<p><strong>Size the margin in units of noise.</strong> A margin has to be compared with the spread of the difference it is judging. If the difference in (21.1) has standard error $\sigma_\Delta$ when no effect is present, and the margin is set at $\delta = z\,\sigma_\Delta$, then a system with no effect passes with probability</p>
+<p>$$\Pr(\text{pass} \mid \text{no effect}) = 1 - \Phi(z), \tag{21.2}$$</p>
+<p>where $\Phi$ is the standard normal distribution function. A margin chosen without reference to $\sigma_\Delta$ has an unknown false-positive rate, and an absolute tolerance tests itself and not the system.</p>
+<p><strong>A null can move.</strong> Section 17.11.2 is a warning about nulls that depend on the experiment. The null skewness of a retrieval count is $1/\sqrt{\rho}$, which rises as the query budget $\rho$ falls. A comparison made at two different budgets compares two different nulls. Where a null depends on a design quantity, either hold that quantity fixed or model the null and remove it, and then confirm by measurement that it has been removed.</p>
+<hr />
+<h2 id="214-admissibility">21.4 Admissibility</h2>
+<p>A registration can be made first, reported in full and cited at the right class, and the experiment can still be incapable of grading the claim. <strong>Admissibility</strong> is the property that the design could have failed. It has four checks, and each is discharged by a named artifact, not by the author&rsquo;s assurance.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Question</th>
+<th>Discharged by</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A1 Nonvacuity</td>
+<td>Could any outcome have withheld the pass?</td>
+<td>A constructed record that the registered grading code scores as a miss. For a statistical test, many records drawn from the null, on which the code passes at no more than its nominal rate</td>
+</tr>
+<tr>
+<td>A2 Identification</td>
+<td>Is every fitted object the test relies on identified, on data fit for that role?</td>
+<td>The data each object was fitted on and its overlap with the evaluation data; an identification statistic with a threshold</td>
+</tr>
+<tr>
+<td>A3 Intervention</td>
+<td>Did the manipulation move the named construct, leave the instrument measuring, and not build the response?</td>
+<td>A manipulation check; an instrument check under treatment; a placebo arm</td>
+</tr>
+<tr>
+<td>A4 Inference</td>
+<td>Is the estimate the registered one, on the registered population?</td>
+<td>A fixed estimand and denominator; an account of exclusions; a correction for the family of tests, fixed in advance</td>
+</tr>
+</tbody>
+</table>
+<p>A1 is a property of the design and is settled before any data exist. A2 to A4 are instrument gates: a miss voids the run and does not refute the claim, and the void is recorded with the check that failed.</p>
+<p>Three examples from this volume show what each check is for.</p>
+<p><strong>A1, a function that cannot fail.</strong> The first version of the evaluation function in Section 20.7.1 computed a vector of weights from its parameters and then did not use it. Its return value was the same for every parameter vector. A campaign run on it would give every subset of dimensions the same error, a flat sensitivity profile and a robustness index of zero, and none of these would say anything about the decoder. The witness that A1 asks for takes one line: evaluate the function at two different parameter vectors and require the outputs to differ. The corrected function in Section 20.7.1 now ends with that line. The defect example of Chapter 19 has a milder form of the same problem, and the recorded run shows its cost: the function reads only whether each parameter is below 1000, so 189,462 calls in one campaign came down to 32 distinct models, and the robustness index came out exactly zero (Section 19.7).</p>
+<p><strong>A3, a manipulation that moved something else.</strong> In the measurement reported in Section 17.11.2, the manipulated quantity was corpus size. The script that varied it also drew queries from a different part of the dataset than the corpus, so the query distribution was shifted in every cell. The response attributed to corpus size was partly a response to that shift. A placebo arm, the same rows shuffled before the split, exposed it.</p>
+<p><strong>A4, an error bar on the wrong unit.</strong> In the same measurement the largest corpus in each ladder was the whole pool, so every seed shared one corpus and only the queries varied. The spread across seeds in that cell was a fraction of the spread in the others, and that cell carried the most weight in the fitted slope. Standard errors belong to the unit that was resampled. A corpus that was drawn once has a sample size of one, however many queries were run against it.</p>
+<p>A registration that declares all four checks not applicable has checked nothing, and a conforming report says how many were declared not applicable.</p>
+<hr />
+<h2 id="215-the-record">21.5 The Record</h2>
+<p><strong>Completeness.</strong> Every result is reported, whatever its sign. Stated that way the rule cannot be checked, because the set of unreported results cannot be seen. The specification makes it checkable by a device: registrations are numbered from a contiguous sequence, and every number resolves to a disposition, which is one of reported, superseded, void with a reason, or never assigned. A hidden failure then needs a visible gap or a false entry. This does not prove that nothing was hidden. It means that hiding takes an act and not an omission.</p>
+<p><strong>Authority.</strong> A book, a paper or a talk holds no authority to assert. It is a view over the record, and every assertion in it resolves to an entry whose class the context admits. This is why the sections of this volume that report measurements name the file each number came from, and why Sections 6.4.4 and 17.11 open with a statement of status. A reader should be able to tell, for any number in the text, whether it was measured, on what, and where the record is.</p>
+<p><strong>Dependencies.</strong> A claim that uses another claim says so. When a claim is refuted or withdrawn, everything that depends on it is found mechanically and suspended until it is re-examined. The size of that set is the cost of the error, and keeping it small is a reason to state claims narrowly.</p>
+<hr />
+<h2 id="216-five-working-rules">21.6 Five Working Rules</h2>
+<p>The following rules are not in the specification. Each records a mistake made in this programme, and each is cheap to apply.</p>
+<ol>
+<li><strong>Test the pipeline, not the components.</strong> Every stage can pass its own check while the composed result is wrong. The witness of A1 is run through the whole path, from raw input to the graded number.</li>
+<li><strong>Selection is fitting.</strong> Data used to choose among model structures, even only to rank candidates, are not held out. A held-out set is one that no decision has touched.</li>
+<li><strong>Cluster by the unit of the covariate.</strong> If the predictor of interest varies by problem, the sample size is the number of problems, not the number of responses, and standard errors are clustered by problem.</li>
+<li><strong>Measure invariance.</strong> Before a statistic is called independent of a nuisance quantity, measure it under two protocols that differ only in that quantity (Section 17.11.3, rule 6). Dividing by a null removes the null&rsquo;s location and not its shape.</li>
+<li><strong>Agreement under one sampling rule is one measurement.</strong> Repetitions that share a split, a seed schedule or a corpus agree with each other for that reason. Independent confirmation changes the thing that might be wrong.</li>
+</ol>
+<hr />
+<h2 id="217-how-the-discipline-fails">21.7 How the Discipline Fails</h2>
+<p>A method that cannot say how it fails should not be trusted, and this one fails in at least four ways.</p>
+<p><strong>The apparatus becomes the output.</strong> A programme can produce registrations and conformance reports and no results. Nothing in the rules detects this. The record is to be judged by the claims it carries.</p>
+<p><strong>Registration as theatre.</strong> A bar that no outcome could miss satisfies the letter of Section 21.2. The witness of A1 is the main defence, and it is incomplete: a witness can be weaker than the real alternative, and a bar that refuses a pure null can still credit a proxy for the effect.</p>
+<p><strong>The verifier shares the author&rsquo;s blind spot.</strong> A check made by someone, or something, with the same assumptions and tools will miss what the author missed. Independence comes in degrees and is described, not asserted. The proofs of Appendix C and the identities of Chapter 17 that are checked symbolically are checked by a different kind of process from the one that wrote them, which is the point of doing so. A symbolic check confirms the algebra. It does not confirm that the algebra is the right model.</p>
+<p><strong>The method is itself posited.</strong> The specification is an unregistered claim about how inquiry should be governed. By its own rules its class is exploratory until programmes other than its author&rsquo;s have used it and reported what broke.</p>
+<hr />
+<h2 id="218-the-status-of-this-volume">21.8 The Status of This Volume</h2>
+<p>Applying Section 21.1 to the volume itself gives the following, as of November 2026.</p>
+<table>
+<thead>
+<tr>
+<th>Material</th>
+<th>Class</th>
+<th>Record</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Theorems of Appendix C</td>
+<td>Proved in writing. Parts (iii) and (iv) of Theorem C.1, Proposition C.3.1 and Corollary C.7.1 were restated or reproved in the November 2026 review</td>
+<td><code>formal/matlab/volume_checks.m</code> for the identities and cases it covers; no machine-checked proof</td>
+</tr>
+<tr>
+<td>Identities of Section 17.11</td>
+<td>Proved; checked symbolically</td>
+<td><code>formal/matlab/ch17_neighbourhood_stats.m</code></td>
+</tr>
+<tr>
+<td>Measurements of Section 17.11</td>
+<td>Demonstrated or exploratory, as each source file states; one withdrawn claim</td>
+<td><code>openvector-bench</code>, files named in the section</td>
+</tr>
+<tr>
+<td>Einstein midpoint (Section 3.6), interaction identities (Section 12.4.2), hypervolume (Section 18.6)</td>
+<td>Proved; checked symbolically or against an independent computation</td>
+<td><code>formal/matlab/volume_checks.m</code></td>
+</tr>
+<tr>
+<td>Edge weights of Section 6.6.1 and loss-aversion table of Section 7.7.1</td>
+<td>Computed from the printed code; the values follow from hand-set inputs</td>
+<td><code>formal/matlab/volume_checks.m</code></td>
+</tr>
+<tr>
+<td>Covariance, penalties, displacement coefficients and scaling functions of Chapters 6 and 7</td>
+<td>Posited</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Discontinuities quoted in Section 6.4.4</td>
+<td>Record of an archived draft</td>
+<td><code>geometric-economics</code>, as cited there</td>
+</tr>
+<tr>
+<td>Tables of Chapters 1, 8, 9, 11 and 12</td>
+<td>Posited; the text presents them as illustrations</td>
+<td>None</td>
+</tr>
+<tr>
+<td>Results of Chapter 19</td>
+<td>Measured on one recorded run, with an oracle bound and a 20-seed redraw. Exploratory: no prediction was registered before the run</td>
+<td><code>formal/runs/ch19_*.py</code> and their JSON outputs</td>
+</tr>
+<tr>
+<td>Experiment of Section 14.9</td>
+<td>Three predictions registered in the script before it ran, graded on one recorded run</td>
+<td><code>formal/runs/ch14_shortcut_experiment.py</code> and its JSON output; priority shown by file hash, not by version-control ancestry</td>
+</tr>
+<tr>
+<td>Water-filling program of Section 22.3</td>
+<td>Proved, in the ledger of Volume 14 (row PAPER-III.a)</td>
+<td><code>geometric-observation</code>, <code>claims/LEDGER.md</code></td>
+</tr>
+<tr>
+<td>Concentration bound of Section 22.2 and the rate statements of Section 22.5</td>
+<td>Exploratory in that ledger (rows T1 and T1-MK): written proofs and independent audits, no sealed numerical test</td>
+<td>Same</td>
+</tr>
+<tr>
+<td>Run of Section 22.4</td>
+<td>Three predictions written in the script and committed before it ran, graded on one recorded run. Exploratory: one synthetic consumer, one seed</td>
+<td><code>formal/runs/ch22_read_metric.py</code> and its JSON output</td>
+</tr>
+<tr>
+<td>Results of Section 20.9</td>
+<td>Measured, but the executed notebook is not committed, so there is no public record</td>
+<td><code>eris-ketos</code> notebook, executed copy of 12 March 2026</td>
+</tr>
+<tr>
+<td>Contributions claimed for the geometric layers in Sections 20.2 to 20.4</td>
+<td>Posited; the comparison of Section 20.9.4 has not been run</td>
+<td>None</td>
+</tr>
+</tbody>
+</table>
+<p>Two domains of the wider series had passed frozen-null gates when the repository&rsquo;s status note was written in July 2026: moral dimensions in text, and legal text. Their records are in the instrument repositories <code>xbse</code>, <code>moral-spectrum-analyzer</code> and <code>lebse</code>, not in this volume.</p>
+<hr />
+<h2 id="summary">Summary</h2>
+<p>A number from a geometric instrument is posited until it has been put at risk. Putting it at risk means registering the prediction and its bar before the measurement, with the registration an ancestor of the result in the version-control graph; setting the bar as a margin over nulls that are fixed in advance and sized in units of noise; showing that the design could have failed, by a witness the grading code scores as a miss; and keeping every outcome in a numbered record. A withdrawn claim is not a refuted one. A book is a view over that record and asserts nothing the record cannot show.</p>
+<hr />
+<h2 id="notes-and-further-reading">Notes and Further Reading</h2>
+<p>The normative text is PE-CLS-1.0, <em>The Claim Ledger Specification</em> (Bond, 2026; amended 2026-10-17), in the <code>philosophy-engineering</code> repository, with its companions PE-BRW-1.0 and PE-DSC-1.0. Pre-registration as a remedy for undisclosed flexibility in analysis is argued in Simmons, Nelson and Simonsohn, &ldquo;False-Positive Psychology&rdquo; (<em>Psychological Science</em>, 2011), and the practice is set out in Nosek et al., &ldquo;The Preregistration Revolution&rdquo; (<em>PNAS</em>, 2018). The distinction between a claim&rsquo;s support and the risk it bore follows Popper, <em>The Logic of Scientific Discovery</em> (1959), and Mayo, <em>Statistical Inference as Severe Testing</em> (2018).</p>
+      </div>
+
+      <div class="chapter-nav-bottom">
+        <a href="chapter-20-case-study-bioacoustics.html" class="nav-prev">&larr; Chapter 20: Case Study --- Cetacean Bioacoustics</a>
+        <a href="index.html" class="nav-toc">Contents</a>
+        <a href="chapter-22-the-read-metric.html" class="nav-next">Chapter 22: The Read Metric &rarr;</a>
+      </div>
+    </div>
+  </article>
+
+  <footer class="book-footer">
+    <p>&copy; 2026 Andrew H. Bond. <em>Geometric Methods: Computational Modeling.</em></p>
+    <p class="footer-note">Geometry first. Scalars, if ever, last.</p>
+  </footer>
+
+  <script src="../assets/js/series.js"></script>
+  <script>
+    window.addEventListener('scroll', function () {
+      document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+    document.querySelector('.nav-toggle')?.addEventListener('click', function () {
+      document.querySelector('.nav-links').classList.toggle('open');
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\\\(', right: '\\\\)', display: false},
+        {left: '\\\\[', right: '\\\\]', display: true}
+      ],
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+      throwOnError: false
+    });"></script>
+  <script src="assets/demos.js"></script>
+  <script>
+    // Mount the interactive demos (assets/demos.js) for this chapter.
+    document.addEventListener('DOMContentLoaded', function () {
+      var id = document.body.getAttribute('data-chapter-id');
+      var host = document.querySelector('.chapter-content');
+      if (id && host && typeof window.injectDemos === 'function') {
+        window.injectDemos(id, host);
+      }
+    });
+  </script>
+</body>
+</html>

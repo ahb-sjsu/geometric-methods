@@ -58,7 +58,7 @@
 <h1 id="chapter-3-hyperbolic-geometry-for-hierarchical-data">Chapter 3: Hyperbolic Geometry for Hierarchical Data</h1>
 <p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation — Andrew H. Bond</em></p>
 <hr />
-<p>In the preceding chapters we established the machinery of differential geometry on smooth manifolds and studied how curvature shapes the behavior of geodesics, parallel transport, and volume growth. We now turn to the first concrete non-Euclidean geometry that has become indispensable in modern computational modeling: <em>hyperbolic space</em>. Where Euclidean space is the natural home for grid-like, translation-invariant data, hyperbolic space is the natural home for trees, taxonomies, ontologies, and every other structure whose size grows exponentially with depth.</p>
+<p>Chapter 2 replaced the Euclidean metric with a weighted one, but the space stayed flat. We now turn to the first curved geometry of the book, one that has become indispensable in modern computational modeling: <em>hyperbolic space</em>. Where Euclidean space is the natural home for grid-like, translation-invariant data, hyperbolic space is the natural home for trees, taxonomies, ontologies, and every other structure whose size grows exponentially with depth.</p>
 <p>This chapter develops the Poincaré ball model from first principles, derives the closed-form operations needed for gradient-based optimization, and demonstrates three applications drawn from production systems: taxonomy embedding, hyperbolic multinomial logistic regression, and hyperbolic rule encoding for program synthesis.</p>
 <hr />
 <h2 id="31-why-hyperbolic-space">3.1 Why Hyperbolic Space?</h2>
@@ -66,15 +66,15 @@
 <p>Consider a complete binary tree of depth $d$. It contains $2^{d+1} - 1$ nodes and $2^d$ leaves. More generally, a $k$-ary tree of depth $d$ contains $\Theta(k^d)$ nodes. This exponential growth is not an inconvenience — it is the defining structural property of hierarchical data.</p>
 <p>Now suppose we wish to embed such a tree into a metric space $(X, d_X)$ so that the tree distance $d_T(u,v)$ between any two nodes $u,v$ is faithfully preserved. Formally, we seek a mapping $f: V \to X$ and constants $\alpha, \beta > 0$ such that for all $u,v \in V$:</p>
 <p>$$\alpha \cdot d_T(u,v) \;\leq\; d_X\bigl(f(u), f(v)\bigr) \;\leq\; \beta \cdot d_T(u,v)$$</p>
-<p>The <em>distortion</em> of the embedding is $\beta / \alpha$. The celebrated result of Bourgain (1985) shows that any $n$-point metric space embeds into $\ell_2$ with distortion $O(\log n)$. But for trees the situation in Euclidean space is much worse.</p>
-<p><strong>Theorem 3.1 (Linial, London, and Rabinovich, 1995).</strong> Any embedding of the complete binary tree of depth $d$ into $\mathbb{R}^k$ with the Euclidean metric incurs distortion $\Omega\!\bigl(\sqrt{\log n}\,\bigr)$ when $k$ is fixed, and achieving $O(1)$ distortion requires dimension $k = \Omega(n)$.</p>
+<p>The <em>distortion</em> of the embedding is $\beta / \alpha$. The celebrated result of Bourgain (1985) shows that any $n$-point metric space embeds into $\ell_2$ with distortion $O(\log n)$. Trees do better than that worst case, but no Euclidean space holds them faithfully.</p>
+<p><strong>Theorem 3.1 (Bourgain, 1986).</strong> Any embedding of the complete binary tree with $n$ vertices into a Euclidean space, of any dimension, incurs distortion $\Omega\!\bigl(\sqrt{\log \log n}\,\bigr)$. In particular no Euclidean embedding has distortion bounded independently of the size of the tree. The bound is tight: Matoušek (1999) showed that every $n$-point tree embeds in Euclidean space with distortion $O(\sqrt{\log \log n})$. Theorem 3.2 below gives the contrast with hyperbolic space.</p>
 <p>The intuition is geometric. In $\mathbb{R}^k$, the volume of a ball of radius $r$ grows as $r^k$ — polynomially in $r$. A tree, however, has exponentially many nodes at distance $d$ from the root. No polynomial-growth space can accommodate exponential branching without either stretching nearby nodes apart or crushing distant nodes together.</p>
 <h3 id="312-exponential-volume-growth-in-hyperbolic-space">3.1.2 Exponential Volume Growth in Hyperbolic Space</h3>
 <p>Hyperbolic space $\mathbb{H}^k$ of constant sectional curvature $-1$ has a fundamentally different volume growth profile. The volume of a geodesic ball of radius $r$ in $\mathbb{H}^k$ satisfies:</p>
 <p>$$\text{Vol}\bigl(B_r^{\mathbb{H}^k}\bigr) \;=\; \omega_{k-1} \int_0^r \sinh^{k-1}(t)\, dt \;\sim\; C_k \, e^{(k-1)r}$$</p>
 <p>for large $r$, where $\omega_{k-1}$ is the volume of the unit $(k-1)$-sphere. The volume grows <em>exponentially</em> in the radius — exactly matching the branching pattern of trees.</p>
 <p><strong>Theorem 3.2 (Gromov, 1987; Sarkar, 2011).</strong> Any finite tree with $n$ nodes and weighted edges embeds into the Poincaré disk $\mathbb{H}^2$ with distortion $1 + \varepsilon$ for any $\varepsilon > 0$, using only two dimensions.</p>
-<p>This is a dramatic improvement: from $\Omega(n)$ dimensions in Euclidean space to just 2 in hyperbolic space, with arbitrarily low distortion. In practice, one works with moderate dimensions ($d \in [16, 64]$) and adjustable curvature to balance fidelity against numerical stability.</p>
+<p>This is a dramatic improvement: in Euclidean space no number of dimensions keeps the distortion of large trees bounded, while two hyperbolic dimensions bring it arbitrarily close to 1. In practice, one works with moderate dimensions ($d \in [16, 64]$) and adjustable curvature to balance fidelity against numerical stability.</p>
 <h3 id="313-the-poincare-ball-model">3.1.3 The Poincaré Ball Model</h3>
 <p>Among the five classical models of hyperbolic geometry (Poincaré ball, Poincaré half-space, Klein, hyperboloid, and hemisphere), the Poincaré ball is the most convenient for machine learning because it lives inside a bounded subset of $\mathbb{R}^d$ and thus interfaces cleanly with standard optimizers and neural network layers.</p>
 <p><strong>Definition 3.1 (Poincaré Ball).</strong> For curvature parameter $c > 0$, the Poincaré ball of dimension $d$ is the open ball</p>
@@ -292,7 +292,7 @@ def spectral_init(distance_matrix: np.ndarray, dim: int = 2,
 </code></pre>
 <h3 id="333-example-cetacean-taxonomy">3.3.3 Example: Cetacean Taxonomy</h3>
 <p>To make this concrete, consider embedding a small cetacean taxonomy. The order Cetacea splits into Mysticeti (baleen whales) and Odontoceti (toothed whales). Under Mysticeti we have families like Balaenopteridae (rorquals: blue whale, humpback) and Balaenidae (right whales: bowhead). Under Odontoceti we have Delphinidae (dolphins: bottlenose, orca) and Phocoenidae (porpoises: harbor porpoise).</p>
-<p>In a Poincaré disk embedding ($d = 2$, $c = 1$), the root (Cetacea) sits near the origin. The Mysticeti and Odontoceti subtrees occupy opposite sectors of the disk, each fanning out toward the boundary. Species within the same family cluster together near the boundary, separated by small geodesic distances despite being at nearly the same Euclidean radius. Species in different suborders are separated by large geodesic distances because any path between them must pass through the low-curvature interior near the root.</p>
+<p>In a Poincaré disk embedding ($d = 2$, $c = 1$), the root (Cetacea) sits near the origin. The Mysticeti and Odontoceti subtrees occupy opposite sectors of the disk, each fanning out toward the boundary. Species within the same family cluster together near the boundary, separated by small geodesic distances despite being at nearly the same Euclidean radius. Species in different suborders are separated by large geodesic distances because any path between them must pass through the interior near the root.</p>
 <p>This &ldquo;onion-like&rdquo; structure — general concepts near the center, specific instances near the boundary — is the hallmark of hyperbolic embeddings and directly mirrors the hierarchical structure of the data.</p>
 <hr />
 <h2 id="34-hyperbolic-multinomial-logistic-regression">3.4 Hyperbolic Multinomial Logistic Regression</h2>
@@ -472,14 +472,19 @@ class HyperbolicMLR(nn.Module):
 <h2 id="36-einstein-midpoint-for-aggregation">3.6 Einstein Midpoint for Aggregation</h2>
 <p>A recurring operation in hyperbolic neural networks is <em>weighted averaging</em> — computing the centroid of a set of points on the ball. The Euclidean weighted mean $\bar{x} = \sum_i w_i x_i / \sum_i w_i$ does not generalize directly because $\mathbb{B}^d_c$ is not a vector space.</p>
 <h3 id="361-derivation">3.6.1 Derivation</h3>
-<p>The <em>Einstein midpoint</em> provides a principled solution. It arises from the Klein model of hyperbolic geometry (which has straight-line geodesics) and can be transferred to the Poincaré ball model.</p>
-<p>For points $x_1, \ldots, x_N \in \mathbb{B}^d_c$ with non-negative weights $w_1, \ldots, w_N$, the Einstein midpoint is:</p>
-<p>$$\bar{x} \;=\; \frac{\sum_{i=1}^{N} \gamma_i\, w_i\, x_i}{\sum_{i=1}^{N} \gamma_i\, w_i}$$</p>
-<p>where $\gamma_i = \gamma_c(x_i)$ is the <em>Lorentz factor</em> (conformal factor):</p>
-<p>$$\gamma_c(x) \;=\; \frac{1}{1 - c\,\|x\|^2}$$</p>
-<p>The Lorentz factor upweights points near the boundary, which is geometrically correct: points near the boundary of the Poincaré ball are &ldquo;further out&rdquo; in the actual hyperbolic space, and their positions should contribute more strongly to the midpoint computation to avoid the midpoint being biased toward the origin.</p>
-<p><strong>Proposition 3.1.</strong> The Einstein midpoint of a set of points in $\mathbb{B}^d_c$ lies in $\mathbb{B}^d_c$ (i.e., the formula is closed), and it reduces to the Euclidean weighted mean in the limit $c \to 0$.</p>
-<p><em>Proof sketch.</em> By convexity of the open ball and the fact that the $\gamma$-weighted combination is a convex combination (all $\gamma_i w_i \geq 0$ and we normalize by their sum), the result lies in the convex hull of the $x_i$, which is contained in $\mathbb{B}^d_c$. The limit $c \to 0$ sends all $\gamma_i \to 1$, recovering the Euclidean formula. $\square$</p>
+<p>The <em>Einstein midpoint</em> provides a principled solution. It is defined in the Klein model of hyperbolic space, whose geodesics are straight chords, and then carried to the Poincaré ball.</p>
+<p>In the Klein model a point $k$ with $c\|k\|^2 < 1$ has the <em>Lorentz factor</em></p>
+<p>$$\gamma_c(k) \;=\; \frac{1}{\sqrt{1 - c\,\|k\|^2}},$$</p>
+<p>and the Einstein midpoint of points $k_1, \ldots, k_N$ with non-negative weights $w_1, \ldots, w_N$ is the $\gamma$-weighted average</p>
+<p>$$\bar{k} \;=\; \frac{\sum_{i=1}^{N} w_i\, \gamma_c(k_i)\, k_i}{\sum_{i=1}^{N} w_i\, \gamma_c(k_i)}.$$</p>
+<p>A Poincaré point $x$ corresponds to the Klein point $k = 2x / (1 + c\|x\|^2)$. Written with the conformal factor $\lambda^c_x = 2/(1 - c\|x\|^2)$ of Section 3.2, this map and the Lorentz factor take a simple form:</p>
+<p>$$k = \frac{\lambda^c_x}{\lambda^c_x - 1}\, x, \qquad \gamma_c(k) = \lambda^c_x - 1.$$</p>
+<p>Substituting both into the Klein average, and mapping the result back to the ball, gives the Einstein midpoint directly in Poincaré coordinates:</p>
+<p>$$\bar{x} \;=\; \tfrac{1}{2} \otimes_c \left( \frac{\sum_{i=1}^{N} w_i\, \lambda^c_{x_i}\, x_i}{\sum_{i=1}^{N} w_i\, \bigl(\lambda^c_{x_i} - 1\bigr)} \right),$$</p>
+<p>where $r \otimes_c y = \frac{1}{\sqrt c} \tanh\!\bigl(r \operatorname{artanh}(\sqrt c\,\|y\|)\bigr)\, \frac{y}{\|y\|}$ is Möbius scalar multiplication. The vector inside the parentheses is the Klein midpoint $\bar k$, and halving it in the Möbius sense is exactly the map from the Klein model back to the ball. The weights $\lambda^c_{x_i}$ grow toward the boundary, so points far from the origin in hyperbolic distance pull the midpoint toward themselves, as they should.</p>
+<p><strong>Proposition 3.1.</strong> The Einstein midpoint of points in $\mathbb{B}^d_c$ lies in $\mathbb{B}^d_c$. It reduces to the Euclidean weighted mean as $c \to 0$. For two points with equal weights it is the midpoint of the geodesic between them.</p>
+<p><em>Proof sketch.</em> In the Klein model the average is a convex combination with positive coefficients $w_i \gamma_i / \sum_j w_j \gamma_j$ of points of the open ball, so it lies in the ball, and the map back to the Poincaré ball preserves the ball. As $c \to 0$, every $\lambda^c_{x_i} \to 2$, the inner vector tends to $2 \sum_i w_i x_i / \sum_i w_i$, and $\tfrac{1}{2} \otimes_c$ tends to multiplication by $\tfrac{1}{2}$. For two points the Klein average with Lorentz weights lies on the chord between them, which is their geodesic in the Klein model, at the point of equal hyperbolic distance from both. $\square$</p>
+<p>The two-point property is a useful test of any implementation. Take $x_1 = (0.9, 0)$ and $x_2 = 0$ in the unit ball. The geodesic midpoint lies at radius $\tanh\bigl(\tfrac12 \operatorname{artanh} 0.9\bigr) \approx 0.627$, and the formula above returns it. A tempting shortcut that weights Poincaré points by $1/(1 - c\|x\|^2)$ and averages them directly returns $0.756$, and is not a hyperbolic midpoint. Both values are recomputed in <code>formal/matlab/volume_checks.m</code>.</p>
 <pre><code class="language-python">    def einstein_midpoint(self, x: torch.Tensor,
                           weights: torch.Tensor = None) -&gt; torch.Tensor:
         &quot;&quot;&quot;
@@ -497,20 +502,25 @@ class HyperbolicMLR(nn.Module):
             (dim,) or (batch, dim) the Einstein midpoint
         &quot;&quot;&quot;
         c = self.c
+        sqrt_c = c ** 0.5
 
-        # Lorentz (conformal) factors: γ_i = 1 / (1 - c||x_i||²)
+        # Conformal factors: lambda_i = 2 / (1 - c||x_i||^2)
         x_sq = (x * x).sum(dim=-1)  # (..., N)
-        gamma = 1.0 / (1.0 - c * x_sq).clamp(min=self.EPS)  # (..., N)
+        lam = 2.0 / (1.0 - c * x_sq).clamp(min=self.EPS)  # (..., N)
 
         if weights is None:
-            weights = torch.ones_like(gamma)
+            weights = torch.ones_like(lam)
 
-        # Weighted combination: Σ γ_i w_i x_i / Σ γ_i w_i
-        scale = gamma * weights  # (..., N)
-        numerator = (scale.unsqueeze(-1) * x).sum(dim=-2)  # (..., dim)
-        denominator = scale.sum(dim=-1, keepdim=True).clamp(min=self.EPS)
+        # Klein midpoint, written in Poincare coordinates:
+        # sum w_i lambda_i x_i / sum w_i (lambda_i - 1)
+        numerator = ((weights * lam).unsqueeze(-1) * x).sum(dim=-2)
+        denominator = (weights * (lam - 1.0)).sum(dim=-1, keepdim=True)
+        y = numerator / denominator.clamp(min=self.EPS)
 
-        midpoint = numerator / denominator
+        # Back to the ball: Mobius scalar multiplication by 1/2
+        y_norm = y.norm(dim=-1, keepdim=True).clamp(min=self.EPS)
+        arg = (sqrt_c * y_norm).clamp(max=1.0 - self.EPS)
+        midpoint = torch.tanh(0.5 * torch.atanh(arg)) * y / (sqrt_c * y_norm)
         return self.project(midpoint)
 </code></pre>
 <h3 id="362-application-aggregating-rule-embeddings">3.6.2 Application: Aggregating Rule Embeddings</h3>
@@ -576,18 +586,18 @@ class HyperbolicMLR(nn.Module):
 <li><em>Hyperbolic MLR</em> (Section 3.4): prototype-based classification using geodesic distance as the logit.</li>
 <li><em>Hyperbolic rule encoding</em> (Section 3.5): mapping program synthesis rules to the Poincaré ball so that general rules sit near the center and specific sub-rules fan out toward the boundary.</li>
 </ul>
-<p>The Einstein midpoint (Section 3.6) provides the aggregation primitive needed to combine multiple hyperbolic representations — a building block we will use extensively in Part II when we develop hyperbolic attention mechanisms and tree-structured decoders.</p>
-<p>In the next chapter, we turn to <em>product manifolds</em> — spaces formed by taking Cartesian products of Euclidean, hyperbolic, and spherical components. These mixed-curvature spaces can simultaneously capture hierarchical, flat, and cyclical structure in a single embedding, extending the ideas of this chapter to data with heterogeneous geometric character.</p>
+<p>The Einstein midpoint (Section 3.6) provides the aggregation primitive needed to combine multiple hyperbolic representations — the building block that the rule encoder of Section 3.5 uses to aggregate rule embeddings.</p>
+<p>In the next chapter we turn to a different curved space: the manifold of symmetric positive definite matrices, the natural home of covariance data.</p>
 <hr />
 <h3 id="exercises">Exercises</h3>
 <p><strong>3.1.</strong> Prove that Möbius addition reduces to standard vector addition in the limit $c \to 0$. <em>(Hint: expand the numerator and denominator to first order in $c$.)</em></p>
 <p><strong>3.2.</strong> Show that $d_c(\mathbf{0}, x) = \frac{2}{\sqrt{c}}\,\text{arctanh}(\sqrt{c}\,\|x\|)$ by computing $(-\mathbf{0}) \oplus_c x$ and substituting into the distance formula.</p>
 <p><strong>3.3.</strong> Implement the full taxonomy embedding pipeline for the cetacean example: construct the distance matrix for a 12-species tree, compute the spectral initialization, and refine by gradient descent on the stress loss. Plot the resulting Poincaré disk embedding and verify that taxonomic neighbors are geodesically close.</p>
-<p><strong>3.4.</strong> The conformal factor $\gamma_c(x) = 1/(1 - c\|x\|^2)$ and the Riemannian conformal factor $\lambda_x^c = 2/(1 - c\|x\|^2)$ differ by a factor of 2. Explain why the Einstein midpoint uses $\gamma$ rather than $\lambda$. <em>(Hint: the Einstein midpoint is derived in the Klein model, not the Poincaré model.)</em></p>
+<p><strong>3.4.</strong> Starting from the Klein-model midpoint, verify the two identities $k = \lambda^c_x x / (\lambda^c_x - 1)$ and $\gamma_c(k) = \lambda^c_x - 1$ of Section 3.6.1, and use them to derive the Poincaré form of the Einstein midpoint. Then show that the map from the Klein model back to the ball is $k \mapsto \tfrac12 \otimes_c k$.</p>
 <p><strong>3.5.</strong> Extend the <code>HyperbolicMLR</code> classifier to use the full Ganea et al. (2018) formulation with geodesic hyperplanes rather than prototype distances. Compare classification accuracy on a synthetic hierarchical dataset.</p>
 <hr />
 <h3 id="bibliographic-notes">Bibliographic Notes</h3>
-<p>The use of hyperbolic geometry for tree embedding traces to Gromov&rsquo;s theory of $\delta$-hyperbolic metric spaces (Gromov, 1987). Sarkar (2011) gave the first constructive low-distortion embedding of trees into $\mathbb{H}^2$. The Poincaré ball model for machine learning was popularized by Nickel and Kiela (2017), who learned word embeddings with dramatically better hierarchy capture than Euclidean models. Ganea et al. (2018) developed hyperbolic neural network layers including the MLR classifier. The Einstein midpoint aggregation was introduced by Gulcehre et al. (2019) and refined by Chami et al. (2019). For a comprehensive treatment of gyrovector spaces underpinning Möbius operations, see Ungar (2008). The connection between curvature and volume growth is covered in standard Riemannian geometry texts; we recommend do Carmo (1992) for the foundations.</p>
+<p>The Euclidean lower bound for the complete binary tree is due to Bourgain, &ldquo;The metrical interpretation of superreflexivity in Banach spaces&rdquo; (<em>Israel Journal of Mathematics</em>, 1986), and the matching upper bound for all trees to Matoušek, &ldquo;On embedding trees into uniformly convex Banach spaces&rdquo; (<em>Israel Journal of Mathematics</em>, 1999). The use of hyperbolic geometry for tree embedding traces to Gromov&rsquo;s theory of $\delta$-hyperbolic metric spaces (Gromov, 1987). Sarkar (2011) gave the first constructive low-distortion embedding of trees into $\mathbb{H}^2$. The Poincaré ball model for machine learning was popularized by Nickel and Kiela (2017), who learned word embeddings with dramatically better hierarchy capture than Euclidean models. Ganea et al. (2018) developed hyperbolic neural network layers including the MLR classifier. The Einstein midpoint aggregation was introduced by Gulcehre et al. (2019) and refined by Chami et al. (2019). For a comprehensive treatment of gyrovector spaces underpinning Möbius operations, see Ungar (2008). The connection between curvature and volume growth is covered in standard Riemannian geometry texts; we recommend do Carmo (1992) for the foundations.</p>
       </div>
 
       <div class="chapter-nav-bottom">

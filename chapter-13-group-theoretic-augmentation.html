@@ -123,13 +123,13 @@
 </tr>
 <tr>
 <td>Reflect vertical</td>
-<td>$sr$</td>
+<td>$sr^2$</td>
 <td>Flip across horizontal axis</td>
 <td>$\begin{pmatrix} 1 & 0 \\ 0 & -1 \end{pmatrix}$</td>
 </tr>
 <tr>
 <td>Reflect main diagonal</td>
-<td>$sr^2$</td>
+<td>$sr$</td>
 <td>Transpose</td>
 <td>$\begin{pmatrix} 0 & 1 \\ 1 & 0 \end{pmatrix}$</td>
 </tr>
@@ -183,7 +183,8 @@ def reflect_grid(grid: np.ndarray, axis: int = 0) -&gt; np.ndarray:
 <pre><code class="language-python">def all_dihedral(grid: np.ndarray) -&gt; List[np.ndarray]:
     &quot;&quot;&quot;Generate all 8 dihedral group transforms of a grid.
 
-    Returns [identity, rot90, rot180, rot270, flip_h, flip_v, diag1, diag2].
+    Returns [identity, rot90, rot180, rot270,
+             flip_h, transpose, flip_v, anti_transpose].
     &quot;&quot;&quot;
     results = []
     for k in range(4):
@@ -276,9 +277,9 @@ candidate_2 = self.predict(z_rule_alt, test_input, device)
 </code></pre>
 <p>This is a particularly elegant use of augmentation. ARC allows two submission attempts per test input. The solver uses the original training pairs for the first attempt and augmented pairs for the second. Because the augmented pairs emphasize the transformation rule from different orientations, the alternative rule encoding $z\_rule\_alt$ may capture aspects of the rule that the original encoding missed &mdash; especially for rules with strong directional components.</p>
 <h3 id="1343-interaction-with-structure-probing">13.4.3 Interaction with Structure Probing</h3>
-<p>Chapter 10 introduced the structure probing framework, which applies parametric transforms to grids and measures latent displacement to discover what invariances the model has learned. The connection to $D_4$ augmentation is direct: the <code>rotate</code>, <code>reflect_h</code>, and <code>reflect_v</code> parametric transforms in the probe suite are exactly the generators of $D_4$.</p>
+<p>Chapter 10 introduced probing with parametric transforms, for acoustic decoders. The ARC solver applies the same idea to grids in its <code>arc_prize.fuzzer</code> module: a <code>StructureProbe</code> applies grid transforms and measures how far the model&rsquo;s latent representation moves. The connection to $D_4$ augmentation is direct: its <code>rotate</code>, <code>reflect_h</code>, and <code>reflect_v</code> transforms generate $D_4$.</p>
 <p>A model trained <em>without</em> $D_4$ augmentation will exhibit high latent displacement under rotations and reflections &mdash; the probe reveals that the model has not learned rotational or reflective invariance. A model trained <em>with</em> $D_4$ augmentation should exhibit low displacement under these same transforms, because the augmented training data teaches the model that rotated and reflected grids are equivalent.</p>
-<p>The structure probe&rsquo;s robustness index (Chapter 10, Section 10.3) thus provides a quantitative measure of how effectively augmentation has been absorbed. A model with high robustness index separates structural invariants (low displacement under $D_4$ transforms) from stress transforms (high displacement under noise and dropout). If $D_4$ augmentation is working correctly, the invariant transforms should produce near-zero displacement; any residual displacement indicates that the model has incompletely learned the symmetry.</p>
+<p>The structure probe&rsquo;s robustness index (the <code>robustness_index</code> of <code>StructureProbeReport</code>, the grid counterpart of the Decoder Robustness Index of Section 10.5) thus provides a quantitative measure of how effectively augmentation has been absorbed. A model with high robustness index separates structural invariants (low displacement under $D_4$ transforms) from stress transforms (high displacement under noise and dropout). If $D_4$ augmentation is working correctly, the invariant transforms should produce near-zero displacement; any residual displacement indicates that the model has incompletely learned the symmetry.</p>
 <p>This creates a diagnostic loop: augment, train, probe, and iterate. If probing reveals that the model remains sensitive to 90-degree rotation despite augmentation, possible causes include insufficient augmentation (increase <code>n_augments</code>), architectural bottlenecks (the encoder may lack the capacity to represent rotational invariance), or training instability (the augmented examples may be overwhelming the original signal). The probe provides the diagnostic; the group theory provides the remedy.</p>
 <hr />
 <h2 id="135-equivariant-architectures">13.5 Equivariant Architectures</h2>
@@ -341,11 +342,11 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 <li>The identity $e$ fixes all $10^{n^2}$ grids.</li>
 <li>A 90-degree rotation $r$ fixes grids with 4-fold rotational symmetry. For an $n \times n$ grid with $n$ even, the number of fixed grids is $10^{n^2/4}$. For $n$ odd, it is $10^{(n^2-1)/4 + 1}$.</li>
 <li>A 180-degree rotation $r^2$ fixes grids with 2-fold symmetry: $10^{\lceil n^2/2 \rceil}$ grids.</li>
-<li>Reflections fix grids symmetric about the corresponding axis: $10^{\lceil n^2/2 \rceil}$ for axis-aligned reflections, $10^{(n^2+n)/2}$ for diagonal reflections (when $n$ is such that the diagonal maps the grid to itself).</li>
+<li>Reflections fix grids symmetric about the corresponding axis: $10^{n \lceil n/2 \rceil}$ for axis-aligned reflections, $10^{(n^2+n)/2}$ for diagonal reflections (when $n$ is such that the diagonal maps the grid to itself).</li>
 </ul>
-<p>For a 5 by 5 grid with 10 colors, the total number of grids is $10^{25} \approx 10^{25}$, while the number of $D_4$-equivalence classes is approximately $10^{25}/8 \approx 1.25 \times 10^{24}$. The correction from Burnside&rsquo;s lemma is negligible for large grids because almost all grids are asymmetric. But for small grids (3 by 3, common in ARC), the correction is significant: of the $10^9$ possible grids, a meaningful fraction have nontrivial stabilizers.</p>
+<p>For a 5 by 5 grid with 10 colors, the total number of grids is $10^{25}$, while the number of $D_4$-equivalence classes is approximately $10^{25}/8 \approx 1.25 \times 10^{24}$. The correction from Burnside&rsquo;s lemma is negligible for large grids because almost all grids are asymmetric. Even for 3 by 3 grids the correction is small: of the $10^9$ possible grids, at most $4.1 \times 10^6$, under half a percent, have a nontrivial stabilizer, and Burnside&rsquo;s lemma gives $125{,}512{,}750$ classes against $10^9/8 = 125{,}000{,}000$.</p>
 <hr />
-<h2 id="137-extending-beyond-math158">13.7 Extending Beyond $D_4$</h2>
+<h2 id="137-extending-beyond-math161">13.7 Extending Beyond $D_4$</h2>
 <h3 id="1371-color-permutation-groups">13.7.1 Color Permutation Groups</h3>
 <p>The 10 ARC colors form a set $C = \{0, 1, \ldots, 9\}$, and a <em>color permutation</em> is a bijection $\sigma: C \to C$. The set of all such permutations is the symmetric group $S_{10}$ of order $10! = 3{,}628{,}800$. However, color 0 has a distinguished role as the background, so the relevant group is typically $S_9$ (permutations of colors 1&ndash;9, fixing 0), with order $9! = 362{,}880$.</p>
 <p>The <code>permute_colors</code> function in the ARC codebase samples random elements of $S_9$:</p>
@@ -365,7 +366,7 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 <p>Color permutations commute with $D_4$ transforms: rotating a color-permuted grid is the same as color-permuting a rotated grid. This means the combined symmetry group is the <em>direct product</em> $D_4 \times S_9$, with order $8 \times 362{,}880 = 2{,}903{,}040$. No training set can cover even a fraction of this group exhaustively, which is why <code>augment_pair</code> samples randomly from it.</p>
 <p>Not all ARC tasks are invariant under arbitrary color permutations. A task whose rule depends on specific color identities (e.g., &ldquo;replace all blue cells with red&rdquo;) is not $S_9$-invariant. The solver handles this implicitly: the test-time training loop fine-tunes on augmented examples, and if color permutations produce examples that conflict with the true rule, the model learns to downweight them. This is a form of <em>soft</em> symmetry exploitation, where the model uses the group orbit as a regularizer but does not enforce strict invariance.</p>
 <h3 id="1372-translation-groups">13.7.2 Translation Groups</h3>
-<p>Square grids support cyclic translations: shifting all cells by $(dr, dc)$ with wraparound. The group of all such translations is $\mathbb{Z}_H \times \mathbb{Z}_W$ for an $H \times W$ grid, with $H \cdot W$ elements. The <code>_translate</code> transform in the probing framework implements this:</p>
+<p>Square grids support cyclic translations: shifting all cells by $(dr, dc)$ with wraparound. The group of all such translations is $\mathbb{Z}_H \times \mathbb{Z}_W$ for an $H \times W$ grid, with $H \cdot W$ elements. The <code>_translate</code> transform of <code>arc_prize.fuzzer</code> implements this:</p>
 <pre><code class="language-python">def _translate(grid: np.ndarray, intensity: float) -&gt; np.ndarray:
     &quot;&quot;&quot;Shift grid contents, wrapping around.&quot;&quot;&quot;
     if intensity &lt; 0.01:
@@ -378,7 +379,7 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 <p>Translation invariance is appropriate for tasks involving periodic patterns (e.g., tilings) but inappropriate for tasks where absolute position matters (e.g., &ldquo;the red cell is in the top-left corner&rdquo;). The parametric intensity control allows the probing framework to test translation sensitivity at multiple scales, revealing whether the model&rsquo;s rule inference depends on absolute position.</p>
 <p>The full spatial symmetry group of a square grid (combining $D_4$ with translations) is the <em>semidirect product</em> $(\mathbb{Z}_n \times \mathbb{Z}_n) \rtimes D_4$, which has $8n^2$ elements. For a 30 by 30 grid, this is $8 \times 900 = 7{,}200$ elements &mdash; large enough that exhaustive enumeration is impractical but small enough that random sampling is effective.</p>
 <h3 id="1373-scale-symmetries">13.7.3 Scale Symmetries</h3>
-<p>The <code>_scale_up</code> transform in the probing suite tests invariance to integer scaling: repeating each cell to produce a grid at 2x or 3x resolution. Scale invariance is relevant for ARC tasks involving patterns at multiple scales (e.g., &ldquo;the output is the input tiled 2x2&rdquo;). The scaling group is not a standard algebraic group (scaling by 2 and then by 3 gives scaling by 6, but scaling by 2 and then by 1/2 requires a non-integer inverse), but for the integer-valued scales relevant to discrete grids, it forms a multiplicative semigroup.</p>
+<p>The <code>_scale_up</code> transform of <code>arc_prize.fuzzer</code> tests invariance to integer scaling: repeating each cell to produce a grid at 2x or 3x resolution. Scale invariance is relevant for ARC tasks involving patterns at multiple scales (e.g., &ldquo;the output is the input tiled 2x2&rdquo;). The scaling group is not a standard algebraic group (scaling by 2 and then by 3 gives scaling by 6, but scaling by 2 and then by 1/2 requires a non-integer inverse), but for the integer-valued scales relevant to discrete grids, it forms a multiplicative semigroup.</p>
 <h3 id="1374-continuous-symmetries">13.7.4 Continuous Symmetries</h3>
 <p>The groups discussed so far are <em>discrete</em> (finite or countably infinite). Many important symmetries are <em>continuous</em>: the rotation group $SO(2)$ (all planar rotations), the Euclidean group $E(2)$ (rotations + translations), and the affine group $\text{Aff}(2)$ (linear maps + translations). These arise naturally in image recognition, physics simulation, and molecular modeling.</p>
 <p>Discrete grids break continuous symmetries: a square grid admits only 4 rotations, not continuous rotation. But in the <em>feature space</em> of a neural network, continuous rotations are well defined. An equivariant network can learn features that transform under continuous rotation representations even though the input admits only discrete rotations. This is the bridge between the discrete $D_4$ augmentation of this chapter and the continuous geometric methods of Chapters 2&ndash;5.</p>
@@ -404,7 +405,7 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 <p><strong>Identity.</strong> $T_e = \text{id}$. The first element of <code>all_dihedral</code>&rsquo;s output is the unmodified grid.</p>
 </li>
 <li>
-<p><strong>Inverses.</strong> For each $T_g$, there exists $T_{g^{-1}}$ such that $T_g \circ T_{g^{-1}} = \text{id}$. Rotations are their own inverses modulo 4: the inverse of <code>rot90</code> ($k=1$) is <code>rot90</code> ($k=3$).</p>
+<p><strong>Inverses.</strong> For each $T_g$, there exists $T_{g^{-1}}$ such that $T_g \circ T_{g^{-1}} = \text{id}$. Rotation counts add modulo 4: the inverse of <code>rot90</code> ($k=1$) is <code>rot90</code> ($k=3$).</p>
 </li>
 </ol>
 <p>A unit test that verifies these properties for the ARC augmentation code:</p>
@@ -445,7 +446,7 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 <p>The geometric framework of this book represents model configurations as points in a multi-dimensional state space (Chapter 1). Symmetry groups act on this state space, mapping one configuration to an equivalent one. The orbit of a configuration under the symmetry group defines an <em>equivalence class</em>, and the quotient space $\mathcal{S} / G$ (the space of equivalence classes) is the effective search space.</p>
 <p>For the ARC solver, the state space includes the encoder parameters, the rule embedding, and the decoder parameters. The $D_4$ symmetry acts on this space indirectly: two parameter configurations that differ only in how they represent rotated patterns are equivalent. Data augmentation does not reduce the parameter space directly, but it biases optimization toward configurations that are symmetric under $D_4$, effectively projecting the search onto the quotient space.</p>
 <h3 id="1392-orbits-as-geodesics">13.9.2 Orbits as Geodesics</h3>
-<p>On a Riemannian manifold, the orbit of a point under a continuous symmetry group traces a <em>geodesic</em> (or more generally, a curve with specific geometric properties). For discrete groups, the orbit is a finite set of points, but the distances between orbit elements are determined by the group structure and the manifold&rsquo;s geometry.</p>
+<p>On a Riemannian manifold, the orbit of a point under a one-parameter group of isometries traces a curve along which the metric is preserved; it is a geodesic only in special cases, such as a rotation about an axis acting on a point of the axis&rsquo;s equatorial great circle. For discrete groups, the orbit is a finite set of points, but the distances between orbit elements are determined by the group structure and the manifold&rsquo;s geometry.</p>
 <p>In the Poincare ball (Chapter 3), where ARC rules are embedded, the $D_4$ action on rules has a geometric interpretation. If a rule $h \in \mathbb{B}^d$ encodes &ldquo;fill the rightmost column,&rdquo; then $r \cdot h$ (the rotated rule) encodes &ldquo;fill the bottom row.&rdquo; In hyperbolic space, these two rules are at a specific hyperbolic distance determined by how the encoder maps directional information. A well-trained encoder that has absorbed $D_4$ augmentation will place these rules close together (they are the same abstract rule), while an encoder without augmentation may place them far apart (they look like different rules in different orientations).</p>
 <p>The hyperbolic distance between orbit elements thus provides a <em>direct measure of how well augmentation is working</em>. This complements the probing-based measure from Section 13.4.3: probing measures invariance at the grid level (does the encoder produce the same representation for rotated grids?), while hyperbolic orbit distance measures invariance at the rule level (does the rule encoder produce the same rule for rotated training pairs?).</p>
 <h3 id="1393-equivariance-and-parallel-transport">13.9.3 Equivariance and Parallel Transport</h3>
@@ -504,8 +505,8 @@ def unique_orbit(grid: np.ndarray) -&gt; list[np.ndarray]:
 </li>
 </ol>
 <hr />
-<h2 id="1312-forward-symmetry-aware-fuzzing">13.12 Forward: Symmetry-Aware Fuzzing</h2>
-<p>Chapter 14 takes the symmetry framework from augmentation to <em>fuzzing</em>. Where this chapter used symmetry to generate <em>equivalent</em> training examples, Chapter 14 uses symmetry to generate <em>adversarial</em> test cases &mdash; inputs designed to expose failures in the model&rsquo;s learned invariances. The key insight is that a model&rsquo;s failure to respect a known symmetry is a <em>bug</em>, and fuzzing the symmetry group&rsquo;s orbit is a targeted strategy for finding such bugs. The probing framework of Chapter 10 provides the detection mechanism; the group theory of this chapter provides the space of perturbations to search; and Chapter 14 combines them into a systematic adversarial testing methodology.</p>
+<h2 id="1312-forward-from-symmetry-to-invariance-training">13.12 Forward: From Symmetry to Invariance Training</h2>
+<p>This chapter used symmetry to generate <em>equivalent</em> training examples, so that a model sees every member of an orbit. Chapter 14 approaches the same goal from the other side. It does not enumerate a known group. It trains the encoder so that a nuisance variable cannot be predicted from its output, using a gradient reversal layer. A model&rsquo;s failure to respect a known symmetry is a <em>bug</em>, and searching a symmetry group&rsquo;s orbit for such failures with the probing tools of Chapter 10 is a natural test, but it is not developed in this volume.</p>
       </div>
 
       <div class="chapter-nav-bottom">

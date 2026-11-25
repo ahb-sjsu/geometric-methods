@@ -51,7 +51,7 @@
       <div class="chapter-nav-top">
         <a href="chapter-19-case-study-defect-prediction.html" class="nav-prev">&larr; Chapter 19: Case Study --- Software Defect Prediction</a>
         <a href="index.html" class="nav-toc">Contents</a>
-        <span class="nav-next"></span>
+        <a href="chapter-21-measurement-discipline.html" class="nav-next">Chapter 21: The Measurement Discipline &rarr;</a>
       </div>
 
       <div class="chapter-content">
@@ -61,7 +61,7 @@
 <p><em>&ldquo;There is no other species on earth whose social organization and communication system so closely parallels our own as the sperm whale.&rdquo;</em>
 &mdash; Hal Whitehead, <em>Sperm Whales: Social Evolution in the Ocean</em> (2003)</p>
 </blockquote>
-<p>This final chapter brings together the geometric methods developed across the preceding nineteen chapters in a single, complete worked example: the analysis and classification of sperm whale (<em>Physeter macrocephalus</em>) vocalizations. The domain is cetacean bioacoustics, but the purpose is broader. Every technique introduced in this book &mdash; Mahalanobis distance (Chapter 2), hyperbolic embeddings (Chapter 3), SPD manifold analysis (Chapter 4), persistent homology (Chapter 5), adversarial robustness testing (Chapters 9&ndash;10), and structural fuzzing for model validation (throughout) &mdash; converges here in a unified pipeline that processes raw acoustic recordings and produces validated, robust coda classifications. The chapter serves simultaneously as a tutorial on applying geometric methods to biological signal analysis and as a closing argument for the book&rsquo;s central thesis: that geometry is not a metaphor but a computational tool, and that the power of that tool is best demonstrated by composing multiple geometric methods into a coherent system.</p>
+<p>This chapter brings together the geometric methods developed across the preceding nineteen chapters in a single, complete worked example: the analysis and classification of sperm whale (<em>Physeter macrocephalus</em>) vocalizations. The domain is cetacean bioacoustics, but the purpose is broader. Every technique introduced in this book &mdash; Mahalanobis distance (Chapter 2), hyperbolic embeddings (Chapter 3), SPD manifold analysis (Chapter 4), persistent homology (Chapter 5), adversarial robustness testing (Chapters 9&ndash;10), and structural fuzzing for model validation (throughout) &mdash; converges here in a unified pipeline that processes raw acoustic recordings and produces validated, robust coda classifications. The chapter serves simultaneously as a tutorial on applying geometric methods to biological signal analysis and as a closing argument for the book&rsquo;s central thesis: that geometry is not a metaphor but a computational tool, and that the power of that tool is best demonstrated by composing multiple geometric methods into a coherent system.</p>
 <hr />
 <h2 id="201-the-domain-sperm-whale-communication">20.1 The Domain: Sperm Whale Communication</h2>
 <h3 id="2011-codas-and-their-combinatorial-structure">20.1.1 Codas and Their Combinatorial Structure</h3>
@@ -187,7 +187,7 @@ persistence = compute_persistence(
 )
 features = tda_feature_vector(persistence)  # shape: (16,)
 </code></pre>
-<p>The 16-dimensional feature vector concatenates eight summary statistics per homology dimension ($H_0$ and $H_1$):</p>
+<p>The 16-dimensional feature vector concatenates eight summary statistics per homology dimension ($H_0$ and $H_1$), defined in Section 5.5; the table below lists four of them:</p>
 <table>
 <thead>
 <tr>
@@ -268,7 +268,7 @@ classifier.init_from_taxonomy(embeddings)
 logits = classifier(x_on_ball)  # shape: [batch, 21]
 </code></pre>
 <p>The crucial advantage over Euclidean classifiers is that the distance function respects the hierarchy. Two coda types within the same rhythm class (e.g., &ldquo;5R1&rdquo; and &ldquo;5R2&rdquo;) are hyperbolicly close even if their Euclidean feature vectors happen to differ substantially. Two types in different rhythm classes (e.g., &ldquo;5R1&rdquo; and &ldquo;1+1+3&rdquo;) are hyperbolicly far apart. This geometric bias aligns the classifier&rsquo;s similarity structure with the biological taxonomy, reducing the severity of misclassifications: errors tend to fall within the correct rhythm class rather than crossing class boundaries.</p>
-<p>The prototypes live in the tangent space at the origin and are mapped to the ball via the exponential map $\text{exp}_0$. During training, gradients flow through the Mobius operations (Chapter 3, Section 3.3), and the prototype positions adapt while maintaining the taxonomic initialization as a prior. The per-class learnable temperature $e^{s_k}$ allows the model to be more or less confident about each coda type, which is important when class frequencies are highly imbalanced (as they are in the DSWP data, where &ldquo;5R1&rdquo; vastly outnumbers rare types).</p>
+<p>The prototypes live in the tangent space at the origin and are mapped to the ball via the exponential map $\text{exp}_0$. During training, gradients flow through the Mobius operations (Section 3.2), and the prototype positions adapt while maintaining the taxonomic initialization as a prior. The per-class learnable temperature $e^{s_k}$ allows the model to be more or less confident about each coda type, which is important when class frequencies are highly imbalanced (as they are in the DSWP data, where &ldquo;5R1&rdquo; vastly outnumbers rare types).</p>
 <hr />
 <h2 id="205-the-decoder-robustness-index">20.5 The Decoder Robustness Index</h2>
 <p>Having built a decoder from geometric features, we must now ask: <em>how robust is it?</em> Chapter 9 introduced adversarial robustness testing in general terms. Chapter 10 developed adversarial probing methods. The <code>eris-ketos</code> library instantiates these ideas for the bioacoustics domain through the <em>Decoder Robustness Index</em> (DRI), which is a direct adaptation of the Bond Index adversarial fuzzing framework.</p>
@@ -351,7 +351,7 @@ d2 = semantic.distance(&quot;5R1&quot;, &quot;1+1+3&quot;) # different rhythm en
 </code></pre>
 <p>This graduated scoring connects directly to the hyperbolic embedding (Section 20.4): the semantic distance between coda types is correlated with their geodesic distance on the Poincare ball. A decoder that confuses hyperbolicly nearby types incurs a small omega; one that confuses distant types incurs a large omega.</p>
 <h3 id="2053-the-dri-formula">20.5.3 The DRI Formula</h3>
-<p>The DRI aggregates omega values across all transforms, intensities, and test signals using the same weighted percentile formula as the Bond Index (Chapter 9):</p>
+<p>The DRI aggregates omega values across all transforms, intensities, and test signals using the same weighted percentile formula as the Model Robustness Index (Chapter 9):</p>
 <p>$$\text{DRI} = 0.5 \cdot \bar{\omega} + 0.3 \cdot \omega_{75} + 0.2 \cdot \omega_{95}$$</p>
 <p>where $\bar{\omega}$ is the mean omega across all perturbations, $\omega_{75}$ is the 75th percentile, and $\omega_{95}$ is the 95th percentile. The tail weighting ensures that rare catastrophic failures &mdash; a single transform that completely breaks the decoder &mdash; are not hidden by good average performance. This directly addresses the &ldquo;hidden compensation&rdquo; failure mode identified in Chapter 1.</p>
 <pre><code class="language-python">from eris_ketos.decoder_robustness import DecoderRobustnessIndex
@@ -434,7 +434,7 @@ $$\text{Features } z \xrightarrow{\text{GRL}} \xrightarrow{\text{Domain Discrimi
 <p>The combination of gradient reversal (recording invariance) with hyperbolic classification (taxonomy-aware similarity) produces a decoder whose features encode coda structure in a geometry that respects the biological hierarchy while being invariant to recording artifacts. The DRI framework (Section 20.5) can then verify that the recording-invariant encoder achieves lower omega on recording-specific transforms than a standard encoder.</p>
 <hr />
 <h2 id="207-structural-fuzzing-for-model-validation">20.7 Structural Fuzzing for Model Validation</h2>
-<p>The final layer applies the structural fuzzing framework &mdash; the through-line of this book &mdash; to validate the complete geometric analysis pipeline. The pattern follows the integration demonstrated in Chapter 18, adapted from the geometric economics example.</p>
+<p>The final layer applies the structural fuzzing framework &mdash; the through-line of this book &mdash; to validate the complete geometric analysis pipeline. The pattern follows the integration demonstrated in Chapter 16, adapted from the geometric economics example.</p>
 <h3 id="2071-the-evaluation-function-pattern">20.7.1 The Evaluation Function Pattern</h3>
 <p>The structural fuzzing framework requires an evaluation function with signature <code>(params: ndarray) -&gt; (loss: float, errors: dict)</code>. For the bioacoustics pipeline, the parameters control the relative weighting of five feature channels &mdash; three geometric (SPD spectral, TDA topology, hyperbolic embedding) and two traditional (tempo features, ICI histogram):</p>
 <pre><code class="language-python">DIM_NAMES = [
@@ -445,16 +445,19 @@ $$\text{Features } z \xrightarrow{\text{GRL}} \xrightarrow{\text{Domain Discrimi
     &quot;ICI_histogram&quot;,      # Traditional ICI distribution features
 ]
 
-def make_bioacoustics_evaluate_fn(decoder, coda_signals, labels, sr=32000):
+def make_bioacoustics_evaluate_fn(build_decoder, coda_signals, sr=32000):
     &quot;&quot;&quot;Create evaluate_fn for structural fuzzing.
 
-    params[i] controls weight (inverse variance) of dimension i.
+    params[i] is the precision of feature channel i: the decoder sees that
+    channel scaled by 1/params[i], and a value at or above 1e5 removes it.
+    build_decoder(weights) returns a decoder that uses the channel weights.
     &quot;&quot;&quot;
     transforms = make_acoustic_transform_suite()
     dri_engine = DecoderRobustnessIndex(transforms)
 
     def evaluate_fn(params):
         weights = np.where(params &lt; 1e5, 1.0 / np.maximum(params, 1e-6), 0.0)
+        decoder = build_decoder(weights)
         errors = {}
         for transform in transforms:
             result = dri_engine.measure_single_transform(
@@ -465,8 +468,14 @@ def make_bioacoustics_evaluate_fn(decoder, coda_signals, labels, sr=32000):
         return mae, errors
 
     return evaluate_fn
+
+
+# Witness check before any campaign: the value must depend on params.
+f = make_bioacoustics_evaluate_fn(build_decoder, coda_signals)
+assert f(np.ones(5))[0] != f(np.array([1.0, 1e6, 1e6, 1e6, 1e6]))[0]
 </code></pre>
 <p>This mirrors the <code>make_evaluate_fn</code> pattern from the geometric economics model, where parameters controlled inverse covariance weights in a 9-dimensional ethical-economic space. The geometric structure is identical: the Mahalanobis distance (Chapter 2) defines a metric tensor in feature space, and structural fuzzing explores which configurations produce robust decoders.</p>
+<p>An earlier version of this function computed <code>weights</code> and then measured a fixed decoder, so its value did not depend on <code>params</code> and a campaign would have scored every subset alike. The weights now reach the decoder through <code>build_decoder</code>, and the final two lines check that they do: if switching four channels off leaves the score unchanged, the campaign cannot tell channels apart and should not be run. Section 21.4 uses the earlier version as its example of a design that cannot fail.</p>
 <h3 id="2072-subset-enumeration">20.7.2 Subset Enumeration</h3>
 <p>Following the methodology of Chapter 11, we enumerate subsets of feature dimensions to determine which geometric methods are essential and which are redundant. Setting a dimension&rsquo;s parameter to the sentinel value ($10^6$) deactivates the corresponding feature channel.</p>
 <p>The key structural question is: <em>does the full geometric pipeline outperform any subset?</em> If removing TDA features does not degrade the DRI, then the persistent homology computation (which is the most expensive step) can be omitted. If removing SPD features degrades accuracy but not robustness, that reveals a different kind of dependence than if it degrades both.</p>
@@ -559,7 +568,7 @@ def make_bioacoustics_evaluate_fn(decoder, coda_signals, labels, sr=32000):
 <li><strong>Hyperbolic Embedding (Chapter 3).</strong> Map the combined feature vector to the Poincare ball via $\text{exp}_0$. Classify using <code>HyperbolicMLR</code> with taxonomy-initialized prototypes.</li>
 <li><strong>Recording Invariance (Chapter 14).</strong> Train with gradient reversal to remove recording-specific bias. Verify via cross-deployment DRI comparison.</li>
 <li><strong>Robustness Testing (Chapters 9&ndash;10).</strong> Apply the DRI framework: sweep all nine transforms, test compositional chains, compute adversarial thresholds.</li>
-<li><strong>Structural Fuzzing Validation (Chapters 6&ndash;8).</strong> Enumerate feature subsets, compute the MRI, identify tipping points, verify Pareto-optimality.</li>
+<li><strong>Structural Fuzzing Validation (Chapters 8, 9 and 11).</strong> Enumerate feature subsets, compute the MRI, identify tipping points, verify Pareto-optimality.</li>
 </ol>
 <pre><code class="language-python">from eris_ketos import (
     spd_features_from_spectrogram, compute_persistence,
@@ -592,143 +601,91 @@ def validate_decoder(decoder, signals, sr=32000):
     }
 </code></pre>
 <hr />
-<h2 id="209-results-and-interpretation">20.9 Results and Interpretation</h2>
-<p>We summarize the key findings from applying the complete geometric pipeline to the DSWP dataset (1,501 annotated sperm whale codas from Sharma et al., 2024). The results illustrate both the power of composing geometric methods and the specific contributions of each.</p>
-<h3 id="2091-classification-performance">20.9.1 Classification Performance</h3>
+<h2 id="209-what-has-been-measured">20.9 What Has Been Measured</h2>
+<p>The complete workflow of Section 20.8 has not yet been run end to end, and an earlier version of this section reported results for it that no recorded run supports. What has been run is the analysis notebook distributed with <code>eris-ketos</code> (<code>notebooks/cetacean_geometric_analysis.ipynb</code>). Its executed copy is dated 12 March 2026 and is not yet committed to the repository, so the numbers below have no public record yet. They are reported here because they are the only measurements that exist, and they differ from what the earlier version claimed.</p>
+<h3 id="2091-classification">20.9.1 Classification</h3>
+<p>The notebook loads 8,719 annotated codas of 35 types from the repository of Sharma et al. (2024). It keeps the 22 types with at least 30 examples, 8,055 codas, and describes each coda by 11 numbers: the nine inter-click intervals divided by the coda&rsquo;s duration, the logarithm of the duration, and the number of clicks. The data are split 80/20, stratified by type, with seed 42, giving 6,444 training and 1,611 test codas.</p>
 <table>
 <thead>
 <tr>
-<th>Method</th>
-<th>Accuracy</th>
-<th>Notes</th>
+<th>Classifier</th>
+<th style="text-align: center;">Test accuracy</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ICI histogram + Euclidean KNN</td>
-<td>68%</td>
-<td>Traditional baseline</td>
+<td><code>HyperbolicMLR</code> (Poincaré ball)</td>
+<td style="text-align: center;">98.6%</td>
 </tr>
 <tr>
-<td>ICI histogram + Logistic Regression</td>
-<td>72%</td>
-<td>Linear in flat space</td>
+<td>Logistic regression</td>
+<td style="text-align: center;">99.4%</td>
 </tr>
 <tr>
-<td>SPD features + Random Forest</td>
-<td>78%</td>
-<td>Covariance structure helps</td>
+<td>$k$-nearest neighbours, $k = 5$</td>
+<td style="text-align: center;">99.3%</td>
 </tr>
 <tr>
-<td>TDA features + Random Forest</td>
-<td>74%</td>
-<td>Topology alone is competitive</td>
-</tr>
-<tr>
-<td>SPD + TDA + Euclidean classifier</td>
-<td>82%</td>
-<td>Feature concatenation</td>
-</tr>
-<tr>
-<td>SPD + TDA + HyperbolicMLR</td>
-<td>86%</td>
-<td>Hyperbolic geometry adds 4 pts</td>
-</tr>
-<tr>
-<td>Full pipeline + gradient reversal</td>
-<td>88%</td>
-<td>Recording invariance helps</td>
+<td>Random forest, 100 trees</td>
+<td style="text-align: center;">99.4%</td>
 </tr>
 </tbody>
 </table>
-<p>The improvement from flat to geometric is not marginal. Each geometric layer contributes meaningfully, and the gains compound because the layers capture <em>different</em> kinds of structure: spectral covariance (SPD), temporal dynamics (TDA), and hierarchical similarity (hyperbolic). This is the central lesson of the book: geometry is not a single tool but a <em>toolkit</em>, and the tools compose.</p>
-<h3 id="2092-robustness-profile">20.9.2 Robustness Profile</h3>
-<p>The DRI analysis reveals the failure modes that accuracy alone hides:</p>
-<table>
-<thead>
-<tr>
-<th>Decoder Variant</th>
-<th>DRI (Overall)</th>
-<th>DRI (Invariant)</th>
-<th>DRI (Stress)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>ICI baseline</td>
-<td>0.42</td>
-<td>0.31</td>
-<td>0.58</td>
-</tr>
-<tr>
-<td>SPD + TDA Euclidean</td>
-<td>0.28</td>
-<td>0.15</td>
-<td>0.44</td>
-</tr>
-<tr>
-<td>Full geometric</td>
-<td>0.18</td>
-<td>0.06</td>
-<td>0.33</td>
-</tr>
-<tr>
-<td>Full + gradient reversal</td>
-<td>0.14</td>
-<td>0.03</td>
-<td>0.28</td>
-</tr>
-</tbody>
-</table>
-<p>The DRI (invariant) score for the full pipeline with gradient reversal is 0.03, meaning the decoder is nearly perfectly invariant to amplitude scaling, time shifting, and additive noise. Without gradient reversal, the invariant DRI is 0.06 &mdash; still good, but the doubling of the score reveals residual recording-specific sensitivity. The DRI (stress) scores show that all decoders are more vulnerable to content-altering perturbations (Doppler, echo, dropout), as expected, but the geometric decoder degrades more gracefully than the baseline.</p>
-<h3 id="2093-adversarial-thresholds">20.9.3 Adversarial Thresholds</h3>
+<p>On these features every classifier is near the ceiling, and the hyperbolic classifier is slightly behind the Euclidean ones. Coda types in this dataset are defined largely by rhythm, which the normalized intervals encode directly, so the task leaves little room for geometry to help. The test that would show a benefit is a harder one: features computed from audio, not from annotated click times, or a split by recording session so that the classifier meets new recording conditions.</p>
+<h3 id="2092-the-taxonomy-embedding">20.9.2 The Taxonomy Embedding</h3>
+<p>The notebook embeds the hierarchy of coda types in the Poincaré disk and, for comparison, in the plane by principal components, and scores each by the Spearman rank correlation between distances in the embedding and distances in the tree. The Poincaré embedding scores $\rho = 0.830$ and the Euclidean one $\rho = 0.877$. For this taxonomy, at this size and in two dimensions, the flat embedding preserves the order of tree distances better. The argument of Section 3.1 is about trees whose number of nodes grows exponentially with depth. A taxonomy of a few dozen types is shallow, and the advantage the argument predicts need not appear in it.</p>
+<h3 id="2093-robustness-of-a-template-decoder">20.9.3 Robustness of a Template Decoder</h3>
+<p>The robustness measurement uses a deliberately simple decoder: it extracts the inter-click intervals of a signal and returns the type whose mean interval vector is nearest. The test signals are synthesized from the annotated intervals of the first ten codas of each of eight types, 80 signals in all, on which the decoder is 100% accurate. The DRI is then measured on 20 of them, at intensities 0.3, 0.6 and 1.0, with 15 transform chains.</p>
 <table>
 <thead>
 <tr>
 <th>Transform</th>
-<th>Baseline Threshold</th>
-<th>Geometric Threshold</th>
+<th style="text-align: center;">Mean $\omega$ at intensity 1.0</th>
+<th style="text-align: center;">Flip threshold</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>amplitude_scale</code></td>
-<td>0.45</td>
-<td>0.98</td>
+<td><code>time_shift</code></td>
+<td style="text-align: center;">0.300</td>
+<td style="text-align: center;">0.281</td>
 </tr>
 <tr>
-<td><code>additive_noise</code></td>
-<td>0.22</td>
-<td>0.71</td>
-</tr>
-<tr>
-<td><code>pink_noise</code></td>
-<td>0.18</td>
-<td>0.65</td>
-</tr>
-<tr>
-<td><code>doppler_shift</code></td>
-<td>0.35</td>
-<td>0.52</td>
+<td><code>time_stretch</code></td>
+<td style="text-align: center;">0.150</td>
+<td style="text-align: center;">0.922</td>
 </tr>
 <tr>
 <td><code>click_dropout</code></td>
-<td>0.12</td>
-<td>0.38</td>
+<td style="text-align: center;">0.138</td>
+<td style="text-align: center;">1.000</td>
+</tr>
+<tr>
+<td><code>doppler_shift</code></td>
+<td style="text-align: center;">0.075</td>
+<td style="text-align: center;">1.000</td>
+</tr>
+<tr>
+<td><code>amplitude_scale</code>, <code>additive_noise</code>, <code>pink_noise</code>, <code>multipath_echo</code>, <code>spectral_mask</code></td>
+<td style="text-align: center;">0.000</td>
+<td style="text-align: center;">1.000</td>
 </tr>
 </tbody>
 </table>
-<p>The baseline decoder flips on amplitude scaling at intensity 0.45 &mdash; a gain change of less than 3 dB. The geometric decoder with gradient reversal survives until intensity 0.98. For click dropout, the baseline breaks at 0.12 (dropping 1.2% of signal energy), while the geometric decoder survives until 0.38 (dropping 11.4%). These thresholds map directly to operational requirements: a decoder deployed on a new hydrophone array must tolerate the gain variation of that array, and the adversarial threshold tells us exactly how much variation is safe.</p>
+<p>The overall DRI is 0.195, with 0.188 for the transforms classed as invariant and 0.186 for those classed as stress. A threshold of 1.000 is the top of the searched range.</p>
+<p>Two findings stand out. The decoder is untouched by every transform that changes amplitude or spectrum, which is what a decoder that reads only click times should do. And its largest weakness is <code>time_shift</code>, a transform that should change nothing about a coda&rsquo;s meaning and is listed as invariant: a shift of 28% of the transform&rsquo;s range flips the decision. The likely cause is the interval extraction, which detects clicks by an energy threshold and can lose or gain a click at the edge of the window, but that has not been checked. Either way it is the kind of failure Section 10.5 is for. An accuracy of 100% on clean signals says nothing about it.</p>
+<h3 id="2094-what-remains-to-be-run">20.9.4 What Remains to Be Run</h3>
+<p>The comparison the chapter is built around has not been made. It needs the workflow of Section 20.8 on audio: SPD and topological features computed from recordings, a hyperbolic classifier on the combined features, the same decoder trained with and without gradient reversal on recordings from several deployments, and the DRI and flip thresholds of each, against an interval-only baseline on the same split. Until that run exists, the claims of Sections 20.2 to 20.4 about what each geometric layer contributes are posited in the sense of Chapter 21.</p>
 <hr />
 <h2 id="2010-synthesis-the-books-themes-in-one-pipeline">20.10 Synthesis: The Book&rsquo;s Themes in One Pipeline</h2>
 <p>This chapter has demonstrated, in a single end-to-end example, the central themes that have recurred across the preceding nineteen chapters. We close by making these connections explicit.</p>
 <p><strong>Geometry is not a metaphor.</strong> When we say that two coda types are &ldquo;far apart&rdquo; in hyperbolic space, or that a spectral trajectory &ldquo;deviates from a geodesic&rdquo; on the SPD manifold, we mean this literally. The distances are computed, the geodesics are calculated, the deviations are measured. The power of the geometric approach comes from this precision: vague intuitions about similarity and robustness become exact, computable quantities.</p>
 <p><strong>Scalar metrics are structurally inadequate.</strong> The DRI replaces the single-scalar accuracy with a multi-dimensional robustness profile: per-transform omegas, adversarial thresholds, chain results, invariant versus stress decomposition. Every additional dimension of the evaluation space reveals information that the scalar hid. This is the Scalar Irrecoverability Theorem (Chapter 1) in action.</p>
-<p><strong>Different geometries for different structures.</strong> No single geometric framework suffices. Spectral covariance lives on the SPD manifold (Chapter 4), where the log-Euclidean metric respects multiplicative eigenvalue structure. Taxonomic hierarchy lives in hyperbolic space (Chapter 3), where exponential volume growth matches exponential branching. Click dynamics live in the topology of the reconstructed attractor (Chapter 5), where persistent homology captures loops and clusters invisible to any metric. The correct geometry is determined by the <em>structure of the data</em>, not by computational convenience.</p>
-<p><strong>Adversarial testing finds what validation misses.</strong> A decoder with 86% accuracy might seem adequate. The DRI reveals that it fails catastrophically under 1.2% click dropout. The adversarial threshold search (Chapter 10) locates the exact tipping point. The sensitivity profile identifies which transforms are dangerous. None of this information is available from the accuracy number.</p>
+<p><strong>Different geometries for different structures.</strong> No single geometric framework suffices. Spectral covariance lives on the SPD manifold (Chapter 4), where the log-Euclidean metric respects multiplicative eigenvalue structure. Taxonomic hierarchy is the natural candidate for hyperbolic space (Chapter 3), where exponential volume growth matches exponential branching, though for the shallow coda taxonomy measured in Section 20.9.2 a flat embedding did as well. Click dynamics live in the topology of the reconstructed attractor (Chapter 5), where persistent homology captures loops and clusters invisible to any metric. The correct geometry is determined by the <em>structure of the data</em>, not by computational convenience.</p>
+<p><strong>Adversarial testing finds what validation misses.</strong> The template decoder of Section 20.9.3 is 100% accurate on clean signals. The DRI shows that a time shift, which should not change a coda&rsquo;s meaning, flips its decision at 28% of the transform&rsquo;s range. The flip-threshold search (Chapter 10) locates that tipping point. The sensitivity profile identifies which transforms are dangerous. None of this information is available from the accuracy number.</p>
 <p><strong>Structural fuzzing composes with domain methods.</strong> The structural fuzzing framework operates on the evaluation function without knowing or caring that the underlying features come from SPD manifolds, persistent homology, or hyperbolic embeddings. It tests which feature channels matter (subset enumeration, Chapter 11), how stable the configuration is (MRI, Chapter 9), and where the pipeline breaks (adversarial threshold, Chapter 10). This compositionality &mdash; geometric domain methods plugging into a geometric validation framework &mdash; is the architectural contribution of the book.</p>
 <p><strong>Invariance and sensitivity are two sides of the same coin.</strong> The gradient reversal layer (Chapter 14) makes the encoder invariant to recording conditions. The DRI measures whether that invariance actually holds. The SPD manifold captures spectral structure that is <em>sensitive</em> to vowel-like patterns while being <em>invariant</em> to broadband noise. The TDA features are <em>invariant</em> to tempo changes while being <em>sensitive</em> to rhythmic organization. Every geometric choice in the pipeline is a choice about <em>what to be invariant to</em> and <em>what to be sensitive to</em>. Making these choices explicit, testable, and quantifiable is what geometric methods provide.</p>
-<p>The cetacean bioacoustics pipeline is one instantiation of a general pattern. The same geometric toolkit applies to medical signal analysis (EEG covariance on SPD manifolds, cardiac rhythm topology via TDA), financial modeling (hierarchical asset taxonomy in hyperbolic space, regime detection via persistent homology), and any domain where data has structure that flat Euclidean representations distort. The tools are ready. The geometry is precise. The validation framework composes. What remains is to apply them.</p>
+<p>The cetacean bioacoustics pipeline is one instantiation of a general pattern. The same geometric toolkit applies to medical signal analysis (EEG covariance on SPD manifolds, cardiac rhythm topology via TDA), financial modeling (hierarchical asset taxonomy in hyperbolic space, regime detection via persistent homology), and any domain where data has structure that flat Euclidean representations distort. The tools exist and the validation framework composes. Whether the geometric layers improve on flat methods for this domain is the measurement of Section 20.9.4, and it has not yet been made.</p>
 <hr />
 <h2 id="exercises">Exercises</h2>
 <p><strong>20.1.</strong> Download the DSWP dataset and compute SPD features for the five most common coda types. Visualize the pairwise log-Euclidean distance matrix. Do the SPD distances correlate with the taxonomic distances?</p>
@@ -740,14 +697,14 @@ def validate_decoder(decoder, signals, sr=32000):
 <p><strong>20.7.</strong> Train two decoders: one with gradient reversal for recording invariance, one without. Compare their DRI (invariant) scores. Does gradient reversal improve robustness to amplitude scaling and noise transforms, as predicted?</p>
 <hr />
 <h2 id="notes-and-references">Notes and References</h2>
-<p>Sharma, P. et al., &ldquo;Contextual and combinatorial structure in sperm whale vocalisations,&rdquo; <em>Nature Communications</em> 15, 3617 (2024). Begus, G. et al., &ldquo;Vowels and diphthongs in sperm whale vocalization,&rdquo; <em>Open Mind</em> 9, 1849&ndash;1874 (2025). Rendell, L. and Whitehead, H., &ldquo;Vocal clans in sperm whales,&rdquo; <em>Proceedings of the Royal Society B</em> 270, 225&ndash;231 (2003). Gero, S. et al., &ldquo;Individual, unit and vocal clan level identity cues in sperm whale codas,&rdquo; <em>Royal Society Open Science</em> 3, 150372 (2016). Youngblood, M., &ldquo;Linguistic laws in whale vocalization,&rdquo; <em>Science Advances</em> 11, eads6014 (2025). The DSWP dataset: <a href="https://huggingface.co/datasets/orrp/DSWP">huggingface.co/datasets/orrp/DSWP</a>. The <code>eris-ketos</code> library (Bond, 2026) implements all geometric methods described here.</p>
+<p>Sharma, P. et al., &ldquo;Contextual and combinatorial structure in sperm whale vocalisations,&rdquo; <em>Nature Communications</em> 15, 3617 (2024). Begus, G. et al., &ldquo;Vowel- and diphthong-like spectral patterns in sperm whale codas,&rdquo; <em>Open Mind</em> 9, 1849&ndash;1874 (2025). Rendell, L. and Whitehead, H., &ldquo;Vocal clans in sperm whales,&rdquo; <em>Proceedings of the Royal Society B</em> 270, 225&ndash;231 (2003). Gero, S. et al., &ldquo;Individual, unit and vocal clan level identity cues in sperm whale codas,&rdquo; <em>Royal Society Open Science</em> 3, 150372 (2016). Youngblood, M., &ldquo;Linguistic laws in whale vocalization,&rdquo; <em>Science Advances</em> 11, eads6014 (2025). The DSWP dataset: <a href="https://huggingface.co/datasets/orrp/DSWP">huggingface.co/datasets/orrp/DSWP</a>. The <code>eris-ketos</code> library (Bond, 2026) implements all geometric methods described here.</p>
 <p>Nickel, M. and Kiela, D., &ldquo;Poincare embeddings for learning hierarchical representations,&rdquo; <em>NeurIPS</em> 2017. Sarkar, R., &ldquo;Low distortion Delaunay embedding of trees in hyperbolic plane,&rdquo; <em>Graph Drawing</em> (LNCS 7034), 2011. Arsigny, V. et al., &ldquo;Log-Euclidean metrics for fast and simple calculus on diffusion tensors,&rdquo; <em>Magnetic Resonance in Medicine</em> 56(2), 2006. Edelsbrunner, H. and Harer, J., <em>Computational Topology: An Introduction</em>, AMS, 2010. Bauer, U., &ldquo;Ripser: efficient computation of Vietoris-Rips persistence barcodes,&rdquo; <em>J. Appl. Comput. Topol.</em> 5, 391&ndash;423 (2021). Ganin, Y. et al., &ldquo;Domain-adversarial training of neural networks,&rdquo; <em>JMLR</em> 17(59), 1&ndash;35 (2016). Bond, A.H., &ldquo;ErisML: Geometric ethics framework,&rdquo; <a href="https://github.com/ahb-sjsu/erisml-lib">erisml-lib</a>, 2025. Paradise, O. et al., &ldquo;WhAM: Whale Acoustic Model,&rdquo; <em>NeurIPS</em> 2025. Cantor, M. and Whitehead, H., &ldquo;The interplay between social networks and culture,&rdquo; <em>Phil. Trans. R. Soc. B</em> 368, 20120340 (2013).</p>
       </div>
 
       <div class="chapter-nav-bottom">
         <a href="chapter-19-case-study-defect-prediction.html" class="nav-prev">&larr; Chapter 19: Case Study --- Software Defect Prediction</a>
         <a href="index.html" class="nav-toc">Contents</a>
-        <span class="nav-next"></span>
+        <a href="chapter-21-measurement-discipline.html" class="nav-next">Chapter 21: The Measurement Discipline &rarr;</a>
       </div>
     </div>
   </article>

@@ -100,7 +100,7 @@ conda activate structural-fuzzing
 - On shared computing environments, use <code>--user</code> installs or virtual
   environments to avoid permission issues.</p>
 <h2 id="b3-the-structural-fuzzing-package">B.3 The structural-fuzzing Package</h2>
-<p>The <code>structural-fuzzing</code> package (version 0.2.0 at the time of writing)
+<p>The <code>structural-fuzzing</code> package (version 0.4.0 as of November 2026)
 provides the core framework used throughout this book. It implements
 structural validation through parameter-space exploration, Pareto analysis,
 sensitivity profiling, robustness quantification, and adversarial threshold
@@ -128,7 +128,7 @@ pip install -e &quot;.[dev,examples,docs]&quot;
 </code></pre>
 <h3 id="verifying-the-installation">Verifying the installation</h3>
 <pre><code class="language-python">import structural_fuzzing
-print(structural_fuzzing.__version__)  # Should print &quot;0.2.0&quot; or later
+print(structural_fuzzing.__version__)  # Should print &quot;0.4.0&quot; or later
 </code></pre>
 <h2 id="b4-core-and-optional-dependencies">B.4 Core and Optional Dependencies</h2>
 <h3 id="core-numpy-124">Core: NumPy (&gt;= 1.24)</h3>
@@ -137,7 +137,7 @@ operations underlying all geometric computations: parameter vectors,
 perturbation sampling, log-space transformations, and statistical
 aggregation. It is installed automatically with <code>structural-fuzzing</code>.</p>
 <h3 id="optional-scikit-learn-13">Optional: scikit-learn (&gt;= 1.3)</h3>
-<p>Required for the machine learning examples in Parts II and III, including
+<p>Required for the machine learning examples in Parts II to IV, including
 the defect prediction case study. Provides the classifiers and regressors
 that serve as evaluation targets for structural fuzzing campaigns. Included
 in the <code>[examples]</code> extras group.</p>
@@ -242,9 +242,9 @@ domains:</p>
   Repository: <a href="https://github.com/ahb-sjsu/eris-econ">github.com/ahb-sjsu/eris-econ</a></p>
 </li>
 <li>
-<p><strong>eris-ketos</strong> (<code>pip install eris-ketos</code>) &ndash; Marine ecosystem modeling
-  with geometric structure, extending the decision framework to ecological
-  and environmental domains.</p>
+<p><strong>eris-ketos</strong> (<code>pip install eris-ketos</code>) &ndash; Geometric analysis of cetacean
+  communication: hyperbolic embeddings, topological data analysis, and
+  adversarial robustness testing for whale vocalization decoding (Chapters 4, 5, 10, 14 and 20).</p>
 </li>
 <li>
 <p><strong>arc-agi</strong> &ndash; ARC-AGI-2 solver using geometric embeddings, hyperbolic
@@ -255,18 +255,17 @@ domains:</p>
 </li>
 </ul>
 <h2 id="b8-chapter-dependency-matrix">B.8 Chapter Dependency Matrix</h2>
-<p>The table below shows which packages are required or recommended for each
-chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy are needed.</p>
+<p>The table below shows which packages the code in each chapter imports. &ldquo;Core&rdquo; means <code>structural-fuzzing</code> and NumPy. &ldquo;Required&rdquo; means the chapter&rsquo;s code does not run without the package; &ldquo;Examples&rdquo; means only the worked example needs it. The last column names companion packages from Section B.7 that a chapter&rsquo;s code comes from. The table was rebuilt in November 2026 by searching each chapter&rsquo;s code for its imports.</p>
 <table>
 <thead>
 <tr>
 <th>Chapter / Part</th>
 <th>Core</th>
 <th>scikit-learn</th>
-<th>pandas</th>
-<th>scipy</th>
-<th>gudhi/ripser</th>
-<th>geoopt</th>
+<th>SciPy</th>
+<th>PyTorch</th>
+<th>ripser</th>
+<th>Other</th>
 </tr>
 </thead>
 <tbody>
@@ -292,19 +291,19 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>Ch 2. Mahalanobis Distance</td>
 <td>Required</td>
 <td>&ndash;</td>
+<td>Required</td>
 <td>&ndash;</td>
-<td>Recommended</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-econ</code> (described)</td>
 </tr>
 <tr>
 <td>Ch 3. Hyperbolic Geometry</td>
 <td>Required</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
-<td>Recommended</td>
-<td>&ndash;</td>
 <td>Required</td>
+<td>Required</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
 </tr>
 <tr>
 <td>Ch 4. SPD Manifolds</td>
@@ -313,16 +312,16 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>&ndash;</td>
 <td>Required</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-ketos</code></td>
 </tr>
 <tr>
 <td>Ch 5. Topological Data Analysis</td>
 <td>Required</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>Required</td>
-<td>Required</td>
 <td>&ndash;</td>
+<td>Required</td>
+<td><code>eris-ketos</code></td>
 </tr>
 <tr>
 <td><strong>Part II: Algorithms</strong></td>
@@ -338,9 +337,9 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>Required</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>Recommended</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
+<td><code>eris-econ</code></td>
 </tr>
 <tr>
 <td>Ch 7. Equilibrium on Manifolds</td>
@@ -349,12 +348,12 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-econ</code></td>
 </tr>
 <tr>
 <td>Ch 8. Pareto Optimization</td>
 <td>Required</td>
-<td>Recommended</td>
+<td>Examples</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
@@ -363,8 +362,8 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <tr>
 <td>Ch 9. Adversarial Robustness (MRI)</td>
 <td>Required</td>
-<td>Recommended</td>
-<td>Recommended</td>
+<td>Examples</td>
+<td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
@@ -376,7 +375,7 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-ketos</code></td>
 </tr>
 <tr>
 <td><strong>Part III: Design Patterns</strong></td>
@@ -390,7 +389,7 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <tr>
 <td>Ch 11. Subset Enumeration</td>
 <td>Required</td>
-<td>Recommended</td>
+<td>Examples</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
@@ -399,8 +398,8 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <tr>
 <td>Ch 12. Compositional Testing</td>
 <td>Required</td>
-<td>Recommended</td>
-<td>Recommended</td>
+<td>Examples</td>
+<td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
@@ -412,25 +411,25 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>arc-prize</code> (described)</td>
 </tr>
 <tr>
 <td>Ch 14. Gradient Reversal</td>
 <td>Required</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
+<td>Required</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-ketos</code></td>
 </tr>
 <tr>
 <td>Ch 15. Cholesky Parameterization</td>
 <td>Required</td>
 <td>&ndash;</td>
+<td>Required</td>
+<td>Required</td>
 <td>&ndash;</td>
-<td>Recommended</td>
-<td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>eris-econ</code> (described)</td>
 </tr>
 <tr>
 <td><strong>Part IV: Systems</strong></td>
@@ -444,8 +443,8 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <tr>
 <td>Ch 16. Building Geometric Pipelines</td>
 <td>Required</td>
-<td>Recommended</td>
-<td>Recommended</td>
+<td>Examples</td>
+<td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
@@ -454,10 +453,10 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>Ch 17. Scaling to High Dimensions</td>
 <td>Required</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
 <td>Recommended</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
+<td><code>openvector-bench</code> (Section 17.11)</td>
 </tr>
 <tr>
 <td>Ch 18. Production Deployment</td>
@@ -466,25 +465,43 @@ chapter. &ldquo;Core&rdquo; means only <code>structural-fuzzing</code> and NumPy
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
-<td>&ndash;</td>
+<td><code>requests</code>, <code>pandas</code></td>
 </tr>
 <tr>
 <td>Ch 19. Case Study: Defect Prediction</td>
 <td>Required</td>
 <td>Required</td>
-<td>Recommended</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
 <td>&ndash;</td>
+<td><code>matplotlib</code></td>
 </tr>
 <tr>
 <td>Ch 20. Case Study: Bioacoustics</td>
 <td>Required</td>
 <td>&ndash;</td>
 <td>Recommended</td>
-<td>Recommended</td>
 <td>Required</td>
 <td>Required</td>
+<td><code>eris-ketos</code></td>
+</tr>
+<tr>
+<td><strong>Part V: Method</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Ch 21. The Measurement Discipline</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
+<td>&ndash;</td>
 </tr>
 </tbody>
 </table>
@@ -496,24 +513,26 @@ source .venv/bin/activate  # or .venv\Scripts\activate on Windows
 # Install structural-fuzzing with all optional groups
 pip install structural-fuzzing[examples,dev,docs]
 
-# Install external geometric libraries
-pip install scipy gudhi geoopt
+# Install the libraries the chapters import (see the matrix in B.8)
+pip install scipy torch ripser matplotlib requests pandas
 
 # Install ecosystem packages
 pip install eris-econ eris-ketos
 </code></pre>
-<p>For a minimal installation covering Parts I and II only:</p>
+<p>For a minimal installation:</p>
 <pre><code class="language-bash">pip install structural-fuzzing
 </code></pre>
-<p>This installs only <code>structural-fuzzing</code> and NumPy, sufficient for
-Chapters 1 through 2 and Chapters 6 through 11.</p>
+<p>This installs only <code>structural-fuzzing</code> and NumPy. That is enough for
+the framework itself; the matrix above lists what each chapter adds.</p>
 <h2 id="b10-verifying-the-full-installation">B.10 Verifying the Full Installation</h2>
 <pre><code class="language-python">import sys
 
 for module, name in [(&quot;structural_fuzzing&quot;, &quot;structural-fuzzing&quot;),
                      (&quot;numpy&quot;, &quot;NumPy&quot;), (&quot;sklearn&quot;, &quot;scikit-learn&quot;),
                      (&quot;pandas&quot;, &quot;pandas&quot;), (&quot;scipy&quot;, &quot;SciPy&quot;),
-                     (&quot;gudhi&quot;, &quot;GUDHI&quot;), (&quot;geoopt&quot;, &quot;Geoopt&quot;)]:
+                     (&quot;torch&quot;, &quot;PyTorch&quot;), (&quot;ripser&quot;, &quot;ripser&quot;),
+                     (&quot;matplotlib&quot;, &quot;matplotlib&quot;), (&quot;requests&quot;, &quot;requests&quot;),
+                     (&quot;eris_econ&quot;, &quot;eris-econ&quot;), (&quot;eris_ketos&quot;, &quot;eris-ketos&quot;)]:
     try:
         mod = __import__(module)
         print(f&quot;  {name:.&lt;30s} {getattr(mod, '__version__', 'ok')}&quot;)

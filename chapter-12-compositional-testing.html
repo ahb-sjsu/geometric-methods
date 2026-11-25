@@ -109,7 +109,8 @@
 <li>Together, A and B capture a critical interaction: removing <em>both</em> increases MAE by 2.3, not 0.25.</li>
 </ul>
 <p>The sensitivity profile ranks A and B at the bottom of the importance list. An analyst guided purely by sensitivity profiling might discard both dimensions to simplify the model. The result would be catastrophic&mdash;a 2.3-unit increase in error from removing dimensions that individually appeared to contribute almost nothing.</p>
-<p>This failure mode is not exotic. It arises whenever two dimensions provide <em>complementary</em> information: each is individually uninformative, but together they triangulate a feature of the data that neither can capture alone. In software defect prediction, for example, code complexity and developer experience might individually correlate weakly with defects, but their interaction (complex code written by inexperienced developers) is a powerful predictor. In signal processing, two frequency bands might each contain only noise, but their phase relationship encodes the signal.</p>
+<p>This failure mode is not exotic. It arises whenever two dimensions carry <em>the same</em> information: each can stand in for the other, so removing either one costs almost nothing while removing both costs everything. In software defect prediction, Size and Halstead metrics both measure how much code there is. In signal processing, two microphones recording the same source are each dispensable while the other is present.</p>
+<p>The opposite case, a <em>complementary</em> pair, fails the other method. If each dimension is useless without the other, as with complex code and inexperienced authors, removing either one from the full model already destroys their joint contribution, so ablation sees both as important. But a procedure that adds dimensions one at a time sees neither as useful until the other is present. Ablation from the full model is blind to redundant pairs, and forward addition is blind to complementary ones.</p>
 <p>The general principle: single-dimension analysis decomposes a multi-dimensional space into independent axes. When the structure of the problem aligns with those axes, the decomposition is faithful. When the structure is <em>rotated</em> relative to the axes&mdash;when the important directions in the space are diagonal, not axis-aligned&mdash;single-dimension analysis misses the structure entirely.</p>
 <h3 id="1213-quantifying-what-is-missed">12.1.3 Quantifying What Is Missed</h3>
 <p>Let $f(\mathbf{x})$ denote the MAE for parameter vector $\mathbf{x}$, and let $\mathbf{x}^{(-i)}$ denote the vector with dimension $i$ set to its inactive value. The sensitivity profile computes:</p>
@@ -133,18 +134,18 @@
 <td>Dimensions contribute independently</td>
 </tr>
 <tr>
-<td>Synergistic</td>
+<td>Redundant</td>
 <td>$\Phi_{ij} > 0$</td>
-<td>Removing both is worse than predicted; the dimensions complement each other</td>
+<td>Removing both is worse than the single removals predict; each can stand in for the other</td>
 </tr>
 <tr>
-<td>Redundant</td>
+<td>Complementary</td>
 <td>$\Phi_{ij} < 0$</td>
-<td>Removing both is better than predicted; the dimensions overlap</td>
+<td>Removing both is less damaging than predicted; each needs the other, so removing either already loses their joint contribution</td>
 </tr>
 </tbody>
 </table>
-<p>The interaction matrix $\Phi \in \mathbb{R}^{n \times n}$ collects all pairwise interactions. Its diagonal entries are zero by construction ($\Phi_{ii} = 0$), and its off-diagonal entries quantify the departure from additivity for each pair. This matrix is a first-class geometric object: it encodes the curvature of the evaluation landscape with respect to dimension activations, revealing whether the landscape is locally flat (additive), concave (synergistic), or convex (redundant) in each pairwise direction.</p>
+<p>The interaction matrix $\Phi \in \mathbb{R}^{n \times n}$ collects all pairwise interactions. Its diagonal entries are zero by construction ($\Phi_{ii} = 0$), and its off-diagonal entries quantify the departure from additivity for each pair. This matrix is a first-class geometric object: it encodes the curvature of the evaluation landscape with respect to dimension activations, and the sign of each entry says whether a pair overlaps (positive) or completes each other (negative). The two-dimension case shows why. With $g$ the predictive value of a set, so that $f$ is a constant minus $g$, the definition gives $\Phi_{ij} = g(\{i\}) + g(\{j\}) - g(\varnothing) - g(\{i, j\})$. Two copies of one signal have $g(\{i\}) = g(\{j\}) = g(\{i,j\}) = 1$ and $\Phi_{ij} = +1$; two halves of an exclusive-or have $g(\{i\}) = g(\{j\}) = 0$, $g(\{i,j\}) = 1$, and $\Phi_{ij} = -1$.</p>
 <hr />
 <h2 id="122-the-interaction-matrix">12.2 The Interaction Matrix</h2>
 <h3 id="1221-construction">12.2.1 Construction</h3>
@@ -204,41 +205,41 @@ def build_interaction_matrix(
 <tr>
 <td>Size</td>
 <td>0</td>
-<td>+0.02</td>
-<td>-0.31</td>
-<td>+0.05</td>
-<td>+0.41</td>
+<td>-0.02</td>
+<td>+0.31</td>
+<td>-0.05</td>
+<td>-0.41</td>
 </tr>
 <tr>
 <td>Complexity</td>
-<td>+0.02</td>
+<td>-0.02</td>
 <td>0</td>
-<td>-0.28</td>
-<td>+0.11</td>
-<td>+0.87</td>
+<td>+0.28</td>
+<td>-0.11</td>
+<td>-0.87</td>
 </tr>
 <tr>
 <td>Halstead</td>
-<td>-0.31</td>
-<td>-0.28</td>
+<td>+0.31</td>
+<td>+0.28</td>
 <td>0</td>
-<td>-0.04</td>
-<td>+0.06</td>
+<td>+0.04</td>
+<td>-0.06</td>
 </tr>
 <tr>
 <td>OO</td>
-<td>+0.05</td>
-<td>+0.11</td>
-<td>-0.04</td>
+<td>-0.05</td>
+<td>-0.11</td>
+<td>+0.04</td>
 <td>0</td>
-<td>+0.15</td>
+<td>-0.15</td>
 </tr>
 <tr>
 <td>Process</td>
-<td>+0.41</td>
-<td>+0.87</td>
-<td>+0.06</td>
-<td>+0.15</td>
+<td>-0.41</td>
+<td>-0.87</td>
+<td>-0.06</td>
+<td>-0.15</td>
 <td>0</td>
 </tr>
 </tbody>
@@ -246,13 +247,13 @@ def build_interaction_matrix(
 <p>Several patterns are immediately visible:</p>
 <ol>
 <li>
-<p><strong>Strong synergy: Complexity + Process</strong> ($\Phi = +0.87$). Removing both dimensions is far worse than the sum of individual removals predicts. These dimensions provide complementary information&mdash;likely, complexity metrics identify <em>what</em> is hard to maintain while process metrics identify <em>who</em> is maintaining it, and neither alone captures defect risk as well as their combination.</p>
+<p><strong>Strongly complementary: Complexity + Process</strong> ($\Phi = -0.87$). Removing both is far less damaging than the sum of the individual removals predicts, because removing either one already loses most of what the pair provides. These dimensions provide complementary information&mdash;likely, complexity metrics identify <em>what</em> is hard to maintain while process metrics identify <em>who</em> is maintaining it, and neither alone captures defect risk as well as their combination.</p>
 </li>
 <li>
-<p><strong>Strong redundancy: Size + Halstead</strong> ($\Phi = -0.31$). Removing both is less damaging than predicted by summing individual effects. Halstead metrics are mathematically derived from the same token-level program properties that determine lines of code, so they carry overlapping information.</p>
+<p><strong>Redundant: Size + Halstead</strong> ($\Phi = +0.31$). Removing both is more damaging than the sum of the individual removals predicts, because each covers for the other when removed alone. Halstead metrics are mathematically derived from the same token-level program properties that determine lines of code, so they carry overlapping information.</p>
 </li>
 <li>
-<p><strong>Near-additive: Size + Complexity</strong> ($\Phi = +0.02$). These dimensions contribute nearly independently. Knowing one tells you almost nothing about the other&rsquo;s effect.</p>
+<p><strong>Near-additive: Size + Complexity</strong> ($\Phi = -0.02$). These dimensions contribute nearly independently. Knowing one tells you almost nothing about the other&rsquo;s effect.</p>
 </li>
 </ol>
 <h3 id="1223-higher-order-interactions">12.2.3 Higher-Order Interactions</h3>
@@ -260,7 +261,7 @@ def build_interaction_matrix(
 <p>$$\Phi_{ijk} = \left[f(\mathbf{x}^{(-ijk)}) - f(\mathbf{x})\right] - \left[\Delta_i + \Delta_j + \Delta_k\right] - \left[\Phi_{ij} + \Phi_{ik} + \Phi_{jk}\right]$$</p>
 <p>The three-way interaction is the residual after accounting for all individual and pairwise effects. Computing all $\binom{n}{3}$ three-way interactions is cubic in $n$, which remains tractable for $n \leq 10$ but becomes expensive beyond that.</p>
 <p>In practice, higher-order interactions are rarer than pairwise ones, and when they do occur they tend to involve dimensions that already exhibit strong pairwise interactions. A practical strategy is to compute the full pairwise matrix first, identify the pairs with the largest $|\Phi_{ij}|$, and then compute three-way interactions only for triples that include at least one strongly interacting pair.</p>
-<p>This strategy connects directly to the subset enumeration of Chapter 11. Subset enumeration tests all combinations up to a maximum size, producing a complete picture of model behavior across the combinatorial space. The interaction matrix provides a <em>structured decomposition</em> of those results: instead of a flat list of subset performances, the matrix reveals <em>why</em> certain subsets perform well (synergistic interactions among their members) and others poorly (redundancy among their members). Subset enumeration is the exhaustive search; compositional testing is the analytical lens that makes the search results interpretable.</p>
+<p>This strategy connects directly to the subset enumeration of Chapter 11. Subset enumeration tests all combinations up to a maximum size, producing a complete picture of model behavior across the combinatorial space. The interaction matrix provides a <em>structured decomposition</em> of those results: instead of a flat list of subset performances, the matrix reveals <em>why</em> certain subsets perform well (members that complete each other) and others poorly (members that overlap). Subset enumeration is the exhaustive search; compositional testing is the analytical lens that makes the search results interpretable.</p>
 <hr />
 <h2 id="123-the-compositional-testing-algorithm">12.3 The Compositional Testing Algorithm</h2>
 <h3 id="1231-greedy-dimension-building">12.3.1 Greedy Dimension Building</h3>
@@ -449,26 +450,22 @@ MAE sequence: [3.81, 2.09, 1.72, 1.58, 1.51]
 </table>
 <p>The gains exhibit strong diminishing returns: the first dimension added (Process) produces a gain of 1.72, while the last (Halstead) produces only 0.07. This is a common pattern. It arises because each successive dimension can only capture the variance unexplained by the already-active dimensions, and that unexplained variance shrinks with each addition.</p>
 <p><strong>Diminishing-returns elbow.</strong> The point where marginal gains transition from substantial to negligible&mdash;the &ldquo;elbow&rdquo; of the MAE curve&mdash;is a natural place to draw a complexity boundary. In the example above, the elbow occurs at step 2 (adding Size), after which further dimensions contribute less than 0.15 MAE each. A practitioner might reasonably conclude that three dimensions (Complexity, Process, Size) capture the essential behavior and the remaining two add complexity without proportionate benefit. This connects directly to the Pareto analysis of Chapter 8: the elbow in the compositional sequence often corresponds to a Pareto-optimal point on the (dimensionality, MAE) frontier.</p>
-<p><strong>Interaction signatures.</strong> The marginal gains also encode interaction information, though less directly than the interaction matrix. If the gain from adding dimension $j$ to the set $\{d_1, \ldots, d_k\}$ is much larger than $j$&rsquo;s individual ablation delta from the sensitivity profile, then $j$ is synergistic with the current active set: it contributes more in combination than it does alone. Conversely, if the gain is much smaller than the ablation delta, the current set already captures most of $j$&rsquo;s information&mdash;a signature of redundancy.</p>
+<p><strong>Interaction signatures.</strong> The marginal gains also encode interaction information, though less directly than the interaction matrix. If the gain from adding dimension $j$ to the set $\{d_1, \ldots, d_k\}$ is much larger than the gain from $j$ alone, then $j$ completes something already in the set. If it is much smaller, the set already carries most of $j$&rsquo;s information. Section 12.4.2 makes this exact.</p>
 <h3 id="1242-synergy-versus-redundancy">12.4.2 Synergy versus Redundancy</h3>
-<p>The interaction matrix $\Phi_{ij}$ provides the precise decomposition, but the compositional test&rsquo;s MAE sequence offers a sequential view that is often more actionable. Define the <em>expected marginal gain</em> at step $k$ as the ablation delta $\Delta_{j}$ of the dimension $j$ being added (measured from the full model). Then:</p>
-<ul>
-<li>If the actual marginal gain exceeds $\Delta_j$: dimension $j$ is synergistic with the current active set. The combination unlocks performance that $j$&rsquo;s individual contribution does not predict.</li>
-<li>If the actual marginal gain equals $\Delta_j$: dimension $j$ is additive. It contributes independently.</li>
-<li>If the actual marginal gain falls below $\Delta_j$: dimension $j$ is redundant with the current active set. Some of its information is already captured by active dimensions.</li>
-</ul>
-<p>This comparison is not exact&mdash;the sensitivity profile&rsquo;s $\Delta_j$ is measured from the full model, not from the current partial model&mdash;but it provides a useful diagnostic. Large discrepancies between expected and actual marginal gains are strong signals of interaction effects that warrant further investigation.</p>
+<p>The interaction matrix $\Phi_{ij}$ provides the precise decomposition, but the compositional test&rsquo;s MAE sequence offers a sequential view that is often more actionable. Let $G_j(S) = f(\mathbf{x}^{S}) - f(\mathbf{x}^{S \cup \{j\}})$ be the gain from adding dimension $j$ to the active set $S$, so that $G_j(\varnothing)$ is the gain of $j$ alone over the empty model and $G_j(F \setminus \{j\}) = \Delta_j$ is its ablation delta from the full set $F$. If the evaluation function has no interactions above second order, two identities hold exactly:</p>
+<p>$$G_j(S) - G_j(\varnothing) = -\sum_{k \in S} \Phi_{jk}, \qquad G_j(S) - \Delta_j = \sum_{k \notin S,\, k \neq j} \Phi_{jk}.$$</p>
+<p>The first compares the gain with the gain from $j$ alone, and its sign says how $j$ interacts with the dimensions already active: a larger gain means $j$ completes them, a smaller one that it overlaps with them. The second compares the gain with the ablation delta, and its sign is set by the dimensions <em>not yet</em> added. A gain above $\Delta_j$ therefore does not mean that $j$ works well with the current set. It means that something still to come can stand in for $j$. With higher-order interactions both identities become approximations, and large discrepancies are signals that warrant the full interaction matrix. Both identities are checked symbolically in <code>formal/matlab/volume_checks.m</code>.</p>
 <h3 id="1243-order-dependence">12.4.3 Order Dependence</h3>
 <p>The greedy ordering is not necessarily unique. When two candidate dimensions produce similar MAE improvements at a given step, the algorithm breaks ties arbitrarily (in practice, by iteration order). Different starting dimensions can also produce different orderings.</p>
 <p>This order dependence is a <em>feature</em>, not a bug. It reflects genuine structure in the interaction landscape. When the ordering is stable&mdash;when the same dimension is chosen first regardless of the starting point&mdash;the interaction structure is dominated by that dimension&rsquo;s strong main effect. When the ordering is unstable&mdash;when small perturbations in the starting point or evaluation function produce different orderings&mdash;the interaction structure is more complex, with multiple dimensions of comparable importance that interact in non-trivial ways.</p>
-<p>To probe order dependence, run the compositional test from multiple starting dimensions and compare the resulting orderings. If all orderings agree on the first two or three dimensions, those dimensions constitute a robust &ldquo;core&rdquo; of the model. If orderings diverge, the model has multiple roughly equivalent compositional structures, and the choice among them is a modeling decision rather than a empirical one.</p>
+<p>To probe order dependence, run the compositional test from multiple starting dimensions and compare the resulting orderings. If all orderings agree on the first two or three dimensions, those dimensions constitute a robust &ldquo;core&rdquo; of the model. If orderings diverge, the model has multiple roughly equivalent compositional structures, and the choice among them is a modeling decision rather than an empirical one.</p>
 <hr />
 <h2 id="125-connection-to-sensitivity-profiling">12.5 Connection to Sensitivity Profiling</h2>
 <h3 id="1251-ablation-as-a-special-case">12.5.1 Ablation as a Special Case</h3>
 <p>Sensitivity profiling (Chapter 9) and compositional testing are two perspectives on the same underlying question: how does model behavior depend on dimension membership? The connection is precise.</p>
 <p>Sensitivity profiling <em>removes</em> dimensions from a full model one at a time. It answers: &ldquo;Given everything, what happens when we lose this?&rdquo; The result is a vector of individual importance scores.</p>
 <p>Compositional testing <em>adds</em> dimensions to an empty (or minimal) model one at a time. It answers: &ldquo;Given nothing, what happens when we gain this?&rdquo; The result is an ordered construction sequence.</p>
-<p>These are dual perspectives. In a purely additive model&mdash;one where $\Phi_{ij} = 0$ for all pairs&mdash;the sensitivity ranking and the compositional ordering are exact reverses of each other: the most important dimension to remove is the most important to add. In a model with interactions, they diverge, and the divergence is precisely the interaction structure.</p>
+<p>These are dual perspectives. In a purely additive model&mdash;one where $\Phi_{ij} = 0$ for all pairs&mdash;the sensitivity ranking and the compositional ordering agree: the dimension whose removal costs the most is the one whose addition gains the most. In a model with interactions, they diverge, and the divergence is precisely the interaction structure.</p>
 <h3 id="1252-the-pipeline-integration">12.5.2 The Pipeline Integration</h3>
 <p>The structural fuzzing pipeline runs both analyses as part of a complete campaign. Examining the pipeline orchestration reveals the design:</p>
 <pre><code class="language-python">def run_campaign(
@@ -520,8 +517,8 @@ class StructuralFuzzReport:
 <ol>
 <li>Identify the dimensions whose ranks differ by more than one position between the sensitivity ranking and the compositional ordering.</li>
 <li>For each such dimension, compute the pairwise interaction terms $\Phi_{ij}$ between that dimension and all others.</li>
-<li>Large positive $\Phi_{ij}$ values explain cases where the dimension ranks high in the compositional order but low in the sensitivity ranking: it is synergistic with early-added dimensions, so it appears important when building up but appears dispensable (because its partners are present) when ablating from the top.</li>
-<li>Large negative $\Phi_{ij}$ values explain the reverse: the dimension appears important individually (high sensitivity rank) but redundant when combined with others (low compositional rank).</li>
+<li>Large positive $\Phi_{ij}$ values explain a dimension that ranks high in the compositional order but low in the sensitivity ranking: it overlaps with other dimensions, so it is valuable when added before them and dispensable when they are present.</li>
+<li>Large negative $\Phi_{ij}$ values explain the reverse: the dimension ranks high in sensitivity, because removing it breaks a partnership, but low in the compositional order, because it is worth little until its partner has been added.</li>
 </ol>
 <p>This reconciliation procedure transforms a confusing disagreement between two analyses into a structured understanding of the interaction landscape.</p>
 <hr />
@@ -533,10 +530,10 @@ class StructuralFuzzReport:
 <p><strong>Start from each dimension in turn.</strong> Run $n$ compositional tests, one from each starting dimension, and compare the orderings. This is the most thorough approach and directly reveals order dependence (Section 12.4.3). The cost is $n$ times higher, but for models with $n \leq 10$ it remains practical.</p>
 <p>The pipeline&rsquo;s default behavior uses <code>start_dim=0</code>, which corresponds to the first dimension in the names list. For a thorough analysis, the pipeline supports overriding this parameter, and running multiple compositional tests with different starting points is recommended when the interaction structure is unknown.</p>
 <h3 id="1262-detecting-emergent-dimensions">12.6.2 Detecting Emergent Dimensions</h3>
-<p>An <em>emergent dimension</em> is one whose compositional marginal gain far exceeds its individual ablation delta. Formally, if the marginal gain of adding dimension $j$ at step $k$ is $G_j^{(k)}$ and the ablation delta is $\Delta_j$, then the emergence ratio is:</p>
-<p>$$E_j = \frac{G_j^{(k)}}{\Delta_j}$$</p>
-<p>An emergence ratio substantially greater than 1.0 indicates that dimension $j$ is synergistic with the currently active set. Ratios greater than 2.0 are noteworthy; ratios greater than 5.0 indicate strong emergent behavior that demands investigation.</p>
-<p>Emergence often arises in models where dimensions encode different <em>aspects</em> of the same underlying phenomenon. A model predicting material failure might have one dimension for stress and another for temperature. Neither alone predicts failure well (both have low $\Delta$), but together they define the stress-temperature failure envelope: a region in the joint space where failure probability is high. The emergence ratio captures this synergy quantitatively.</p>
+<p>An <em>emergent dimension</em> is one whose compositional marginal gain far exceeds the gain it gives alone. Formally, if the marginal gain of adding dimension $j$ at step $k$ to the active set $S_k$ is $G_j(S_k)$ and its gain alone is $G_j(\varnothing)$, taken from the size-one subsets of Chapter 11, the emergence ratio is:</p>
+<p>$$E_j = \frac{G_j(S_k)}{G_j(\varnothing)}$$</p>
+<p>An emergence ratio substantially greater than 1.0 indicates that dimension $j$ completes the currently active set. By the first identity of Section 12.4.2 this happens when the interactions $\Phi_{jk}$ with the active dimensions are negative. Dividing by the ablation delta $\Delta_j$ instead would measure something else: its interactions with the dimensions not yet added. Ratios greater than 2.0 are noteworthy; ratios greater than 5.0 indicate strong emergent behavior that demands investigation.</p>
+<p>Emergence often arises in models where dimensions encode different <em>aspects</em> of the same underlying phenomenon. A model predicting material failure might have one dimension for stress and another for temperature. Neither alone predicts failure well (both have a small gain alone), but together they define the stress-temperature failure envelope: a region in the joint space where failure probability is high. The emergence ratio captures this synergy quantitatively.</p>
 <h3 id="1263-diagnosing-redundancy-clusters">12.6.3 Diagnosing Redundancy Clusters</h3>
 <p>When a group of dimensions are mutually redundant, the compositional test reveals this as a cluster of diminishing marginal gains. After the first dimension in the cluster is added, subsequent cluster members contribute very little because their information is already represented.</p>
 <p>To identify redundancy clusters from the compositional result:</p>
@@ -552,7 +549,7 @@ class StructuralFuzzReport:
 <p>Each step of the compositional test produces a point in the evaluation space: a (dimensionality, MAE) pair. The sequence of points traces a <em>composition path</em> from the starting dimension to the full model. This path is a one-dimensional curve through the $n$-dimensional parameter space, projected onto the two-dimensional (dimensionality, MAE) plane.</p>
 <p>The geometry of this path encodes interaction information:</p>
 <ul>
-<li><strong>Steep descent</strong> from step $k$ to step $k+1$ indicates strong synergy between the newly added dimension and the current active set.</li>
+<li><strong>Steep descent</strong> from step $k$ to step $k+1$ indicates a large main effect, or a dimension that completes one already active.</li>
 <li><strong>Shallow descent</strong> indicates near-independence or mild redundancy.</li>
 <li><strong>Plateau</strong> indicates complete redundancy: the new dimension adds no information.</li>
 <li><strong>Ascent</strong> (MAE increases) is theoretically possible if re-optimization of the expanded set finds a worse optimum than the restricted set. In practice, this is rare because the search space strictly expands with each added dimension, but it can occur with random search in high dimensions where the search budget is insufficient.</li>
@@ -564,9 +561,9 @@ class StructuralFuzzReport:
 <h3 id="1273-the-interaction-matrix-as-a-metric-tensor">12.7.3 The Interaction Matrix as a Metric Tensor</h3>
 <p>There is a deeper geometric interpretation of the interaction matrix $\Phi$ that connects to the Riemannian framework of Chapters 6 and 9. Consider the space of <em>dimension activation vectors</em> $\mathbf{a} \in \{0, 1\}^n$, where $a_i = 1$ indicates that dimension $i$ is active. The evaluation function restricted to this discrete space defines a function $f : \{0, 1\}^n \to \mathbb{R}$.</p>
 <p>If we approximate $f$ by a second-order expansion around the all-active point $\mathbf{a} = \mathbf{1}$:</p>
-<p>$$f(\mathbf{a}) \approx f(\mathbf{1}) - \sum_i \Delta_i (1 - a_i) + \frac{1}{2} \sum_{i \neq j} \Phi_{ij} (1 - a_i)(1 - a_j)$$</p>
-<p>the interaction matrix $\Phi$ plays the role of a metric tensor on the discrete activation space. It defines how &ldquo;distance&rdquo; in the activation space translates to distance in the evaluation space. Directions of strong synergy ($\Phi_{ij} > 0$) are directions along which the evaluation landscape curves upward (removing both dimensions is more damaging than expected); directions of redundancy ($\Phi_{ij} < 0$) are directions along which it curves downward.</p>
-<p>This is not merely an analogy. When the discrete activation space is relaxed to a continuous space $\mathbf{a} \in [0, 1]^n$ (replacing binary on/off with continuous weighting), the interaction matrix becomes a genuine metric tensor on that space, and the compositional test traces a geodesic-like path through the space: at each step it moves in the direction of steepest descent as measured by this metric.</p>
+<p>$$f(\mathbf{a}) \approx f(\mathbf{1}) + \sum_i \Delta_i (1 - a_i) + \frac{1}{2} \sum_{i \neq j} \Phi_{ij} (1 - a_i)(1 - a_j)$$</p>
+<p>the interaction matrix $\Phi$ is the second-order term of the evaluation function on the activation space, the off-diagonal part of its Hessian. The expansion is exact for one or two removals: setting $a_i = 0$ gives $f + \Delta_i$, and setting $a_i = a_j = 0$ gives $f + \Delta_i + \Delta_j + \Phi_{ij}$. Redundant pairs ($\Phi_{ij} > 0$) are directions along which the evaluation landscape curves upward, since removing both is more damaging than expected; complementary pairs ($\Phi_{ij} < 0$) are directions along which it curves downward.</p>
+<p>$\Phi$ is not a metric tensor. Its diagonal is zero and its entries take both signs, so it is not positive definite and does not define distances. When the activation space is relaxed to $\mathbf{a} \in [0, 1]^n$, replacing on and off with continuous weights, it becomes the off-diagonal part of the Hessian of $f$, and the compositional test is a greedy discrete descent on that landscape.</p>
 <hr />
 <h2 id="128-limitations-and-extensions">12.8 Limitations and Extensions</h2>
 <h3 id="1281-greedy-suboptimality">12.8.1 Greedy Suboptimality</h3>
@@ -591,7 +588,7 @@ class StructuralFuzzReport:
 <p>Compositional testing addresses a fundamental gap in single-dimension analysis: the interaction structure between dimensions. The key contributions of this chapter are:</p>
 <ol>
 <li>
-<p><strong>The interaction matrix</strong> $\Phi_{ij}$, which decomposes multi-dimensional model behavior into additive, synergistic, and redundant components. Positive entries indicate synergy (dimensions complement each other); negative entries indicate redundancy (dimensions overlap).</p>
+<p><strong>The interaction matrix</strong> $\Phi_{ij}$, which decomposes multi-dimensional model behavior into additive, synergistic, and redundant components. Positive entries indicate redundancy (dimensions overlap); negative entries indicate complementarity (each dimension needs the other).</p>
 </li>
 <li>
 <p><strong>The greedy compositional algorithm</strong>, implemented as <code>compositional_test</code> in the structural fuzzing framework, which constructs an efficient dimension-addition ordering with quadratic cost. At each step, all active dimensions are re-optimized jointly, capturing cross-dimensional adjustments that sequential approaches miss.</p>
@@ -606,16 +603,16 @@ class StructuralFuzzReport:
 <p><strong>The geometric interpretation.</strong> The interaction matrix functions as a metric tensor on the dimension activation space, encoding how curvature in the activation space maps to curvature in the evaluation space. Compositional testing traces an approximately geodesic path through this space.</p>
 </li>
 </ol>
-<p>The analysis developed in this chapter is <em>local</em>: it characterizes interactions around a specific baseline configuration (for ablation) or along a specific greedy path (for composition). It does not guarantee that the interaction structure is the same in other regions of the parameter space. For models with strongly nonlinear evaluation functions, interactions can appear and disappear as the baseline moves. Chapter 13 extends the analysis by examining how compositional structures change under perturbation, connecting the local interaction picture to the global robustness framework developed in Chapter 9.</p>
+<p>The analysis developed in this chapter is <em>local</em>: it characterizes interactions around a specific baseline configuration (for ablation) or along a specific greedy path (for composition). It does not guarantee that the interaction structure is the same in other regions of the parameter space. For models with strongly nonlinear evaluation functions, interactions can appear and disappear as the baseline moves. Whether an interaction structure is stable when the baseline is perturbed is not developed in this volume; the robustness tools of Chapter 9 are the place to start.</p>
 <hr />
 <h2 id="1210-exercises">12.10 Exercises</h2>
-<p><strong>12.1.</strong> Given a model with four dimensions and the following ablation deltas: $\Delta_A = 1.0$, $\Delta_B = 0.5$, $\Delta_C = 0.3$, $\Delta_D = 0.1$, and the pairwise ablation results $f(\mathbf{x}^{(-AB)}) - f(\mathbf{x}) = 2.0$, $f(\mathbf{x}^{(-AC)}) - f(\mathbf{x}) = 1.2$, $f(\mathbf{x}^{(-AD)}) - f(\mathbf{x}) = 1.1$, compute the interaction matrix entries $\Phi_{AB}$, $\Phi_{AC}$, and $\Phi_{AD}$. Classify each pair as synergistic, additive, or redundant.</p>
+<p><strong>12.1.</strong> Given a model with four dimensions and the following ablation deltas: $\Delta_A = 1.0$, $\Delta_B = 0.5$, $\Delta_C = 0.3$, $\Delta_D = 0.1$, and the pairwise ablation results $f(\mathbf{x}^{(-AB)}) - f(\mathbf{x}) = 2.0$, $f(\mathbf{x}^{(-AC)}) - f(\mathbf{x}) = 1.2$, $f(\mathbf{x}^{(-AD)}) - f(\mathbf{x}) = 1.1$, compute the interaction matrix entries $\Phi_{AB}$, $\Phi_{AC}$, and $\Phi_{AD}$. Classify each pair as complementary, additive, or redundant.</p>
 <p><strong>12.2.</strong> Run <code>compositional_test</code> on a five-dimensional evaluation function of your choice with three different starting dimensions. Compare the orderings. What do the differences (or lack thereof) tell you about the interaction structure?</p>
-<p><strong>12.3.</strong> Prove that for a purely additive model (where $f(\mathbf{x}) = \sum_i g_i(x_i)$ for independent functions $g_i$), the interaction matrix $\Phi_{ij} = 0$ for all $i \neq j$, and the compositional ordering is the reverse of the sensitivity ranking.</p>
-<p><strong>12.4.</strong> Consider a model where $\Phi_{AB} = +2.0$ (strong synergy) but both $\Delta_A < 0.1$ and $\Delta_B < 0.1$ (individually unimportant). Explain why the greedy compositional algorithm starting from dimension C will never discover this synergy. Propose a modification to the algorithm that would detect it.</p>
+<p><strong>12.3.</strong> Prove that for a purely additive model (where $f(\mathbf{x}) = \sum_i g_i(x_i)$ for independent functions $g_i$), the interaction matrix $\Phi_{ij} = 0$ for all $i \neq j$, and the compositional ordering agrees with the sensitivity ranking.</p>
+<p><strong>12.4.</strong> Consider a model where $\Phi_{AB} = -2.0$ (A and B strongly complementary), and adding A or B alone to any set that lacks the other improves the MAE by less than 0.1. Explain why the greedy compositional algorithm starting from dimension C will not discover the pair. Propose a modification to the algorithm that would detect it.</p>
 <p><strong>12.5.</strong> The cost of the compositional test is $O(n^2)$ while full subset enumeration is $O(2^n)$. For what range of $n$ is the compositional test at least 10x cheaper? Derive the crossover point exactly.</p>
 <hr />
-<p><em>Chapter 13 extends the compositional framework by examining how interaction structures respond to perturbation. Where this chapter asks &ldquo;which dimensions interact?&rdquo;, Chapter 13 asks &ldquo;how stable are those interactions?&rdquo;&mdash;connecting the local composition picture developed here to the global robustness analysis of the full campaign pipeline.</em></p>
+<p><em>Chapter 13 turns from the structure of a model&rsquo;s parameters to the structure of its inputs: symmetry groups acting on data, and their use for augmentation.</em></p>
       </div>
 
       <div class="chapter-nav-bottom">

@@ -63,7 +63,7 @@
 <p>Consider three point clouds in the plane. The first is a tight ball of points. The second is an elongated ellipse. The third is a ring. A nearest-neighbor classifier treats all three as collections of pairwise distances. A Gaussian mixture model fits covariance ellipses. Neither representation notices the hole in the middle of the ring — the topological feature that distinguishes it from a filled disk, no matter how you stretch, bend, or compress it. Topology is the mathematics of properties preserved under continuous deformation: stretching and bending are allowed, but tearing and gluing are not. A coffee cup and a donut are topologically equivalent (both have one hole), but a sphere and a donut are not.</p>
 <p>Topological data analysis (TDA) brings this perspective to finite point clouds. The central insight is that data has <em>shape</em>, and that shape carries information. Clusters are zero-dimensional topology (connected components). Loops are one-dimensional topology (cycles). Voids are two-dimensional topology (cavities). These features are invariant to the continuous deformations that plague distance-based methods: nonlinear scaling, monotonic warping, sensor drift, and moderate noise all change distances but preserve topology.</p>
 <p>This invariance is not merely aesthetic. In applications where the generative process produces structured geometry — oscillatory systems, recurrent dynamics, hierarchical organization — the topological features of the data encode the structure of the process itself. A periodic signal traces a loop. A quasiperiodic signal traces a torus. A chaotic attractor produces a characteristic tangle of components and cycles that distinguishes it from stochastic noise. TDA extracts these features in a principled, stable, and computable way.</p>
-<p>This chapter develops the TDA pipeline from first principles. We begin with a technique for lifting one-dimensional time series into higher-dimensional point clouds where topological structure becomes visible (Section 5.2). We then define persistent homology, the central algebraic tool that tracks topological features across scales (Section 5.3), and its standard visualization, the persistence diagram (Section 5.4). Section 5.5 addresses the practical problem of converting persistence diagrams into fixed-length feature vectors suitable for downstream machine learning. Finally, Section 5.6 applies the full pipeline to cetacean bioacoustics, where topological features of vocal dynamics distinguish social groups that are indistinguishable by spectral analysis alone.</p>
+<p>This chapter develops the TDA pipeline from first principles. We begin with a technique for lifting one-dimensional time series into higher-dimensional point clouds where topological structure becomes visible (Section 5.2). We then define persistent homology, the central algebraic tool that tracks topological features across scales (Section 5.3), and its standard visualization, the persistence diagram (Section 5.4). Section 5.5 addresses the practical problem of converting persistence diagrams into fixed-length feature vectors suitable for downstream machine learning. Section 5.6 assembles the full pipeline, and Section 5.7 applies it to cetacean bioacoustics, where topological features of vocal dynamics complement spectral analysis.</p>
 <hr />
 <h2 id="52-takens-time-delay-embedding">5.2 Takens&rsquo; Time-Delay Embedding</h2>
 <p>Many real-world systems are dynamical: they evolve in time according to deterministic or stochastic rules operating on a high-dimensional state space. We rarely observe the full state. A single sensor — a microphone, a temperature probe, a stock price — gives us a one-dimensional projection of a multi-dimensional trajectory. The question is whether we can recover the geometry of the underlying attractor from this single scalar time series.</p>
@@ -216,7 +216,7 @@
 <td>6</td>
 <td>Total persistence</td>
 <td>$\sum_i \ell_i^2$</td>
-<td>$L^2$ norm of the persistence landscape</td>
+<td>Sum of squared lifetimes</td>
 </tr>
 <tr>
 <td>7</td>
@@ -238,7 +238,7 @@
         4: p75_lifetime — 75th percentile
         5: mean_birth
         6: total_persistence — sum of squared lifetimes (L2 norm)
-        7: normalized_persistence — total / count
+        7: normalized_persistence — sqrt(total) / count
 
     Args:
         dgm: Persistence diagram, shape [n, 2] with (birth, death).
@@ -421,7 +421,7 @@ print(f&quot;Feature vector shape: {features.shape}&quot;)  # (16,)
 <p><strong>Extract ICI sequence.</strong> Given a coda with click onset times $t_1, t_2, \ldots, t_k$, compute the inter-click intervals $\Delta_i = t_{i+1} - t_i$. This is a short one-dimensional time series (typically 3&ndash;20 values for sperm whale codas, longer for click trains of other species).</p>
 </li>
 <li>
-<p><strong>Time-delay embed.</strong> Apply Takens embedding with appropriate $\tau$ and $d$. For short ICI sequences, $d = 2$ or $d = 3$ and $\tau = 1$ (consecutive ICIs) is common. For longer click trains or continuous audio, higher $\tau$ and subsampling are needed.</p>
+<p><strong>Time-delay embed.</strong> Apply Takens embedding with appropriate $\tau$ and $d$. For short ICI sequences, $d = 2$ or $d = 3$ and $\tau = 1$ (consecutive ICIs) is common. For longer click trains or continuous audio, higher $\tau$ and subsampling are needed. Note how small these clouds are: with $d = 3$ and $\tau = 1$, a coda of $m$ intervals gives $m - 2$ points, so a coda of five intervals gives three. Three points can form no loop, and a handful of points can form only short-lived ones, so $H_1$ features of single codas should be read with that in mind; pooling the intervals of many codas of one type gives clouds large enough for loops to mean something.</p>
 </li>
 <li>
 <p><strong>Compute persistent homology.</strong> The Vietoris-Rips persistence of the embedded cloud captures:</p>
@@ -469,7 +469,7 @@ coda_icis = [...]  # list of ICI arrays, one per coda
 feature_matrix = np.stack([process_coda(ici) for ici in coda_icis])
 # feature_matrix.shape = (n_codas, 16)
 </code></pre>
-<p>The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of distinct interval clusters).</p>
+<p>The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of finite $H_0$ bars, which is one less than the number of points in the cloud and so tracks the length of the coda).</p>
 <h3 id="575-interpretation-of-results">5.7.5 Interpretation of Results</h3>
 <p>When applied to the DSWP dataset (1,501 annotated sperm whale codas), TDA features reveal structure aligned with the known social organization:</p>
 <ul>
@@ -506,7 +506,7 @@ feature_matrix = np.stack([process_coda(ici) for ici in coda_icis])
 <p><strong>Application to cetacean bioacoustics</strong> demonstrates that topological features capture the dynamical shape of vocal patterns — cyclic structure, interval clustering, rhythmic regularity — in ways that are invariant to tempo and complementary to spectral analysis.</p>
 </li>
 </ol>
-<p>The topological perspective will recur in later chapters. In Part II, we will see how persistent homology can detect phase transitions in adversarial parameter spaces (Chapter 9) and how topological features serve as robust invariants for structural fuzzing campaigns (Chapter 20). The key takeaway is that topology captures qualitative structure — the presence or absence of holes, loops, and clusters — that persists under the continuous deformations induced by noise, measurement error, and parameter perturbation, making it a natural complement to the metric and manifold methods developed in Chapters 2 through 4.</p>
+<p>The topological perspective will recur in later chapters. Chapter 10 uses connected components to group transforms with similar probe responses, and the bioacoustics case study of Chapter 20 uses the features of this chapter as one of its channels. The key takeaway is that topology captures qualitative structure — the presence or absence of holes, loops, and clusters — that persists under the continuous deformations induced by noise, measurement error, and parameter perturbation, making it a natural complement to the metric and manifold methods developed in Chapters 2 through 4.</p>
 <hr />
 <h2 id="exercises">Exercises</h2>
 <p><strong>5.1.</strong> <em>Embedding dimension.</em> Generate a Lorenz attractor time series ($\sigma = 10$, $\rho = 28$, $\beta = 8/3$) and compute Takens&rsquo; embedding with $d = 2, 3, 4, 5$ and $\tau = 15$. For each $d$, compute the $H_1$ persistence diagram. At what $d$ does the dominant $H_1$ feature stabilize? How does this relate to the known dimension of the Lorenz attractor ($m \approx 2.06$)?</p>

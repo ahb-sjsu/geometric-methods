@@ -351,8 +351,8 @@
 <p>$$\lambda_x^c = \frac{2}{1 - c\,\|x\|^2}$$</p>
 <p>The Riemannian conformal factor on the Poincare ball. Relates the Poincare metric tensor to the Euclidean metric: $g_x^{\mathbb{B}} = (\lambda_x^c)^2\, g^E$. Diverges as $\|x\| \to 1/\sqrt{c}$, reflecting the exponential magnification of distances near the boundary. Chapter 3.</p>
 <h3 id="a47-lorentz-factor">A.4.7 Lorentz Factor</h3>
-<p>$$\gamma_c(x) = \frac{1}{1 - c\,\|x\|^2}$$</p>
-<p>Used in the Einstein midpoint computation. Differs from the conformal factor $\lambda_x^c$ by a factor of 2 because it is derived in the Klein model rather than the Poincare model. Chapter 3.</p>
+<p>$$\gamma_c(k) = \frac{1}{\sqrt{1 - c\,\|k\|^2}}$$</p>
+<p>Defined for a point $k$ of the Klein model and used in the Einstein midpoint. If $k$ is the Klein image of the Poincaré point $x$, then $\gamma_c(k) = \lambda_x^c - 1$. Chapter 3.</p>
 <h3 id="a48-projection-onto-the-poincare-ball">A.4.8 Projection onto the Poincare Ball</h3>
 <p>$$\text{proj}(x) = \begin{cases} x & \text{if } \|x\| < r_{\max}/\sqrt{c} \\ \frac{r_{\max}}{\sqrt{c}\,\|x\|}\,x & \text{otherwise} \end{cases}$$</p>
 <p>Projects points back inside the open ball after floating-point drift. The parameter $r_{\max} < 1$ (typically $0.95$) provides a safety margin. Chapter 3.</p>
@@ -362,8 +362,8 @@
 <hr />
 <h2 id="a5-aggregation-and-means">A.5 Aggregation and Means</h2>
 <h3 id="a51-einstein-midpoint">A.5.1 Einstein Midpoint</h3>
-<p>$$\bar{x} = \frac{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i\, x_i}{\sum_{i=1}^{N} \gamma_c(x_i)\, w_i}$$</p>
-<p>Weighted average of points on the Poincare ball, derived from the Klein model. Upweights points near the boundary via the Lorentz factor $\gamma_c$. Reduces to the Euclidean weighted mean as $c \to 0$. Chapter 3.</p>
+<p>$$\bar{x} = \tfrac{1}{2} \otimes_c \left( \frac{\sum_{i=1}^{N} w_i\, \lambda^c_{x_i}\, x_i}{\sum_{i=1}^{N} w_i\, (\lambda^c_{x_i} - 1)} \right)$$</p>
+<p>Weighted average of points on the Poincare ball, defined in the Klein model as the Lorentz-weighted mean and written here in Poincaré coordinates; $\otimes_c$ is Möbius scalar multiplication. Lies in the ball, reduces to the Euclidean weighted mean as $c \to 0$, and for two points with equal weights is their geodesic midpoint. Chapter 3.</p>
 <h3 id="a52-frechet-mean-on-spdn">A.5.2 Frechet Mean on SPD(n)</h3>
 <p>$$\bar{S}_{LE} = \exp\!\left(\sum_{i=1}^{k} w_i \log(S_i)\right)$$</p>
 <p>The Frechet mean under the log-Euclidean metric. Minimizes $\sum_i w_i\, d_{LE}(S_i, M)^2$ over $M \in \text{SPD}(n)$. Closed-form: take the weighted mean in log-space, then exponentiate. Chapter 4.</p>
@@ -484,8 +484,11 @@
 </tr>
 </tbody>
 </table>
-<h3 id="a71-mri-weights">A.7.1 MRI Weights</h3>
-<p>The Model Robustness Index combines mean deviation, 75th percentile, and 95th percentile of perturbation response into a single robustness score. The composite explicitly accounts for tail risk, unlike standard deviation which treats all deviations symmetrically. Chapter 1 (introduced), Chapter 9 (developed).</p>
+<h3 id="a71-model-robustness-index">A.7.1 Model Robustness Index</h3>
+<p>$$\omega_k = \bigl| f(\boldsymbol{\theta} \odot e^{\boldsymbol{\varepsilon}_k}) - f(\boldsymbol{\theta}) \bigr|, \quad \boldsymbol{\varepsilon}_k \sim \mathcal{N}(0, \sigma^2 I), \qquad \text{MRI} = 0.5\,\bar{\omega} + 0.3\,\omega_{75} + 0.2\,\omega_{95}$$</p>
+<p>The deviation $\omega_k$ is the absolute change in MAE under the $k$-th multiplicative perturbation (default $\sigma = 0.5$, 300 draws, clipped to $[10^{-3}, 10^6]$); $\bar{\omega}$, $\omega_{75}$ and $\omega_{95}$ are its mean and percentiles. The MRI is in the units of the MAE, not a ratio, and it is zero whenever the evaluation function cannot see the perturbation (Section 19.7). The weights emphasize the tail. Chapter 1 (introduced), Chapter 9 (developed).</p>
+<h3 id="a71a-decoder-robustness-index">A.7.1a Decoder Robustness Index</h3>
+<p>The same weighted combination applied to semantic deviations $\omega \in [0, 1]$ of a decoder&rsquo;s output under input transforms: $\omega = 0$ when the decision is unchanged, and at least $0.5$ when it flips. Chapter 10.</p>
 <h3 id="a72-softmax-choice-rule">A.7.2 Softmax Choice Rule</h3>
 <p>$$P(\text{reject}) = \frac{\exp(-d_{\text{reject}} / T)}{\exp(-d_{\text{accept}} / T) + \exp(-d_{\text{reject}} / T)}$$</p>
 <p>Probabilistic choice model based on Mahalanobis distances, where $T$ is a temperature parameter controlling decision sharpness. Chapter 2.</p>
@@ -561,7 +564,8 @@
 <table>
 <thead>
 <tr>
-<th>Index</th>
+<th>Symbol</th>
+<th style="text-align: center;">Code index</th>
 <th>Name</th>
 <th>Features</th>
 </tr>
@@ -569,26 +573,31 @@
 <tbody>
 <tr>
 <td>$s_1$</td>
+<td style="text-align: center;">0</td>
 <td>Size</td>
 <td>LOC, SLOC, blank lines</td>
 </tr>
 <tr>
 <td>$s_2$</td>
+<td style="text-align: center;">1</td>
 <td>Complexity</td>
 <td>Cyclomatic, essential, design</td>
 </tr>
 <tr>
 <td>$s_3$</td>
+<td style="text-align: center;">2</td>
 <td>Halstead</td>
 <td>Volume, difficulty, effort, time</td>
 </tr>
 <tr>
 <td>$s_4$</td>
+<td style="text-align: center;">3</td>
 <td>Object-Orientation</td>
 <td>Coupling, cohesion, inheritance depth</td>
 </tr>
 <tr>
 <td>$s_5$</td>
+<td style="text-align: center;">4</td>
 <td>Process</td>
 <td>Revisions, distinct authors, code churn</td>
 </tr>
@@ -642,7 +651,7 @@
 </tbody>
 </table>
 <h3 id="a83-sentinel-values">A.8.3 Sentinel Values</h3>
-<p>The sentinel value $10^6$ (denoted <code>inactive_value</code> in code) indicates that a dimension is <em>inactive</em> &mdash; its corresponding feature group is excluded from the metric. When a parameter value exceeds the threshold $10^5$, the framework assigns zero weight to that dimension, effectively removing it from the distance computation:</p>
+<p>The sentinel value $10^6$ (denoted <code>inactive_value</code> in code) indicates that a dimension is <em>inactive</em> &mdash; its corresponding feature group is excluded from the metric. When a parameter value reaches a threshold, the evaluation function treats that dimension as off. The threshold is chosen by each evaluation function, not by the framework: the economics example uses $10^5$, as below, and the defect example of Chapter 19 uses $10^3$. In the economics example:</p>
 <p>$$w_i = \begin{cases} 1 / \max(p_i, 10^{-6}) & \text{if } p_i < 10^5 \\ 0 & \text{if } p_i \geq 10^5 \end{cases}$$</p>
 <p>This mechanism enables subset enumeration: each combination of active/inactive dimensions defines a different sparsity pattern on $\Sigma^{-1}$. Chapters 1, 2.</p>
 <h3 id="a84-log-space-parameterization">A.8.4 Log-Space Parameterization</h3>

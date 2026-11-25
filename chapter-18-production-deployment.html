@@ -69,12 +69,12 @@
 <p>In a production <code>requirements.txt</code> or <code>pyproject.toml</code>, pin the version explicitly:</p>
 <pre><code class="language-toml">[project]
 dependencies = [
-    &quot;structural-fuzzing==0.2.0&quot;,
+    &quot;structural-fuzzing==0.4.0&quot;,
     # ... other production dependencies
 ]
 </code></pre>
 <p>For organizations that mirror PyPI internally, the package installs cleanly from private indices:</p>
-<pre><code class="language-bash">pip install structural-fuzzing==0.2.0 --index-url https://pypi.internal.corp.example.com/simple
+<pre><code class="language-bash">pip install structural-fuzzing==0.4.0 --index-url https://pypi.internal.corp.example.com/simple
 </code></pre>
 <p>The optional <code>examples</code> extras (<code>scikit-learn</code>, <code>pandas</code>) are development conveniences and should not be installed in production images. If your <code>evaluate_fn</code> requires scikit-learn, that dependency belongs in your application&rsquo;s dependency list, not in the validation tool&rsquo;s.</p>
 <h3 id="1812-import-patterns-for-production-code">18.1.2 Import Patterns for Production Code</h3>
@@ -117,7 +117,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e &quot;.[dev]&quot;
-          pip install structural-fuzzing==0.2.0
+          pip install structural-fuzzing==0.4.0
 
       - name: Run structural fuzzing campaign
         run: python scripts/run_validation.py --output results/
@@ -134,9 +134,9 @@ jobs:
           retention-days: 90
 </code></pre>
 <p>Three design decisions merit attention.</p>
-<p><strong>The <code>schedule</code> trigger.</strong> Structural fuzzing on every commit is often too expensive. The workflow above runs the full campaign weekly on a schedule, while PR-triggered runs execute a lighter check (Section 18.4). The scheduled run establishes the baseline; PR runs check for regressions against it.</p>
+<p><strong>The <code>schedule</code> trigger.</strong> Structural fuzzing on every commit is often too expensive. The workflow above runs the full campaign weekly on a schedule, while PR-triggered runs execute a lighter check (Section 18.5). The scheduled run establishes the baseline; PR runs check for regressions against it.</p>
 <p><strong>The <code>timeout-minutes</code> limit.</strong> Production CI must have a hard upper bound on execution time. A campaign that runs indefinitely&mdash;because an <code>evaluate_fn</code> hangs, because a combinatorial explosion was not anticipated&mdash;blocks the pipeline and erodes trust in the validation system. Section 18.5 discusses timeout handling in detail.</p>
-<p><strong>Artifact retention.</strong> Campaign results are uploaded as CI artifacts with a 90-day retention window. This creates a versioned history of geometric baselines that can be compared over time (Section 18.8).</p>
+<p><strong>Artifact retention.</strong> Campaign results are uploaded as CI artifacts with a 90-day retention window. This creates a versioned history of geometric baselines that can be compared over time (Section 18.9).</p>
 <h3 id="1822-the-validation-script">18.2.2 The Validation Script</h3>
 <p>The <code>run_validation.py</code> script is the bridge between the CI environment and the structural fuzzing API. Its structure follows the <code>run_campaign</code> function signature from <code>structural_fuzzing.pipeline</code>:</p>
 <pre><code class="language-python">#!/usr/bin/env python
@@ -219,10 +219,10 @@ class ThresholdPolicy:
     max_mri_p95: float = 4.0
     min_pareto_count: int = 2
     max_best_mae: float = 3.0
-    max_adversarial_count: int = 10
     max_sensitivity_delta: float = 5.0
 </code></pre>
-<p>The <code>max_mri</code> threshold deserves careful calibration. An MRI of 2.0 means the weighted combination of mean deviation, 75th percentile, and 95th percentile is at most 2.0&mdash;the model&rsquo;s error roughly doubles under the worst perturbations seen during validation. Whether this is acceptable depends on the domain. For a defect prediction model that informs code review priorities, an MRI of 2.0 may be fine. For a model that triggers automated security responses, an MRI above 1.0 may be unacceptable. Chapter 9 provides guidance on setting these thresholds based on domain-specific risk tolerance.</p>
+<p>The <code>max_mri</code> threshold deserves careful calibration. The MRI is measured in the units of the MAE: an MRI of 2.0 means that the weighted combination of the mean, 75th-percentile and 95th-percentile absolute changes in MAE under perturbation is 2.0 points. It is not a ratio, so whether 2.0 is large depends on the MAE itself: it is a small wobble for a model whose MAE is 40 and larger than the whole error of a model whose MAE is 1.5. Set the threshold relative to the baseline MAE and the domain. For a model that informs code review priorities a generous bound may be fine; for one that triggers automated security responses it may not.</p>
+<p>A low MRI passes this gate whether the model is robust or the evaluation function cannot see the perturbation. Section 19.7 reports a campaign whose MRI is exactly zero for the second reason. Run the witness check of Section 21.4, two parameter vectors that must give different scores, before trusting the gate. Chapter 9 provides guidance on setting these thresholds based on domain-specific risk tolerance.</p>
 <p>The <code>max_mri_p95</code> threshold independently bounds the tail of the perturbation distribution. A model can have a low composite MRI (because the mean is low) while still exhibiting catastrophic behavior in the worst 5% of perturbations. Bounding P95 separately catches this case.</p>
 <h3 id="1832-the-threshold-checker">18.3.2 The Threshold Checker</h3>
 <p>The <code>check_thresholds.py</code> script loads the JSON results and applies the policy:</p>
@@ -232,8 +232,10 @@ class ThresholdPolicy:
 import json
 import sys
 
+from policy import ThresholdPolicy  # the dataclass above, saved as scripts/policy.py
 
-def check_thresholds(results_path: str) -&gt; bool:
+
+def check_thresholds(results_path: str, policy: ThresholdPolicy = ThresholdPolicy()) -&gt; bool:
     with open(results_path) as f:
         results = json.load(f)
 
@@ -241,34 +243,34 @@ def check_thresholds(results_path: str) -&gt; bool:
 
     # MRI checks
     mri = results.get(&quot;mri&quot;)
-    if mri is not None and mri &gt; 2.0:
-        failures.append(f&quot;MRI {mri:.4f} exceeds threshold 2.0&quot;)
+    if mri is not None and mri &gt; policy.max_mri:
+        failures.append(f&quot;MRI {mri:.4f} exceeds threshold {policy.max_mri}&quot;)
 
     mri_p95 = results.get(&quot;mri_p95&quot;)
-    if mri_p95 is not None and mri_p95 &gt; 4.0:
-        failures.append(f&quot;MRI P95 {mri_p95:.4f} exceeds threshold 4.0&quot;)
+    if mri_p95 is not None and mri_p95 &gt; policy.max_mri_p95:
+        failures.append(f&quot;MRI P95 {mri_p95:.4f} exceeds threshold {policy.max_mri_p95}&quot;)
 
     # Pareto frontier check
     pareto_count = results.get(&quot;pareto_count&quot;, 0)
-    if pareto_count &lt; 2:
+    if pareto_count &lt; policy.min_pareto_count:
         failures.append(
             f&quot;Pareto frontier has {pareto_count} points &quot;
-            f&quot;(minimum 2 required)&quot;
+            f&quot;(minimum {policy.min_pareto_count} required)&quot;
         )
 
     # Best MAE check
     pareto_maes = results.get(&quot;pareto_maes&quot;, [])
-    if pareto_maes and min(pareto_maes) &gt; 3.0:
+    if pareto_maes and min(pareto_maes) &gt; policy.max_best_mae:
         failures.append(
-            f&quot;Best Pareto MAE {min(pareto_maes):.4f} exceeds threshold 3.0&quot;
+            f&quot;Best Pareto MAE {min(pareto_maes):.4f} exceeds threshold {policy.max_best_mae}&quot;
         )
 
     # Sensitivity check: no single dimension should dominate excessively
     for entry in results.get(&quot;sensitivity_ranking&quot;, []):
-        if abs(entry[&quot;delta_mae&quot;]) &gt; 5.0:
+        if abs(entry[&quot;delta_mae&quot;]) &gt; policy.max_sensitivity_delta:
             failures.append(
                 f&quot;Dimension '{entry['dim']}' has excessive sensitivity &quot;
-                f&quot;(delta_MAE={entry['delta_mae']:.4f}, threshold=5.0)&quot;
+                f&quot;(delta_MAE={entry['delta_mae']:.4f}, threshold={policy.max_sensitivity_delta})&quot;
             )
 
     # Report
@@ -286,13 +288,30 @@ def check_thresholds(results_path: str) -&gt; bool:
 
 
 if __name__ == &quot;__main__&quot;:
-    success = check_thresholds(sys.argv[1])
-    sys.exit(0 if success else 1)
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument(&quot;results&quot;)
+    ap.add_argument(&quot;--baseline&quot;)
+    ap.add_argument(&quot;--max-mri-regression&quot;, type=float, default=0.20)
+    ap.add_argument(&quot;--max-mae-regression&quot;, type=float, default=0.10)
+    args = ap.parse_args()
+
+    ok = check_thresholds(args.results)
+    if args.baseline:  # check_regression is defined in Section 18.3.3, same file
+        ok = check_regression(args.results, args.baseline,
+                              args.max_mri_regression, args.max_mae_regression) and ok
+    sys.exit(0 if ok else 1)
 </code></pre>
 <p>The exit code is the contract with the CI system: zero means pass, non-zero means fail. When <code>check_thresholds.py</code> exits with code 1, the GitHub Actions step fails, the PR check turns red, and the change cannot merge without an explicit override.</p>
 <h3 id="1833-baseline-comparison-mode">18.3.3 Baseline Comparison Mode</h3>
 <p>Threshold checking against fixed constants is a starting point. The more powerful mode compares against a <em>previous baseline</em>:</p>
-<pre><code class="language-python">def check_regression(current_path: str, baseline_path: str) -&gt; bool:
+<pre><code class="language-python">def check_regression(
+    current_path: str,
+    baseline_path: str,
+    max_mri_regression: float = 0.20,
+    max_mae_regression: float = 0.10,
+) -&gt; bool:
     &quot;&quot;&quot;Check for regressions relative to a stored baseline.&quot;&quot;&quot;
     with open(current_path) as f:
         current = json.load(f)
@@ -302,9 +321,9 @@ if __name__ == &quot;__main__&quot;:
     failures: list[str] = []
 
     # MRI regression: current should not be more than 20% worse
-    if current[&quot;mri&quot;] is not None and baseline[&quot;mri&quot;] is not None:
+    if current[&quot;mri&quot;] is not None and baseline[&quot;mri&quot;]:  # skips a zero baseline
         ratio = current[&quot;mri&quot;] / baseline[&quot;mri&quot;]
-        if ratio &gt; 1.2:
+        if ratio &gt; 1 + max_mri_regression:
             failures.append(
                 f&quot;MRI regressed by {(ratio - 1) * 100:.1f}% &quot;
                 f&quot;({baseline['mri']:.4f} -&gt; {current['mri']:.4f})&quot;
@@ -320,7 +339,7 @@ if __name__ == &quot;__main__&quot;:
     # Best MAE should not increase by more than 10%
     curr_best = min(current[&quot;pareto_maes&quot;]) if current[&quot;pareto_maes&quot;] else float(&quot;inf&quot;)
     base_best = min(baseline[&quot;pareto_maes&quot;]) if baseline[&quot;pareto_maes&quot;] else float(&quot;inf&quot;)
-    if curr_best &gt; base_best * 1.1:
+    if curr_best &gt; base_best * (1 + max_mae_regression):
         failures.append(
             f&quot;Best MAE regressed by {(curr_best / base_best - 1) * 100:.1f}% &quot;
             f&quot;({base_best:.4f} -&gt; {curr_best:.4f})&quot;
@@ -347,7 +366,6 @@ if __name__ == &quot;__main__&quot;:
 <h3 id="1842-wrapping-a-production-model">18.4.2 Wrapping a Production Model</h3>
 <p>The following pattern wraps a model served via HTTP:</p>
 <pre><code class="language-python">import time
-from functools import lru_cache
 from typing import Any
 
 import numpy as np
@@ -429,7 +447,7 @@ def make_evaluate_fn(
     base_fn: callable,
     cache_size: int = 4096,
 ) -&gt; callable:
-    &quot;&quot;&quot;Wrap an evaluate_fn with an LRU cache.
+    &quot;&quot;&quot;Wrap an evaluate_fn with a bounded cache (first in, first out).
 
     Note: NumPy arrays are not hashable. We convert to a tuple
     of rounded values for cache keys.
@@ -590,14 +608,14 @@ def campaign_timeout(seconds: int):
 # with campaign_timeout(1200):  # 20 minutes
 #     report = run_campaign(...)
 </code></pre>
-<p>When the timeout fires, the <code>CampaignTimeoutError</code> propagates up, the CI step fails, and the artifact upload step (marked <code>if: always()</code>) still runs, capturing whatever partial results were produced.</p>
+<p>When the timeout fires, the <code>CampaignTimeoutError</code> propagates up, the CI step fails, and the artifact upload step (marked <code>if: always()</code>) still runs. It uploads only what was written before the timeout, and <code>run_validation.py</code> writes its results after the campaign returns, so a timed-out run uploads no campaign results. Writing each stage&rsquo;s output as it completes would change that.</p>
 <hr />
 <h2 id="186-monitoring-model-robustness-over-time">18.6 Monitoring Model Robustness Over Time</h2>
 <h3 id="1861-the-robustness-time-series">18.6.1 The Robustness Time Series</h3>
 <p>A single MRI value is a snapshot. A <em>time series</em> of MRI values, collected weekly or after every model retrain, reveals trends that no individual measurement can capture. Is the model becoming more brittle as the data distribution shifts? Is robustness improving as the training pipeline matures? These questions require longitudinal data.</p>
 <p>The monitoring system is straightforward: store campaign results in a time-series database (or, for simpler setups, append to a JSON Lines file) and compute statistics over windows:</p>
 <pre><code class="language-python">import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -608,7 +626,7 @@ def append_to_history(
 ) -&gt; None:
     &quot;&quot;&quot;Append campaign results to the history file.&quot;&quot;&quot;
     entry = {
-        &quot;timestamp&quot;: datetime.utcnow().isoformat(),
+        &quot;timestamp&quot;: datetime.now(timezone.utc).isoformat(),
         &quot;model_version&quot;: model_version,
         **results,
     }
@@ -675,30 +693,20 @@ def compute_trend(
 ) -&gt; float:
     &quot;&quot;&quot;Compute the hypervolume dominated by the Pareto frontier.
 
-    Uses a reference point (ref_dims, ref_mae) as the upper-right
-    corner of the dominated region. Larger hypervolume is better.
+    Both objectives are minimized. A point (d, m) dominates the box
+    [d, ref_dims] x [m, ref_mae]; the hypervolume is the area of the
+    union of those boxes. Larger hypervolume is better.
     &quot;&quot;&quot;
-    if not pareto_dims or not pareto_maes:
-        return 0.0
-
-    # Sort by dims ascending
-    points = sorted(zip(pareto_dims, pareto_maes))
-
+    points = sorted(
+        (d, m) for d, m in zip(pareto_dims, pareto_maes)
+        if d &lt; ref_dims and m &lt; ref_mae
+    )
     area = 0.0
-    prev_dims = 0
-    for dims, mae in points:
-        if mae &lt; ref_mae:
-            width = dims - prev_dims
-            height = ref_mae - mae
-            area += width * height
-            prev_dims = dims
-
-    # Add final rectangle to reference point
-    if prev_dims &lt; ref_dims:
-        last_mae = points[-1][1]
-        if last_mae &lt; ref_mae:
-            area += (ref_dims - prev_dims) * (ref_mae - last_mae)
-
+    best_mae = ref_mae
+    for i, (dims, mae) in enumerate(points):
+        next_dims = points[i + 1][0] if i + 1 &lt; len(points) else ref_dims
+        best_mae = min(best_mae, mae)  # lowest MAE reachable with &lt;= dims
+        area += (next_dims - dims) * (ref_mae - best_mae)
     return area
 
 
@@ -785,9 +793,9 @@ def interpret_campaign(results: dict) -&gt; list[dict]:
                 &quot;severity&quot;: Severity.CRITICAL,
                 &quot;value&quot;: mri,
                 &quot;message&quot;: (
-                    f&quot;MRI of {mri:.2f} indicates severe fragility. &quot;
-                    f&quot;The model's error triples under worst-case &quot;
-                    f&quot;perturbations.&quot;
+                    f&quot;MRI of {mri:.2f}: perturbations move the MAE by &quot;
+                    f&quot;{mri:.2f} points on a tail-weighted average. &quot;
+                    f&quot;Investigate before deploying.&quot;
                 ),
             })
         elif mri &gt; 2.0:
@@ -904,7 +912,7 @@ with open(&quot;validation_report/tables.tex&quot;, &quot;w&quot;) as f:
 \section{Geometric Validation Results}
 
 The following results were produced by the structural fuzzing
-framework (v0.2.0) running against the production validation
+framework (v0.4.0) running against the production validation
 holdout set.
 
 \input{tables.tex}
@@ -913,13 +921,13 @@ holdout set.
 
 The Model Robustness Index of 1.43 indicates that under
 worst-case perturbations within the explored parameter space,
-the model's mean absolute error increases by a factor of
-approximately 1.4. The 95th percentile perturbation produces
+the model's mean absolute error moves by about 1.4 points
+on a weighted average that emphasizes the worst perturbations. The 95th percentile perturbation produces
 a deviation of 3.1, indicating non-trivial tail risk.
 
 The Pareto frontier identifies four non-dominated configurations,
 suggesting meaningful tradeoffs between model complexity and
-prediction accuracy. See Chapter~5 of \cite{bond2026geometric}
+prediction accuracy. See Chapter~8 of \cite{bond2026geometric}
 for the theoretical basis of Pareto analysis in this context.
 
 \end{document}
@@ -956,6 +964,7 @@ for the theoretical basis of Pareto analysis in this context.
 </code></pre>
 <p>When a new model version is promoted to production, its campaign results become the new baseline:</p>
 <pre><code class="language-python">import shutil
+from datetime import datetime, timezone
 
 
 def promote_baseline(
@@ -970,7 +979,7 @@ def promote_baseline(
 
     # Archive old baseline with timestamp
     if baseline.exists():
-        timestamp = datetime.utcnow().strftime(&quot;%Y%m%dT%H%M%S&quot;)
+        timestamp = datetime.now(timezone.utc).strftime(&quot;%Y%m%dT%H%M%S&quot;)
         archive_name = f&quot;baseline_{timestamp}.json&quot;
         shutil.copy2(baseline, archive / archive_name)
 
@@ -980,12 +989,16 @@ def promote_baseline(
 </code></pre>
 <h3 id="1892-schema-versioning">18.9.2 Schema Versioning</h3>
 <p>As the structural fuzzing framework evolves, the JSON schema of campaign results may change. A <code>schema_version</code> field in every results file prevents silent incompatibilities:</p>
-<pre><code class="language-python">def save_results(results: dict, path: str) -&gt; None:
+<pre><code class="language-python">import json
+from datetime import datetime, timezone
+
+
+def save_results(results: dict, path: str) -&gt; None:
     &quot;&quot;&quot;Save campaign results with schema version.&quot;&quot;&quot;
     versioned = {
         &quot;schema_version&quot;: &quot;1.0&quot;,
-        &quot;framework_version&quot;: &quot;0.2.0&quot;,
-        &quot;timestamp&quot;: datetime.utcnow().isoformat(),
+        &quot;framework_version&quot;: &quot;0.4.0&quot;,
+        &quot;timestamp&quot;: datetime.now(timezone.utc).isoformat(),
         **results,
     }
     with open(path, &quot;w&quot;) as f:
@@ -1064,14 +1077,14 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e &quot;.[dev]&quot;
-          pip install structural-fuzzing==0.2.0
+          pip install structural-fuzzing==0.4.0
 
       - name: Estimate evaluation cost
         id: budget
         run: |
           python -c &quot;
-          from scripts.budget import estimate_budget
-          params = estimate_budget(
+          from scripts.budget import budget_campaign_params
+          params = budget_campaign_params(
               n_dims=5,
               eval_time_seconds=0.05,
               budget_minutes=30,
@@ -1082,10 +1095,7 @@ jobs:
 
       - name: Run structural fuzzing
         run: |
-          python scripts/run_validation.py \
-            --output results/ \
-            --model models/production_latest.pkl \
-            --dataset data/validation_holdout.parquet
+          python scripts/run_validation.py --output results/
 
       - name: Check absolute thresholds
         run: python scripts/check_thresholds.py results/campaign.json

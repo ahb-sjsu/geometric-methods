@@ -58,7 +58,7 @@
 <h1 id="chapter-4-spd-manifolds-and-spectral-geometry">Chapter 4: SPD Manifolds and Spectral Geometry</h1>
 <p><em>Structural Fuzzing: Geometric Methods for Adversarial Model Validation</em> &mdash; Andrew H. Bond</p>
 <hr />
-<p>In the preceding chapters, we established the vocabulary of manifolds, tangent spaces, and geodesics. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example &mdash; covariance analysis of cetacean vocalizations &mdash; illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.</p>
+<p>Chapter 3 worked on one curved space, the Poincaré ball. We now turn to a specific manifold that arises naturally in signal processing, machine learning, and statistical modeling: the manifold of symmetric positive definite (SPD) matrices. This chapter develops the Riemannian geometry of SPD matrices from first principles, introduces the log-Euclidean metric as a computationally tractable distance function, and demonstrates how these ideas apply to spectral analysis of acoustic signals. The running example &mdash; covariance analysis of cetacean vocalizations &mdash; illustrates a broader pattern: whenever your data consists of second-order statistics (covariances, correlation matrices, diffusion tensors), flat Euclidean methods throw away geometric structure that the SPD manifold preserves.</p>
 <h2 id="41-the-manifold-of-positive-definite-matrices">4.1 The Manifold of Positive Definite Matrices</h2>
 <p><strong>Definition 4.1.</strong> The set of <em>n x n</em> symmetric positive definite matrices is</p>
 <p>$$\text{SPD}(n) = \{S \in \mathbb{R}^{n \times n} : S = S^\top,\; x^\top S x > 0 \;\forall x \neq 0\}.$$</p>
@@ -130,7 +130,7 @@
 <p>$$S_1 = \begin{pmatrix} 1 & 0 \\ 0 & 0.01 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 1 & 0 \\ 0 & 100 \end{pmatrix}.$$</p>
 <p>The Frobenius distance is $\|S_1 - S_2\|_F = \sqrt{(0.01 - 100)^2} = 99.99$. Now consider:</p>
 <p>$$S_3 = \begin{pmatrix} 1 & 0 \\ 0 & 10000 \end{pmatrix}.$$</p>
-<p>The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though both pairs differ by a factor of $10{,}000$ in one eigenvalue.</p>
+<p>The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $d_F(S_1, S_2)$, even though the second pair differs by the smaller multiplicative factor in that eigenvalue ($100$ against $10{,}000$).</p>
 <p>The log-Euclidean distances tell a different story. We have $\log(\lambda)$ values of $\log(0.01) \approx -4.6$, $\log(100) \approx 4.6$, and $\log(10000) \approx 9.2$. So $d_{LE}(S_1, S_2) \approx |{-4.6} - 4.6| = 9.2$ and $d_{LE}(S_2, S_3) \approx |4.6 - 9.2| = 4.6$. The log-Euclidean metric correctly reports that the multiplicative change from $S_2$ to $S_3$ (a factor of 100) is smaller than the change from $S_1$ to $S_2$ (a factor of 10,000). This scale-sensitivity is essential when eigenvalues span many orders of magnitude, as they do in covariance matrices from real-world signals.</p>
 <h2 id="43-the-frechet-mean-on-spdn">4.3 The Frechet Mean on SPD(n)</h2>
 <p>Given a collection of SPD matrices $S_1, \ldots, S_k$, we often need their &ldquo;average.&rdquo; The ordinary arithmetic mean $(S_1 + \cdots + S_k)/k$ is SPD (since SPD matrices are closed under addition and positive scalar multiplication), but it is not the correct notion of center on the Riemannian manifold. The arithmetic mean minimizes $\sum_i \|S_i - M\|_F^2$, which uses the flat Euclidean distance, not the manifold distance.</p>
@@ -356,7 +356,7 @@ def compute_spectral_trajectory(
 <p><strong>$\epsilon$ (regularization)</strong>: Must be large enough to prevent numerical issues in the eigendecomposition but small enough not to dominate the covariance structure. The default $\epsilon = 10^{-4}$ is appropriate when spectrogram values are in the range $[0, 1]$ or $[-1, 1]$. For log-scaled spectrograms with values in $[-10, 0]$, covariance entries are on the order of $1$ to $10$, so $10^{-4}$ is safely negligible.</p>
 </li>
 <li>
-<p><strong>Window and hop sizes</strong> (for trajectory analysis): The window must be large enough to estimate a reliable covariance matrix ($\geq 3 \cdot n_\text{bands}$ frames, as above) and small enough to capture temporal variation. The hop size controls temporal resolution versus computational cost.</p>
+<p><strong>Window and hop sizes</strong> (for trajectory analysis): The window must be large enough to estimate a reliable covariance matrix ($\geq 3 \cdot n_\text{bands}$ frames, as above) and small enough to capture temporal variation. The hop size controls temporal resolution versus computational cost. The default <code>window_frames=32</code> in <code>compute_spectral_trajectory</code> is below this rule for 16 bands (48 frames); the regularization term keeps each window&rsquo;s matrix positive definite, but its estimates are noisy, so pass <code>window_frames=48</code> or more when the trajectory&rsquo;s fine structure matters.</p>
 </li>
 </ul>
 <h2 id="47-connections-and-extensions">4.7 Connections and Extensions</h2>
@@ -367,13 +367,13 @@ def compute_spectral_trajectory(
 <p><strong>Affine-invariant metric</strong>: $d_{AI}(S_1, S_2) = \|\log(S_1^{-1/2} S_2 S_1^{-1/2})\|_F$. This is invariant under congruence transformations $S \mapsto A S A^\top$ and is the &ldquo;natural&rdquo; Riemannian metric on SPD(n). However, computing the Frechet mean requires iterative optimization, making it more expensive.</p>
 </li>
 <li>
-<p><strong>Bures-Wasserstein metric</strong>: Related to optimal transport between Gaussian distributions. The distance $d_{BW}(S_1, S_2) = \text{tr}(S_1) + \text{tr}(S_2) - 2\text{tr}(S_1^{1/2} S_2 S_1^{1/2})^{1/2}$ arises in quantum information theory and has connections to the Wasserstein-2 distance.</p>
+<p><strong>Bures-Wasserstein metric</strong>: Related to optimal transport between Gaussian distributions. The squared distance $d_{BW}^2(S_1, S_2) = \text{tr}(S_1) + \text{tr}(S_2) - 2\text{tr}(S_1^{1/2} S_2 S_1^{1/2})^{1/2}$ arises in quantum information theory and has connections to the Wasserstein-2 distance.</p>
 </li>
 <li>
 <p><strong>Power-Euclidean metrics</strong>: $d_\alpha(S_1, S_2) = \frac{1}{\alpha}\|S_1^\alpha - S_2^\alpha\|_F$ for $\alpha \in (0, 1]$. The log-Euclidean metric is the limit as $\alpha \to 0$.</p>
 </li>
 </ul>
-<p>The log-Euclidean metric is preferred in computational settings for three reasons: (1) the Frechet mean is closed-form, (2) the log map provides a global diffeomorphism to a vector space where standard algorithms apply, and (3) it is computationally no more expensive than Frobenius distance (one eigendecomposition per matrix).</p>
+<p>The log-Euclidean metric is preferred in computational settings for three reasons: (1) the Frechet mean is closed-form, (2) the log map provides a global diffeomorphism to a vector space where standard algorithms apply, and (3) its cost is one eigendecomposition per matrix, after which every distance is a Frobenius distance between stored logarithms.</p>
 <h3 id="diffusion-tensor-imaging">Diffusion Tensor Imaging</h3>
 <p>The SPD manifold framework was originally developed for diffusion tensor imaging (DTI) in neuroimaging, where each voxel in a brain scan is represented by a $3 \times 3$ SPD matrix describing the local diffusion of water molecules. The same mathematical machinery described in this chapter &mdash; log-Euclidean distances, Frechet means, trajectory analysis &mdash; applies directly to DTI data, with &ldquo;frequency bands&rdquo; replaced by &ldquo;diffusion directions.&rdquo;</p>
 <h3 id="covariance-descriptors-in-computer-vision">Covariance Descriptors in Computer Vision</h3>
@@ -391,7 +391,7 @@ def compute_spectral_trajectory(
 <h2 id="notes-and-references">Notes and References</h2>
 <p>The log-Euclidean framework for SPD matrices was introduced by Arsigny, Fillard, Pennec, and Ayache, &ldquo;Log-Euclidean metrics for fast and simple calculus on diffusion tensors,&rdquo; <em>Magnetic Resonance in Medicine</em> 56(2), 2006. The affine-invariant metric dates to Pennec, Fillard, and Ayache, &ldquo;A Riemannian framework for tensor computing,&rdquo; <em>International Journal of Computer Vision</em> 66(1), 2006.</p>
 <p>For covariance descriptors in computer vision, see Tuzel, Porikli, and Meer, &ldquo;Region covariance: A fast descriptor for detection and classification,&rdquo; <em>ECCV</em> 2006. The application to brain-computer interfaces is surveyed in Barachant, Bonnet, Congedo, and Jutten, &ldquo;Riemannian geometry applied to BCI classification,&rdquo; <em>LVA/ICA</em> 2010.</p>
-<p>The discovery of vowel-like spectral structure in sperm whale clicks is reported in Begus, Leban, Silov, Gero, and Sprague, &ldquo;Vowels and diphthongs in sperm whale vocalization,&rdquo; <em>Open Mind</em> 9, 2025. The SPD manifold analysis of cetacean codas using the methods described in this chapter is implemented in the <code>eris-ketos</code> package (Bond, 2026).</p>
+<p>The discovery of vowel-like spectral structure in sperm whale clicks is reported in Begus, Leban, Silov, Gero, and Sprague, &ldquo;Vowel- and diphthong-like spectral patterns in sperm whale codas,&rdquo; <em>Open Mind</em> 9, 2025. The SPD manifold analysis of cetacean codas using the methods described in this chapter is implemented in the <code>eris-ketos</code> package (Bond, 2026).</p>
 <p>The connection between SPD geometry and information geometry is developed in Amari, <em>Information Geometry and Its Applications</em>, Springer, 2016. For optimal transport on SPD matrices, see Bhatia, Jain, and Lim, &ldquo;On the Bures-Wasserstein distance between positive definite matrices,&rdquo; <em>Expositiones Mathematicae</em> 37(2), 2019.</p>
       </div>
 

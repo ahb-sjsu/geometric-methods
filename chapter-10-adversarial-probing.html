@@ -61,7 +61,7 @@
 &mdash; Attributed to Richard Hamming</p>
 </blockquote>
 <p>The Model Robustness Index developed in Chapter 9 answers a critical question: <em>how stable is this configuration under random perturbation?</em> But random perturbation is blunt. It tells you that a model is fragile without telling you <em>why</em>, and it tells you that a model is robust without telling you <em>to what</em>. This chapter sharpens the MRI into a family of directed probing tools that interrogate model internals with the precision of a radar system. Where Chapter 9 threw noise at a model and measured the aggregate response, this chapter sends <em>specific, controlled signals</em> and reads the reflections.</p>
-<p>We develop this idea into three concrete tools: the StructureProbe scanner (Section 10.3), parametric intensity sweeps (Section 10.4), and compositional interaction testing (Section 10.5). Section 10.6 then shows how the same mathematical framework extends from parameter-space fuzzing to signal-space fuzzing through the Decoder Robustness Index (DRI), applying MRI principles to acoustic decoders where semantic distance replaces raw error.</p>
+<p>We develop this idea into three concrete tools: parametric intensity sweeps (Section 10.2), the StructureProbe scanner (Section 10.3), and compositional interaction testing (Section 10.4). Section 10.5 then shows how the same mathematical framework extends from parameter-space fuzzing to signal-space fuzzing through the Decoder Robustness Index (DRI), applying MRI principles to acoustic decoders where semantic distance replaces raw error.</p>
 <hr />
 <h2 id="101-the-radar-analogy">10.1 The Radar Analogy</h2>
 <h3 id="1011-from-physical-radar-to-computational-probing">10.1.1 From Physical Radar to Computational Probing</h3>
@@ -112,7 +112,7 @@ class AcousticTransform:
         &quot;&quot;&quot;Return a fixed-intensity closure for composition.&quot;&quot;&quot;
         return lambda signal, sr: self(signal, sr, intensity)
 </code></pre>
-<p>The <code>at_intensity</code> method returns a closure with fixed perturbation strength, enabling composition into chains (Section 10.5) or integration with higher-order functions.</p>
+<p>The <code>at_intensity</code> method returns a closure with fixed perturbation strength, enabling composition into chains (Section 10.4) or integration with higher-order functions.</p>
 <h3 id="1022-intensity-sweeps">10.2.2 Intensity Sweeps</h3>
 <p>The most informative single measurement is the <em>intensity sweep</em>: evaluating the model&rsquo;s response at uniformly spaced levels from 0 to 1:</p>
 <pre><code class="language-python">def intensity_sweep(self, decoder, signals, sr, transform, n_points=10):
@@ -150,7 +150,7 @@ class AcousticTransform:
             low = mid
     return high
 </code></pre>
-<p>A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The algorithm is identical to Chapter 9&rsquo;s parameter-space adversarial search&mdash;binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.</p>
+<p>A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The search plays the role of Chapter 9&rsquo;s parameter-space threshold search, with one difference: Chapter 9 scans a log-spaced grid, while here binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.</p>
 <hr />
 <h2 id="103-structureprobe-the-probe-response-matrix">10.3 StructureProbe: The Probe Response Matrix</h2>
 <h3 id="1031-the-measurement-protocol">10.3.1 The Measurement Protocol</h3>
@@ -264,12 +264,12 @@ class CodaSemanticDistance:
             return max(0.5, 0.5 + 0.5 * semantic_dist)
         return 0.75  # Fallback: binary mismatch
 </code></pre>
-<p>The hybrid formula&mdash;minimum 0.5 penalty for any flip, scaling to 1.0 for maximally different predictions&mdash;ensures the DRI never ignores a decision flip. An ornamentation change gets $\omega \approx 0.54$; a rhythm change gets $\omega \approx 0.93$. The graduated omega reflects the domain&rsquo;s feature hierarchy.</p>
+<p>The hybrid formula&mdash;minimum 0.5 penalty for any flip, scaling to 1.0 for maximally different predictions&mdash;ensures the DRI never ignores a decision flip. An ornamentation change gets $\omega \approx 0.54$; a change in rhythm alone gets $\omega \approx 0.72$. The graduated omega reflects the domain&rsquo;s feature hierarchy.</p>
 <h3 id="1053-the-full-dri-pipeline">10.5.3 The Full DRI Pipeline</h3>
 <p>The <code>DecoderRobustnessIndex.measure</code> method orchestrates four phases&mdash;per-transform intensity sweeps, compositional chain testing, adversarial threshold search, and DRI computation&mdash;mirroring the structure of the <code>run_campaign</code> pipeline in the structural fuzzing framework:</p>
 <pre><code class="language-python">transforms = make_acoustic_transform_suite()
 dri = DecoderRobustnessIndex(transforms)
-result = dri.measure(decoder, signals, labels, sr=32000)
+result = dri.measure(decoder, signals, sr=32000)
 print(f&quot;DRI: {result.dri:.4f}&quot;)
 print(f&quot;DRI (invariant): {result.dri_invariant:.4f}&quot;)
 print(f&quot;DRI (stress):    {result.dri_stress:.4f}&quot;)
@@ -468,7 +468,7 @@ report = run_campaign(
 <h3 id="1082-connection-to-part-iii">10.8.2 Connection to Part III</h3>
 <p>Part III shifts from developing tools in isolation to identifying reusable design patterns. The probing framework is central:</p>
 <ul>
-<li><strong>Chapter 11</strong> applies the subset enumeration pattern to systematically explore which dimension combinations matter, using the probing tools from this chapter to validate each configuration.</li>
+<li><strong>Chapter 11</strong> applies the subset enumeration pattern to systematically explore which dimension combinations matter.</li>
 <li><strong>Chapter 12</strong> develops compositional testing, integrating probing with incremental dimension-building to reveal interaction effects invisible to single-dimension analysis.</li>
 <li><strong>Chapter 13</strong> combines probing with group-theoretic data augmentation, exploiting symmetries to multiply probing coverage without proportional computational cost.</li>
 </ul>

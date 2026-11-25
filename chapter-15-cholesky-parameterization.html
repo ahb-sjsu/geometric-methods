@@ -61,7 +61,7 @@
 <blockquote>
 <p><em>&ldquo;The art of parameterization is the art of turning constrained problems into unconstrained ones.&rdquo;</em></p>
 </blockquote>
-<p>In Chapter 2, we introduced the Mahalanobis distance and the precision matrix $\Sigma^{-1}$ that gives it shape. In Chapter 4, we developed the geometry of the SPD manifold on which covariance matrices live. Both chapters deferred a central engineering question: when you need to <em>optimize</em> a covariance or precision matrix &mdash; when the metric itself is a learnable parameter &mdash; how do you ensure that the result is always symmetric and positive definite?</p>
+<p>In Chapter 2, we introduced the Mahalanobis distance and the precision matrix $\Sigma^{-1}$ that gives it shape. In Chapter 4, we developed the geometry of the SPD manifold on which covariance matrices live. Section 2.5 gave a first answer to a central engineering question, and this chapter develops it in full: when you need to <em>optimize</em> a covariance or precision matrix &mdash; when the metric itself is a learnable parameter &mdash; how do you ensure that the result is always symmetric and positive definite?</p>
 <p>This chapter answers that question in full. The Cholesky factorization $\Sigma = LL^\top$ transforms the constrained optimization over SPD matrices into an unconstrained optimization over lower-triangular matrices. The log-diagonal variant, where the diagonal of $L$ is parameterized in log-space, removes the last remaining constraint (positive diagonals) and yields a parameterization that is fully unconstrained, numerically stable, and differentiable end-to-end. These properties make it the default choice for covariance learning in modern computational modeling, from behavioral economics calibration to deep metric learning.</p>
 <p>We develop the theory, connect it to the SPD manifold geometry of Chapter 4, implement it in both NumPy and PyTorch, and show how it applies to the Mahalanobis distance learning problem introduced in Chapter 2. We close with the diagonal-only simplification used throughout the structural fuzzing framework and a synthesis that connects the parameterization patterns of Part III back to the geometric foundations of Part I.</p>
 <hr />
@@ -147,7 +147,7 @@ def cholesky_params_to_precision(params: np.ndarray, n: int) -&gt; np.ndarray:
 
     return L @ L.T
 </code></pre>
-<p>The function unpacks the flat array in a specific order: the first $n$ entries are log-diagonal values, and the remaining entries fill the lower triangle column by column. The <code>np.exp</code> call on the diagonal is the only nonlinearity &mdash; everything else is linear.</p>
+<p>The function unpacks the flat array in a specific order: the first $n$ entries are log-diagonal values, and the remaining entries fill the lower triangle row by row. The <code>np.exp</code> call on the diagonal is the only nonlinearity &mdash; everything else is linear.</p>
 <p>The calibration loop wraps this in an objective function and calls L-BFGS-B:</p>
 <pre><code class="language-python">def calibrate_precision(
     evaluate_fn,
@@ -312,7 +312,7 @@ class CholeskyPrecision(nn.Module):
 <h3 id="1573-from-precision-to-covariance-and-back">15.7.3 From Precision to Covariance and Back</h3>
 <p>The <code>eris-econ</code> framework parameterizes the <em>precision</em> matrix $\Sigma^{-1} = LL^\top$ rather than the <em>covariance</em> matrix $\Sigma$, because the Mahalanobis distance uses $\Sigma^{-1}$ directly. If you need $\Sigma$ (for example, to sample from a Gaussian or to inspect the learned variances), you invert:</p>
 <p>$$\Sigma = (\Sigma^{-1})^{-1} = (LL^\top)^{-1} = (L^\top)^{-1}L^{-1} = (L^{-1})^\top L^{-1}$$</p>
-<p>Since $L$ is triangular, its inverse $L^{-1}$ can be computed in $O(n^2)$ by back-substitution, which is cheaper than the general $O(n^3)$ matrix inversion. Alternatively, one can parameterize $\Sigma = LL^\top$ directly and compute $\Sigma^{-1}$ when needed &mdash; the choice depends on which matrix appears more often in the computation.</p>
+<p>Since $L$ is triangular, its inverse $L^{-1}$ can be applied to a vector in $O(n^2)$ by back-substitution, without forming the inverse, which would cost $O(n^3)$. Alternatively, one can parameterize $\Sigma = LL^\top$ directly and compute $\Sigma^{-1}$ when needed &mdash; the choice depends on which matrix appears more often in the computation.</p>
 <p>In the <code>eris-econ</code> <code>estimate_sigma</code> function, the final step recovers $\Sigma$ from the learned $\Sigma^{-1}$:</p>
 <pre><code class="language-python">sigma_inv = _unpack_cholesky(result.x)
 # Recover Sigma from Sigma^{-1}, with regularization for stability
@@ -419,7 +419,7 @@ for _ in range(n_samples):
 <h3 id="1584-cross-validation-and-bootstrap-analysis">15.8.4 Cross-Validation and Bootstrap Analysis</h3>
 <p>The <code>calibration_v2.py</code> module includes two tools for assessing the reliability of the diagonal parameterization:</p>
 <p><strong>Cross-validation</strong> selects the regularization strength. The targets are partitioned into $k$ folds; the diagonal precision is fitted on $k-1$ folds and evaluated on the held-out fold. The regularization $\lambda$ that minimizes the cross-validated negative log-likelihood is chosen. The <code>cross_validate</code> function in <code>calibration_v2.py</code> implements this, sweeping over regularization values $[0.001, 0.005, 0.01, 0.05, 0.1, 0.5]$ and returning the best.</p>
-<p><strong>Bootstrap confidence intervals</strong> quantify parameter uncertainty. The training data is resampled with replacement $B$ times; the diagonal precision is fitted to each bootstrap sample; and the distribution of the resulting parameters reveals which dimensions are reliably important and which are unstable. In the <code>eris-econ</code> joint calibration, bootstrap analysis reveals that Consequences ($d_1$), Fairness ($d_3$), and Privacy/Trust ($d_5$) consistently receive high precision across bootstrap samples, while Autonomy ($d_4$) and Legitimacy ($d_8$) are unstable &mdash; wide confidence intervals indicate the data does not strongly constrain their contribution. This aligns with the structural fuzzing results: the Pareto frontier of dimension subsets is dominated by configurations containing Consequences and Fairness.</p>
+<p><strong>Bootstrap confidence intervals</strong> quantify parameter uncertainty. The training data is resampled with replacement $B$ times; the diagonal precision is fitted to each bootstrap sample; and the distribution of the resulting parameters reveals which dimensions are reliably important and which are unstable. The <code>eris-econ</code> joint calibration implements this procedure. A dimension with a wide interval is one the data do not constrain, and fixing it at a prior value costs little. No recorded bootstrap run is cited here, so the book makes no claim about which of the nine dimensions are stable.</p>
 <hr />
 <h2 id="159-advanced-topics">15.9 Advanced Topics</h2>
 <h3 id="1591-the-cholesky-parameterization-and-riemannian-optimization">15.9.1 The Cholesky Parameterization and Riemannian Optimization</h3>
@@ -432,7 +432,7 @@ for _ in range(n_samples):
 <p>This is a linear function of the log-diagonal parameters &mdash; no eigendecomposition or matrix factorization required. It is the cheapest possible determinant computation, and it is numerically exact (no floating-point accumulation from multiplying many eigenvalues).</p>
 <hr />
 <h2 id="1510-synthesis-from-parameterization-patterns-to-geometric-framework">15.10 Synthesis: From Parameterization Patterns to Geometric Framework</h2>
-<p>This chapter completes the core parameterization toolkit of Part III. Let us step back and trace the thread that connects the patterns developed in Chapters 12&ndash;15 to the geometric framework established in Part I.</p>
+<p>This chapter completes the core parameterization toolkit of Part III. Let us step back and trace the thread that connects the patterns developed in Chapters 11&ndash;15 to the geometric framework established in Part I.</p>
 <h3 id="the-central-theme">The Central Theme</h3>
 <p>Part I established that computational models live in multi-dimensional spaces, and that the geometry of those spaces &mdash; distances, directions, curvatures &mdash; carries information that scalar summaries destroy. Part II developed algorithms for navigating and analyzing those spaces. Part III has addressed a different question: how do you <em>construct</em> and <em>learn</em> the geometric structures themselves?</p>
 <p>The Cholesky parameterization is the final piece of this construction. Consider the full pipeline:</p>

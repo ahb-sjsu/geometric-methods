@@ -113,7 +113,7 @@
 <li>Thread results from early stages to later stages automatically.</li>
 <li>Present a unified configuration surface so that parameters controlling all six stages can be specified in one place.</li>
 <li>Produce a single structured output that captures all results, rather than scattering them across variables.</li>
-<li>Handle partial failures gracefully&mdash;if adversarial search times out, the subset and Pareto results should still be available.</li>
+<li>Handle partial failures gracefully&mdash;if adversarial search times out, the subset and Pareto results should still be available. The current implementation does not meet this requirement; Section 16.7 says what it does instead.</li>
 </ol>
 <h3 id="1612-the-six-stage-architecture">16.1.2 The Six-Stage Architecture</h3>
 <p>The structural fuzzing pipeline proceeds through six stages, each building on the previous:</p>
@@ -299,7 +299,7 @@ class StructuralFuzzReport:
     backward_results: list[SubsetResult] = field(default_factory=list)
 </code></pre>
 <p>Each field holds a typed result object from the corresponding pipeline stage. The <code>SubsetResult</code> objects in <code>subset_results</code> are sorted by MAE (best first). The <code>pareto_results</code> are a subset of <code>subset_results</code> containing only the Pareto-optimal configurations. The <code>sensitivity_results</code> are sorted by importance rank. The <code>adversarial_results</code> list may contain zero, one, or two entries per dimension (one for each search direction), depending on whether thresholds were found. The <code>forward_results</code> and <code>backward_results</code> are empty lists when <code>run_baselines=False</code>.</p>
-<p>The optional fields (<code>mri_result</code>, <code>composition_result</code>) use <code>None</code> to indicate that the corresponding stage was skipped or failed. This is the pipeline&rsquo;s mechanism for partial results: if the MRI computation encounters a numerical error, the report still contains valid subset, Pareto, and sensitivity results.</p>
+<p>The optional fields (<code>mri_result</code>, <code>composition_result</code>) are typed to allow <code>None</code>, but <code>run_campaign</code> always fills them. A stage that raises an exception is not recorded as <code>None</code>: the exception propagates and the call returns no report (Section 16.7).</p>
 <h3 id="1632-navigating-the-results">16.3.2 Navigating the Results</h3>
 <p>The <code>StructuralFuzzReport</code> is designed for programmatic access. After a campaign completes, the typical analysis workflow extracts specific results:</p>
 <pre><code class="language-python">import structural_fuzzing as sf
@@ -448,7 +448,7 @@ print(report.summary())
     return evaluate_fn
 </code></pre>
 <p>Several design choices are worth noting:</p>
-<p><strong>Feature groups, not individual features.</strong> The 16 raw features are organized into 5 groups (Size, Complexity, Halstead, OO, Process). Each dimension in the parameter vector controls an entire group. This is the dimension grouping pattern from Chapter 3: the pipeline operates on a manageable 5-dimensional space rather than a 16-dimensional one, with each dimension carrying semantic meaning.</p>
+<p><strong>Feature groups, not individual features.</strong> The 16 raw features are organized into 5 groups (Size, Complexity, Halstead, OO, Process). Each dimension in the parameter vector controls an entire group. This is the dimension grouping pattern of Section 1.2: the pipeline operates on a manageable 5-dimensional space rather than a 16-dimensional one, with each dimension carrying semantic meaning.</p>
 <p><strong>Inactive threshold.</strong> The function checks <code>params[i] &lt; 1000</code> rather than comparing against the full sentinel value of $10^6$. This is a pragmatic choice: it ensures that any sufficiently large parameter value deactivates the group, avoiding floating-point comparison issues with the exact sentinel.</p>
 <p><strong>Fixed random state.</strong> The <code>RandomForestClassifier</code> uses <code>random_state=42</code>, ensuring deterministic predictions. Without this, repeated evaluations with the same parameters would return different MAE values, confusing the optimization stages.</p>
 <p><strong>Target-relative errors.</strong> Each metric is compared against an explicit target value (e.g., Accuracy target of 75.0). The error dictionary contains signed deviations: positive means the model exceeds the target, negative means it falls short. This convention allows the pipeline to track <em>which</em> targets are met and which are not, rather than collapsing everything into a single pass/fail judgment.</p>
@@ -511,7 +511,7 @@ print(report.summary())
     run_baselines=False,
 )
 </code></pre>
-<p><strong>Standard profile (balanced).</strong> For regular validation runs, the defaults are well-calibrated: <code>max_subset_dims=4</code>, <code>n_random=5000</code>, <code>n_mri_perturbations=300</code>. This explores up to 4D subsets with thorough optimization, completing in 1&ndash;4 hours for a 5&ndash;9 dimensional problem depending on evaluation cost.</p>
+<p><strong>Standard profile (balanced).</strong> For regular validation runs, the defaults are well-calibrated: <code>max_subset_dims=4</code>, <code>n_random=5000</code>, <code>n_mri_perturbations=300</code>. This explores up to 4D subsets with thorough optimization. The enumeration alone costs 79,100 evaluations for five dimensions and 1,064,580 for nine, so at 10 ms per evaluation it takes about 13 minutes and 3 hours, and at 100 ms about 2 hours and 30 hours.</p>
 <pre><code class="language-python">report = sf.run_campaign(
     dim_names=dim_names,
     evaluate_fn=evaluate_fn,
@@ -636,7 +636,7 @@ latex = format_latex_tables(report)
 with open(&quot;defect_tables.tex&quot;, &quot;w&quot;) as f:
     f.write(latex)
 </code></pre>
-<p>The campaign explores all subsets of up to 4 dimensions from the 5 available (31 subsets total), identifies the Pareto frontier, profiles the sensitivity of each dimension, computes the MRI of the best configuration, searches for adversarial thresholds in each dimension, and tests the greedy dimension-addition order. The output captures everything needed for a validation report: which feature groups matter, how robust the model is, and where its tipping points lie.</p>
+<p>The campaign explores all subsets of up to 4 dimensions from the 5 available (30 subsets total), identifies the Pareto frontier, profiles the sensitivity of each dimension, computes the MRI of the best configuration, searches for adversarial thresholds in each dimension, and tests the greedy dimension-addition order. The output captures everything needed for a validation report: which feature groups matter, how robust the model is, and where its tipping points lie.</p>
 <h3 id="1682-geometric-economics-campaign">16.8.2 Geometric Economics Campaign</h3>
 <p>The economics example operates on a higher-dimensional space (9 dimensions) and uses the evaluation function to tune Mahalanobis distance weights rather than feature-group selections:</p>
 <pre><code class="language-python">import structural_fuzzing as sf
@@ -669,7 +669,7 @@ for adv in report.adversarial_results:
 </code></pre>
 <p>The reduced <code>max_subset_dims</code> is critical here: with 9 dimensions, exhaustive enumeration up to size 4 would require $\binom{9}{4} = 126$ four-dimensional subsets, each optimized with 2000 random samples. Limiting to 3D subsets keeps the campaign tractable while still revealing the most important dimension interactions.</p>
 <h3 id="1683-custom-pipeline-with-selective-stages">16.8.3 Custom Pipeline with Selective Stages</h3>
-<p>For situations where the full pipeline is unnecessary or too slow, the public API (Chapter 3 introduced the module structure; the <code>__init__.py</code> exposes all components) supports composing a custom analysis:</p>
+<p>For situations where the full pipeline is unnecessary or too slow, the public API (the package&rsquo;s <code>__init__.py</code> exposes all components) supports composing a custom analysis:</p>
 <pre><code class="language-python">import numpy as np
 import structural_fuzzing as sf
 
@@ -705,7 +705,7 @@ for pr in pareto_results:
 <p>The pipeline has its own configuration space: the vector of all its parameters (<code>max_subset_dims</code>, <code>n_random</code>, <code>n_mri_perturbations</code>, <code>mri_scale</code>, <code>mri_weights</code>, <code>adversarial_tolerance</code>, <code>n_grid</code>). This meta-configuration lives in a space of its own, and the same geometric reasoning that the pipeline applies to models can be applied to the pipeline itself.</p>
 <p>For instance: how sensitive is the pipeline&rsquo;s output to <code>n_random</code>? If increasing <code>n_random</code> from 3000 to 7000 changes the best configuration found, the pipeline was under-sampling at 3000 and the results at that setting are unreliable. If the results are stable, the extra samples are wasted computation. Running the pipeline twice with different <code>n_random</code> values and comparing the Pareto frontiers is a simple convergence check&mdash;and it is, itself, a sensitivity analysis.</p>
 <h3 id="1692-reproducibility">16.9.2 Reproducibility</h3>
-<p>The pipeline does not set global random seeds. The evaluation function is responsible for its own determinism (as discussed in Section 16.5.1), and the pipeline&rsquo;s internal stages use deterministic algorithms where possible. Subset enumeration is exhaustive (no randomness). Pareto extraction is a deterministic filter. Sensitivity profiling evaluates fixed parameter configurations. Only the MRI stage introduces randomness (random perturbation sampling), and its random seed can be controlled through the evaluation function&rsquo;s internal state.</p>
+<p>The pipeline does not set global random seeds, but every random draw inside it uses its own generator seeded with 42: the random search that optimizes subsets of three or more dimensions, the MRI perturbations, and the LASSO baseline. Pareto extraction and sensitivity profiling are deterministic. With an evaluation function that is itself deterministic (Section 16.5.1), a campaign therefore gives the same report every time it is run with the same arguments. <code>compute_mri</code> accepts a generator, so its draws can be varied by calling it directly. The seed of the subset search is fixed inside <code>optimize_subset</code>, and <code>run_campaign</code> exposes neither, so checking that a result does not depend on the random search means changing the package.</p>
 <p>For bit-reproducible results across runs, ensure that:</p>
 <ol>
 <li>The evaluation function uses a fixed random seed.</li>

@@ -183,8 +183,8 @@
 <pre><code class="language-python">grid_values = np.logspace(np.log10(0.01), np.log10(100), n_grid)
 </code></pre>
 <p>This produces <code>n_grid</code> points uniformly spaced on a logarithmic scale between $10^{-2}$ and $10^2$. With <code>n_grid = 20</code>, the values are approximately:</p>
-<p>$$0.01, \; 0.017, \; 0.029, \; 0.050, \; 0.085, \; \ldots, \; 11.7, \; 20.0, \; 34.1, \; 58.5, \; 100.0$$</p>
-<p>Each adjacent pair of grid points differs by a constant multiplicative factor of $(10^4)^{1/19} \approx 1.66$. This provides uniform resolution in the sense that matters: a change from 0.01 to 0.017 is as significant (in relative terms) as a change from 58.5 to 100.0.</p>
+<p>$$0.01, \; 0.016, \; 0.026, \; 0.043, \; 0.070, \; \ldots, \; 14.4, \; 23.4, \; 37.9, \; 61.6, \; 100.0$$</p>
+<p>Each adjacent pair of grid points differs by a constant multiplicative factor of $(10^4)^{1/19} \approx 1.62$. This provides uniform resolution in the sense that matters: a change from 0.01 to 0.016 is as significant (in relative terms) as a change from 61.6 to 100.0.</p>
 <p>For random search in higher dimensions, the same principle applies:</p>
 <pre><code class="language-python">log_low, log_high = np.log10(0.01), np.log10(100)
 log_vals = rng.uniform(log_low, log_high, n_active)
@@ -270,7 +270,7 @@ class SubsetResult:
 <p>The fields serve distinct roles:</p>
 <ul>
 <li>
-<p><strong><code>dims</code></strong> and <strong><code>dim_names</code></strong>: the active dimensions, both by index and by name. The index form enables array operations; the name form enables human-readable output. The tuple type ensures immutability&mdash;a <code>SubsetResult</code> cannot be silently modified after creation.</p>
+<p><strong><code>dims</code></strong> and <strong><code>dim_names</code></strong>: the active dimensions, both by index and by name. The index form enables array operations; the name form enables human-readable output. The tuple type keeps these two fields from being modified in place.</p>
 </li>
 <li>
 <p><strong><code>n_dims</code></strong>: the cardinality of the active subset. Storing this explicitly (rather than computing <code>len(dims)</code> each time) supports efficient sorting and filtering: &ldquo;give me all results with exactly 2 active dimensions&rdquo; is a constant-time field access, not a linear scan.</p>
@@ -414,7 +414,7 @@ class StructuralFuzzReport:
 <p>The current <code>enumerate_subsets</code> implementation tests all subsets at each size before moving to the next. An alternative is early stopping: if no subset of size $k$ improves on the best result of size $k - 1$ by more than $\delta$, skip sizes $k+1, k+2, \ldots$</p>
 <p>This heuristic is not implemented in the framework&rsquo;s core because it sacrifices completeness: a subset of size $k+1$ might improve dramatically over anything at size $k$ due to a synergy that only emerges when three or more dimensions interact. Such cases are rare but consequential, and the whole point of brute-force enumeration is to catch them. In practice, early stopping is best reserved for exploratory runs where speed matters more than thoroughness.</p>
 <h3 id="1153-tuning-n_grid-and-n_random">11.5.3 Tuning <code>n_grid</code> and <code>n_random</code></h3>
-<p>The <code>n_grid</code> parameter controls the resolution of 1D and 2D searches. Increasing it from 20 to 50 improves resolution (the multiplicative step drops from 1.66 to 1.19) but increases the 2D cost from 400 to 2,500 evaluations per subset. For smooth evaluation functions, <code>n_grid = 20</code> is usually sufficient. For functions with narrow optima or sharp transitions, <code>n_grid = 50</code> or higher may be warranted.</p>
+<p>The <code>n_grid</code> parameter controls the resolution of 1D and 2D searches. Increasing it from 20 to 50 improves resolution (the multiplicative step drops from 1.62 to 1.21) but increases the 2D cost from 400 to 2,500 evaluations per subset. For smooth evaluation functions, <code>n_grid = 20</code> is usually sufficient. For functions with narrow optima or sharp transitions, <code>n_grid = 50</code> or higher may be warranted.</p>
 <p>The <code>n_random</code> parameter controls the coverage of 3D+ searches. The expected coverage of a random search depends on the effective dimensionality of the loss landscape. If the loss depends strongly on only one of the $k$ active dimensions, then 5,000 random samples provide excellent coverage of that dimension even in a $k$-dimensional space. If the loss depends on all $k$ dimensions with comparable sensitivity, coverage scales as $n_{\text{random}}^{1/k}$&mdash;about 17 effective grid points per dimension for $k = 3$ and $n_{\text{random}} = 5000$, or about 8 for $k = 4$. These numbers are adequate for identifying the approximate optimum but not for precise characterization. For the latter, a targeted refinement step (not part of the core framework) can be applied to the most promising configurations.</p>
 <h3 id="1154-the-zero-dimensional-baseline">11.5.4 The Zero-Dimensional Baseline</h3>
 <p>The <code>optimize_subset</code> function handles the edge case of zero active dimensions:</p>
@@ -512,7 +512,7 @@ GROUP_NAMES = list(FEATURE_GROUPS.keys())
 </tr>
 </tbody>
 </table>
-<p>Complexity alone is the best single predictor, confirming the domain knowledge that cyclomatic complexity is the primary driver of defect-proneness. OO metrics contribute almost nothing in isolation&mdash;a finding consistent with the data generation process, where OO features are pure noise.</p>
+<p>Complexity alone is the best single predictor, consistent with the generator, in which the complexity coefficients are the largest (essential complexity carries 0.15). These values are illustrative; Section 19.4 gives the recorded ones, in which the single groups score within two MAE points of one another and the ordering carries no information. OO metrics contribute almost nothing in isolation&mdash;a finding consistent with the data generation process, where OO features are pure noise.</p>
 <p><strong>Two-dimension results ($k = 2$).</strong> The ten pairwise combinations reveal interaction effects:</p>
 <table>
 <thead>
@@ -613,7 +613,7 @@ GROUP_NAMES = list(FEATURE_GROUPS.keys())
 </li>
 </ol>
 <p>When these conditions hold, <code>enumerate_subsets</code> with a moderate <code>max_dims</code> produces a complete structural map in acceptable time. The <code>SubsetResult</code> objects that emerge&mdash;typed, immutable, carrying both scalar and multi-dimensional performance data&mdash;feed directly into Pareto analysis, sensitivity profiling, adversarial testing, and every other downstream stage of the structural fuzzing pipeline.</p>
-<p>The pattern&rsquo;s limitation is equally clear: it does not scale to hundreds of dimensions. For those problems, the heuristic methods&mdash;forward selection, backward elimination, and the stochastic approaches discussed in Chapter 12&mdash;are necessary. But the heuristics are most effective when calibrated against the brute-force ground truth on a reduced problem, and the transition from exact enumeration to approximate search is the subject of the next chapter.</p>
+<p>The pattern&rsquo;s limitation is equally clear: it does not scale to hundreds of dimensions. For those problems, the heuristic methods&mdash;forward selection, backward elimination, and the screening and sampling methods of Chapter 17&mdash;are necessary. But the heuristics are most effective when calibrated against the brute-force ground truth on a reduced problem, and the transition from exact enumeration to approximate search is the subject of Chapter 17.</p>
 <hr />
 <h2 id="1110-looking-ahead">11.10 Looking Ahead</h2>
 <p>Chapter 12 introduces the <em>compositional testing pattern</em>, which addresses the question that subset enumeration leaves open: <strong>in what order should dimensions be added?</strong> Subset enumeration tells us that {Complexity, Process, Size} is a strong 3-dimensional configuration, but it does not tell us whether to start with Complexity and add Process, or start with Process and add Complexity. The compositional test builds dimensions incrementally, measuring the marginal contribution of each addition in context, and produces an ordering that reveals the causal structure of dimension interactions. Where subset enumeration maps the landscape, compositional testing traces a path through it.</p>
