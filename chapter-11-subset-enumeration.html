@@ -175,6 +175,8 @@
 </ol>
 <p>When $n$ is small enough for brute force, there is no reason to accept these limitations. The <code>enumerate_subsets</code> function exists precisely for this regime: it tests every subset, sorts the results by performance, and returns the complete landscape for downstream analysis.</p>
 <hr />
+<p><img alt="Figure 11.1" src="figures/ch11_fig1.svg" /></p>
+<p><em>Figure 11.1. The lattice of the 31 non-empty subsets of the five feature groups, one row per subset size k (5, 10, 10, 5 and 1 subsets from bottom to top), with a line from each subset to every subset that adds one group to it. Enumeration with max_dims = 4 evaluates the 30 subsets below the dashed line. The highlighted chain is a single greedy path, which adds one group at a time and so visits 5 of the 31 subsets. Its order (Complexity, Process, Size, OO, Halstead) is the illustrative build order of Section 12.4.1, not a measured result.</em></p>
 <h2 id="112-the-optimize_subset-algorithm">11.2 The <code>optimize_subset</code> Algorithm</h2>
 <p>The core of subset enumeration is the <code>optimize_subset</code> function, which takes a set of active dimensions and finds the best parameter values for those dimensions while holding all inactive dimensions at a sentinel value. The algorithm makes three design decisions that merit detailed examination: log-space parameterization, sentinel values for inactive dimensions, and adaptive search strategy.</p>
 <h3 id="1121-log-space-parameterization">11.2.1 Log-Space Parameterization</h3>
@@ -192,6 +194,8 @@ for i, dim in enumerate(active_dims):
     params[dim] = 10 ** log_vals[i]
 </code></pre>
 <p>The random samples are drawn uniformly in $[\log_{10}(0.01), \log_{10}(100)] = [-2, 2]$ and then exponentiated, producing a distribution that is uniform in log-space. This is equivalent to drawing from a log-uniform distribution over $[0.01, 100]$, which is the maximum-entropy prior for a scale parameter whose order of magnitude is unknown.</p>
+<p><img alt="Figure 11.2" src="figures/ch11_fig2.svg" /></p>
+<p><em>Figure 11.2. Twenty grid points over the search range 0.01 to 100, placed two ways and shown on one logarithmic axis. The log-spaced grid of Section 11.2.1 steps by a constant factor of 1.62 and puts 10 of its 20 points below 1. A uniform grid over the same range steps by 5.26, so its second point is already at 5.27 and only its first lies below 1.</em></p>
 <h3 id="1122-sentinel-values-for-inactive-dimensions">11.2.2 Sentinel Values for Inactive Dimensions</h3>
 <p>When only a subset of dimensions is active, the remaining dimensions must be assigned values that effectively &ldquo;turn them off.&rdquo; The <code>optimize_subset</code> function uses a sentinel value of $10^6$ (the <code>inactive_value</code> parameter):</p>
 <pre><code class="language-python">params = np.full(n_all, inactive_value)

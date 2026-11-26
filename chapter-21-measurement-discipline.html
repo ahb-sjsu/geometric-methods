@@ -137,6 +137,8 @@
 <p>This is evidence that is hard to tamper with. It is not proof of the time on the clock, and it is destroyed by rewriting history, so commits that carry a seal are never rebased.</p>
 <p><strong>Amendments</strong> are dated, state their reason, and come before the data are unblinded. A change of plan after the result is seen is a new registration.</p>
 <hr />
+<p><img alt="Figure 21.1" src="figures/ch21_fig1.svg" /></p>
+<p><em>Figure 21.1. Schematic of the order of events that makes a statement measured (Section 21.2). The registration is written and sealed in a commit before the run. Amendments are allowed only between the seal and the unblinding of the data. The seal commit must be an ancestor of the first commit that holds the result, which is how priority is shown. Grading by the registered code then has three outcomes, and the registration says in advance which gate leads to which.</em></p>
 <h2 id="213-frozen-null-gates">21.3 Frozen-Null Gates</h2>
 <p>A bar stated as an absolute number invites two errors. It can be set where chance already reaches it, and it can be moved after the result is known. A <strong>frozen-null gate</strong> avoids both. The bar is a margin over one or more <em>nulls</em>, which are versions of the instrument that cannot contain the effect, and the nulls, the margin and the date are committed before the run.</p>
 <p>Let $s$ be the score of the system under test and $s^{(1)}_0, \ldots, s^{(J)}_0$ the scores of $J$ nulls on the same held-out data. The gate passes when</p>
@@ -147,6 +149,8 @@
 <p>where $\Phi$ is the standard normal distribution function. A margin chosen without reference to $\sigma_\Delta$ has an unknown false-positive rate, and an absolute tolerance tests itself and not the system.</p>
 <p><strong>A null can move.</strong> Section 17.11.2 is a warning about nulls that depend on the experiment. The null skewness of a retrieval count is $1/\sqrt{\rho}$, which rises as the query budget $\rho$ falls. A comparison made at two different budgets compares two different nulls. Where a null depends on a design quantity, either hold that quantity fixed or model the null and remove it, and then confirm by measurement that it has been removed.</p>
 <hr />
+<p><img alt="Figure 21.2" src="figures/ch21_fig2.svg" /></p>
+<p><em>Figure 21.2. The probability that a system with no effect passes a frozen-null gate, as a function of the margin measured in standard errors of the difference under no effect, from equation (21.2). The vertical axis is logarithmic. A margin of zero passes half the time. Margins of one, two and three standard errors pass about 16%, 2.3% and 0.13% of the time. A margin stated without the standard error has no place on the horizontal axis, so its false-pass rate is unknown.</em></p>
 <h2 id="214-admissibility">21.4 Admissibility</h2>
 <p>A registration can be made first, reported in full and cited at the right class, and the experiment can still be incapable of grading the claim. <strong>Admissibility</strong> is the property that the design could have failed. It has four checks, and each is discharged by a named artifact, not by the author&rsquo;s assurance.</p>
 <table>

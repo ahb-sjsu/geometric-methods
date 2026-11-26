@@ -74,6 +74,8 @@
 <p><strong>Flat profile</strong> ($\delta(\alpha) \approx 0$ for all $\alpha$). The model is invariant to the perturbation. Desirable for structural invariants; alarming for stress transforms (the model is not reading the content being destroyed).</p>
 <p><strong>Threshold profile</strong> ($\delta(\alpha) \approx 0$ for $\alpha &lt; \alpha^*$, then sharp rise). The model tolerates perturbation up to a critical intensity $\alpha^*$&mdash;the <em>adversarial threshold</em>. Binary search finds $\alpha^*$ efficiently.</p>
 <p><strong>Linear profile</strong> ($\delta(\alpha) \approx k\alpha$). Proportional degradation with no hidden tipping points&mdash;the most benign failure mode.</p>
+<p><img alt="Figure 10.1" src="figures/ch10_fig1.svg" /></p>
+<p><em>Figure 10.1. The three canonical shapes of the intensity-response curve of Section 10.1.2: displacement of the model&rsquo;s output (vertical) against the intensity of the transform, from 0 to 1 (horizontal). All three start at zero displacement, as the intensity-zero identity requires. These are schematic shapes, not measurements: the threshold is placed at 0.6 and the linear profile has slope 1.</em></p>
 <h3 id="1013-invariance-and-sensitivity-as-structural-signatures">10.1.3 Invariance and Sensitivity as Structural Signatures</h3>
 <p>Transforms divide into <em>invariant</em> (semantics-preserving) and <em>stress</em> (semantics-destroying), a domain-dependent classification:</p>
 <p>In parameter-space fuzzing (Chapter 9):</p>
@@ -152,6 +154,8 @@ class AcousticTransform:
 </code></pre>
 <p>A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The search plays the role of Chapter 9&rsquo;s parameter-space threshold search, with one difference: Chapter 9 scans a log-spaced grid, while here binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.</p>
 <hr />
+<p><img alt="Figure 10.2" src="figures/ch10_fig2.svg" /></p>
+<p><em>Figure 10.2. The binary search of Section 10.2.3 beside the ten-point sweep of Section 10.2.2, for a decoder whose output flips at an intensity of 0.37, a value chosen for the figure; the horizontal axis is the intensity. The sweep (top row) spends ten evaluations and places the threshold between two points 0.111 apart. Each row below is the interval the search still holds, with a dot at the midpoint it tests next. Seven halvings after the first check at intensity 1 bring the interval to a width of 0.0078, inside the tolerance of 0.01, and the search returns its upper end, 0.375.</em></p>
 <h2 id="103-structureprobe-the-probe-response-matrix">10.3 StructureProbe: The Probe Response Matrix</h2>
 <h3 id="1031-the-measurement-protocol">10.3.1 The Measurement Protocol</h3>
 <p>Given a model $M$, an input corpus $\{x_1, \ldots, x_N\}$, and $K$ parametric transforms, the StructureProbe scanner constructs a $K \times J$ <em>probe response matrix</em> where entry $(k, j)$ is the mean displacement when transform $T_k$ is applied at intensity $\alpha_j$:</p>

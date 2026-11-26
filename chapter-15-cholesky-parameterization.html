@@ -100,6 +100,8 @@
 <li><strong>Off-diagonal parameters</strong> $\ell_{ij}$ for $i &gt; j$ (unconstrained)</li>
 </ul>
 <p>Total: $n(n+1)/2$ unconstrained real parameters that bijectively correspond to the set of $n \times n$ SPD matrices. An optimizer can take gradient steps of any magnitude in any direction without ever leaving the feasible set.</p>
+<p><img alt="Figure 15.1" src="figures/ch15_fig1.svg" /></p>
+<p><em>Figure 15.1. Three ways to hold a 9 by 9 covariance or precision matrix as numbers to optimize. Left: all 81 entries, which no constraint keeps symmetric or positive definite. Middle: the log-diagonal Cholesky factor, 36 unconstrained entries below the diagonal and 9 diagonal entries stored as logarithms, 45 in all, the number of degrees of freedom of a symmetric matrix; any real values give a symmetric positive definite product. Right: the diagonal-only simplification of Section 15.8, 9 numbers.</em></p>
 <h3 id="1532-why-log-space-for-the-diagonal">15.3.2 Why Log-Space for the Diagonal</h3>
 <p>The log-space parameterization is not merely a convenience for enforcing positivity. It provides three additional benefits.</p>
 <p><strong>Uniform sensitivity across scales.</strong> As discussed in Chapter 2 (Section 2.4), the gradient of a loss with respect to $\theta_i = \log(\ell_{ii})$ has more uniform magnitude across the parameter range than the gradient with respect to $\ell_{ii}$ directly. If $\mathcal{L}$ is the loss, then</p>
@@ -117,6 +119,8 @@
 </ol>
 <p>This map is smooth (infinitely differentiable), surjective onto SPD(n), and has a smooth inverse (the Cholesky decomposition followed by taking the log of the diagonal). It is therefore a diffeomorphism between $\mathbb{R}^{n(n+1)/2}$ and SPD(n), which means gradient-based optimization in parameter space $\mathbb{R}^{n(n+1)/2}$ corresponds to smooth navigation of the SPD manifold.</p>
 <hr />
+<p><img alt="Figure 15.2" src="figures/ch15_fig2.svg" /></p>
+<p><em>Figure 15.2. The parameterization map of Section 15.3.3 for a 2 by 2 matrix with its top-left entry fixed at 1, plotted by the off-diagonal entry b (horizontal) and the lower-right entry c (vertical); the matrix is positive definite exactly when c is greater than b squared, the region above the parabola. The map sends the free off-diagonal parameter ℓ and the log-diagonal parameter θ to b = ℓ and c = ℓ squared plus exp(2θ). The curves are the images of the lines θ = −1, −0.5, 0, 0.25 and 0.5 and of the lines ℓ = −1.5 to 1.5 in steps of 0.5. Every one lies above the parabola, which is reached only as θ goes to minus infinity, so a step of any size in the parameters stays inside the cone.</em></p>
 <h2 id="154-implementation-numpy">15.4 Implementation: NumPy</h2>
 <p>The <code>eris-econ</code> calibration module implements Cholesky parameterization for learning the precision matrix $\Sigma^{-1}$ from observed economic choices. The core routine reconstructs the precision matrix from a flat parameter vector:</p>
 <pre><code class="language-python">import numpy as np
