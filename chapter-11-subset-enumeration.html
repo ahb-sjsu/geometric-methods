@@ -233,7 +233,7 @@ params[active_dims[0]] = v
             best_params = params.copy()
             best_errors = errors.copy()
 </code></pre>
-<p>With <code>n_grid = 20</code>, this requires 20 evaluations. The grid is exhaustive within its resolution, guaranteeing that the optimal value (to within a factor of 1.66) is found.</p>
+<p>With <code>n_grid = 20</code>, this requires 20 evaluations. The grid is exhaustive within its resolution, guaranteeing that the optimal value (to within a factor of 1.62) is found.</p>
 <p><strong>2D subsets: full grid search.</strong> For two active dimensions, the algorithm evaluates all pairs on the grid:</p>
 <pre><code class="language-python">elif n_active == 2:
     for v0, v1 in itertools.product(grid_values, grid_values):
@@ -478,7 +478,7 @@ GROUP_NAMES = list(FEATURE_GROUPS.keys())
 </code></pre>
 <p>The errors are signed differences (predicted minus target), and the MAE is the mean of their absolute values. A configuration with MAE 0 would match all targets exactly. The multi-dimensional error vector preserves the direction of deviation&mdash;overperformance versus underperformance on each metric&mdash;while the MAE provides a scalar summary for sorting.</p>
 <h3 id="1163-what-the-enumeration-reveals">11.6.3 What the Enumeration Reveals</h3>
-<p>Running <code>enumerate_subsets</code> with <code>max_dims = 4</code> on the defect prediction example produces 30 <code>SubsetResult</code> objects (all subsets of sizes 1 through 4 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:</p>
+<p>Running <code>enumerate_subsets</code> with <code>max_dims = 5</code> on the defect prediction example produces 31 <code>SubsetResult</code> objects (all subsets of sizes 1 through 5 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:</p>
 <p><strong>Single-dimension results ($k = 1$).</strong> The five single-group models reveal the standalone predictive power of each group:</p>
 <table>
 <thead>
@@ -557,7 +557,7 @@ GROUP_NAMES = list(FEATURE_GROUPS.keys())
 <p>The {Complexity, Process} pair is substantially better than any singleton, demonstrating a <em>synergy</em>: the structural (complexity) and temporal (process) views of the code are complementary. The framework reveals this synergy because it tests all pairs exhaustively; forward selection, starting from Complexity, would find {Complexity, Process} only if Process happened to be the best addition&mdash;which it is, but that outcome is not guaranteed in general.</p>
 <p><strong>Three- and four-dimension results ($k = 3, 4$).</strong> Adding Size to {Complexity, Process} reduces MAE to approximately 1.7. Adding Halstead or OO provides marginal further improvement. The pattern is one of diminishing returns: two dimensions capture most of the predictive structure, a third adds a meaningful increment, and the fourth and fifth add little.</p>
 <h3 id="1164-connecting-to-the-pareto-frontier">11.6.4 Connecting to the Pareto Frontier</h3>
-<p>The 30 <code>SubsetResult</code> objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:</p>
+<p>The 31 <code>SubsetResult</code> objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:</p>
 <p>$$\{(\text{Complexity})\}, \; \{(\text{Complexity, Process})\}, \; \{(\text{Complexity, Process, Size})\}, \; \{(\text{all})\}$$</p>
 <p>Each Pareto-optimal point represents the best achievable MAE at its cardinality. The frontier makes the complexity-performance tradeoff explicit: the practitioner can see that going from 2 to 3 dimensions buys a 0.4-point MAE improvement, while going from 3 to 5 dimensions buys only 0.2 points. Whether the additional features are worth the added model complexity is a domain decision, but the subset enumeration pattern provides the quantitative basis for making it.</p>
 <h3 id="1165-the-ground-truth-test">11.6.5 The Ground Truth Test</h3>

@@ -161,7 +161,7 @@
 <p>$$\text{Orb}(G) = \{ g \cdot G : g \in D_4 \}$$</p>
 <p>For a generic grid with no internal symmetry, $|\text{Orb}(G)| = 8$. But a grid with internal symmetry &mdash; such as a checkerboard pattern, which is invariant under 180-degree rotation &mdash; has a smaller orbit. The <em>stabilizer</em> $\text{Stab}(G) = \{g \in D_4 : g \cdot G = G\}$ captures the grid&rsquo;s internal symmetry, and the orbit-stabilizer theorem gives:</p>
 <p>$$|\text{Orb}(G)| = \frac{|D_4|}{|\text{Stab}(G)|} = \frac{8}{|\text{Stab}(G)|}$$</p>
-<p>A grid with 4-fold rotational symmetry (e.g., an X-pattern centered on the grid) has $|\text{Stab}(G)| = 4$ and orbit size 2. A grid with full $D_4$ symmetry (e.g., a single centered pixel) has $|\text{Stab}(G)| = 8$ and orbit size 1 &mdash; augmentation produces no new examples.</p>
+<p>A grid with 4-fold rotational symmetry and no mirror symmetry (e.g., a pinwheel centered on the grid) has $|\text{Stab}(G)| = 4$ and orbit size 2. A grid with full $D_4$ symmetry (e.g., a single centered pixel) has $|\text{Stab}(G)| = 8$ and orbit size 1 &mdash; augmentation produces no new examples.</p>
 <hr />
 <h2 id="133-implementation-d4-augmentation-for-arc-agi">13.3 Implementation: D4 Augmentation for ARC-AGI</h2>
 <h3 id="1331-the-core-transform-functions">13.3.1 The Core Transform Functions</h3>

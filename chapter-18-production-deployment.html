@@ -487,8 +487,8 @@ def make_evaluate_fn(
 </tr>
 <tr>
 <td>Sensitivity profiling</td>
-<td>$2n$</td>
-<td>One with, one without per dimension</td>
+<td>$n + 1$</td>
+<td>One baseline, then one ablation per dimension</td>
 </tr>
 <tr>
 <td>MRI perturbation</td>
@@ -497,25 +497,25 @@ def make_evaluate_fn(
 </tr>
 <tr>
 <td>Adversarial search</td>
-<td>$n \cdot \lceil\log_2(R / \epsilon)\rceil$</td>
-<td>Binary search per dimension</td>
+<td>up to $2n \cdot n_\text{steps}$</td>
+<td>Log-spaced scan of $n_\text{steps} = 50$ values in each direction per dimension</td>
 </tr>
 <tr>
 <td>Compositional test</td>
-<td>$n \cdot C$</td>
-<td>One optimization per step</td>
+<td>$\bigl(1 + \tfrac{n(n-1)}{2}\bigr) \cdot C$</td>
+<td>One optimization per remaining candidate at each step</td>
 </tr>
 </tbody>
 </table>
 <p>For the default configuration with $n = 5$ dimensions, $K = 4$, $N_\text{pert} = 300$, and $C(k)$ using the grid/random strategy with 20 grid points and 5000 random samples:</p>
 <ul>
 <li>Subset enumeration: $\binom{5}{1} \cdot 20 + \binom{5}{2} \cdot 20^2 + \binom{5}{3} \cdot 5000 + \binom{5}{4} \cdot 5000 \approx 79,100$ evaluations</li>
-<li>Sensitivity: $10$ evaluations</li>
+<li>Sensitivity: $6$ evaluations</li>
 <li>MRI: $300$ evaluations</li>
-<li>Adversarial: $\approx 100$ evaluations</li>
-<li>Compositional: $\approx 25,000$ evaluations</li>
+<li>Adversarial: $\leq 500$ evaluations</li>
+<li>Compositional: $\approx 31,600$ evaluations</li>
 </ul>
-<p>Total: roughly 104,000 evaluations. If each evaluation takes 10 milliseconds, the campaign completes in about 17 minutes. If each evaluation takes 1 second (typical for a model behind an API), the campaign would take nearly 29 hours&mdash;far too long for CI.</p>
+<p>Total: roughly 111,500 evaluations. If each evaluation takes 10 milliseconds, the campaign completes in about 19 minutes. If each evaluation takes 1 second (typical for a model behind an API), the campaign would take about 31 hours&mdash;far too long for CI.</p>
 <h3 id="1852-budgeting-strategies">18.5.2 Budgeting Strategies</h3>
 <p>The solution is to adjust campaign parameters to fit a time budget:</p>
 <pre><code class="language-python">def budget_campaign_params(
