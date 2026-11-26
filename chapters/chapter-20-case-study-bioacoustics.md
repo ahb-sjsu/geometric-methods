@@ -118,7 +118,7 @@ print(f"Geodesic deviation: {trajectory.geodesic_deviation:.4f}")
 # High δ → complex spectral evolution
 ```
 
-In the DSWP data, regular codas (e.g., "5R1") tend to produce low geodesic deviation, consistent with spectrally stable clicks. Compound codas (e.g., "1+1+3") exhibit higher deviation, reflecting the spectral contrast between the isolated clicks and the triplet.
+The expectation for the DSWP data, not yet measured (Section 20.9.4), is that regular codas (e.g., "5R1") produce low geodesic deviation, consistent with spectrally stable clicks, and that compound codas (e.g., "1+1+3") exhibit higher deviation, reflecting the spectral contrast between the isolated clicks and the triplet.
 
 ---
 
@@ -382,7 +382,7 @@ class RecordingInvariantEncoder(nn.Module):
         return coda_logits, domain_logits
 ```
 
-The combination of gradient reversal (recording invariance) with hyperbolic classification (taxonomy-aware similarity) produces a decoder whose features encode coda structure in a geometry that respects the biological hierarchy while being invariant to recording artifacts. The DRI framework (Section 20.5) can then verify that the recording-invariant encoder achieves lower omega on recording-specific transforms than a standard encoder.
+The combination of gradient reversal (recording invariance) with hyperbolic classification (taxonomy-aware similarity) is intended to produce a decoder whose features encode coda structure in a geometry that respects the biological hierarchy while being invariant to recording artifacts. The DRI framework (Section 20.5) can then test whether the recording-invariant encoder achieves lower omega on recording-specific transforms than a standard encoder.
 
 ---
 
@@ -461,7 +461,7 @@ $$\text{MRI} = 0.5 \cdot \bar{d} + 0.3 \cdot d_{75} + 0.2 \cdot d_{95}$$
 
 where $d$ denotes the DRI deviation from baseline under random perturbation. This nested robustness analysis --- the MRI measures robustness of the DRI, which itself measures robustness of the decoder --- exemplifies the compositional nature of geometric validation. The result is a single number that quantifies the overall stability of the geometric analysis pipeline, not just the decoder in isolation.
 
-Sensitivity profiling (ablating one feature channel at a time) reveals the contribution of each geometric method:
+Sensitivity profiling (ablating one feature channel at a time) would reveal the contribution of each geometric method (hypothetical values):
 
 | Ablated Channel | DRI Increase | Interpretation |
 |----------------|-------------|----------------|
@@ -471,7 +471,7 @@ Sensitivity profiling (ablating one feature channel at a time) reveals the contr
 | Tempo features | +0.03 | Raw tempo features are nearly redundant |
 | ICI histogram | +0.02 | Traditional features add almost nothing to geometric pipeline |
 
-These hypothetical values illustrate the pattern: the three geometric channels (SPD, TDA, hyperbolic) each contribute meaningfully, while the traditional features (tempo, ICI histogram) are nearly redundant once the geometric features are present. This is the geometric analogue of the defect prediction finding in Chapter 1, where Complexity and Process dominated while OO and Halstead were nearly redundant.
+These hypothetical values illustrate the pattern: the three geometric channels (SPD, TDA, hyperbolic) each contribute meaningfully, while the traditional features (tempo, ICI histogram) are nearly redundant once the geometric features are present. This is the geometric analogue of the defect prediction illustration in Chapter 1, where Complexity and Process dominated while OO and Halstead were nearly redundant.
 
 ---
 

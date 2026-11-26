@@ -206,9 +206,9 @@ The geometric approach begins by organizing the 16 features into five groups, ea
 
 The model's configuration is now a point in $\mathbb{R}^5$. Each dimension corresponds to a feature group, and the parameter value for that dimension controls the group's influence on predictions. Setting a dimension to the sentinel value ($10^6$) deactivates the corresponding feature group entirely, allowing the framework to test *structural* questions: what happens when the model has no access to complexity features? To OO metrics? To process information?
 
-**Step 1: Subset enumeration (Chapter 11).** The framework tests all $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} = 25$ subsets of dimensions up to size 3. Each subset is optimized independently. The results reveal that {Complexity, Process} achieves MAE 2.1, while {Size, Halstead} achieves MAE 2.3. These two configurations are close in scalar terms but occupy entirely different regions of the feature space.
+**Step 1: Subset enumeration (Chapter 11).** The framework tests all $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} = 25$ subsets of dimensions up to size 3. Each subset is optimized independently. In this illustration the results show that {Complexity, Process} achieves MAE 2.1, while {Size, Halstead} achieves MAE 2.3. These two configurations are close in scalar terms but occupy entirely different regions of the feature space.
 
-**Step 2: Pareto frontier (Chapter 8).** Plotting all 25 configurations in the (number-of-dimensions, MAE) plane, the Pareto frontier identifies four non-dominated points:
+**Step 2: Pareto frontier (Chapter 8).** Plotting all 25 configurations, together with the full five-group model, in the (number-of-dimensions, MAE) plane, the Pareto frontier identifies four non-dominated points (illustrative values):
 
 | Dimensions $k$ | Best MAE | Configuration |
 |:-:|:-:|---|
@@ -221,18 +221,18 @@ Adding OO and Halstead to the three-group configuration reduces MAE from 1.7 to 
 
 **Step 3: Sensitivity profiling (Chapter 9).** Ablation reveals that removing Complexity increases MAE by 1.9 (the most important dimension), removing Process increases it by 1.2, removing Size increases it by 0.6, while removing OO or Halstead increases it by less than 0.2 each. The scalar metric "84% accuracy" hid the fact that the model is overwhelmingly dependent on two of its five feature groups.
 
-**Step 4: Model Robustness Index (Chapter 9).** The MRI perturbs the baseline configuration 300 times, measuring the distribution of MAE deviations:
+**Step 4: Model Robustness Index (Chapter 9).** The MRI perturbs the baseline configuration 300 times, measuring the distribution of MAE deviations (illustrative values):
 
 | Statistic | Value |
 |:-:|:-:|
 | Mean deviation | 0.8 |
 | 75th percentile | 1.4 |
 | 95th percentile | 3.1 |
-| MRI (composite) | 1.43 |
+| MRI (composite) | 1.44 |
 
 The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations, the model's error moves by about twice the whole error of the best configuration (1.5). This tail behavior is invisible to mean-based metrics. The MRI's weighted combination of mean, P75, and P95 provides a single robustness score *that explicitly accounts for tail risk*, unlike standard deviation which treats all deviations symmetrically.
 
-**Step 5: Adversarial threshold search (Chapter 9).** Binary search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity---it is *brittle* with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model's real-world performance.
+**Step 5: Adversarial threshold search (Chapter 9).** A log-spaced search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity---it is *brittle* with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model's real-world performance.
 
 ![Figure 1.2](figures/ch01_fig2.svg)
 
@@ -240,14 +240,14 @@ The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations
 
 ### 1.5.3 What Geometry Revealed
 
-The standard approach said: "84% accuracy." The geometric approach revealed:
+The standard approach said: "84% accuracy." In the illustration, the geometric approach revealed:
 
 1. The model depends almost entirely on Complexity and Process features; Size contributes modestly; OO and Halstead are nearly redundant.
 2. The optimal tradeoff between simplicity and accuracy uses 2--3 feature groups, not all 5.
-3. The model is fragile: 5% of perturbations nearly double the error.
+3. The model is fragile: 5% of perturbations nearly triple the error.
 4. There is a specific tipping point in the Complexity dimension below which the model fails qualitatively, not just quantitatively.
 
-None of these findings were available from accuracy, precision, recall, or F1. They required treating the evaluation as a geometric object---a point in a multi-dimensional space---and applying distance, direction, neighborhood, and boundary analysis to that object.
+In the illustration, none of these findings were available from accuracy, precision, recall, or F1. They required treating the evaluation as a geometric object---a point in a multi-dimensional space---and applying distance, direction, neighborhood, and boundary analysis to that object.
 
 ---
 

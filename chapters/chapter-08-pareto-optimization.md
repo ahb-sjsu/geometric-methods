@@ -360,7 +360,7 @@ $$\rho_i = \frac{\text{MAE}_i - \text{MAE}_{i+1}}{k_{i+1} - k_i}$$
 
 3. Select the configuration just before $\rho_i$ drops below a domain-specific threshold.
 
-For the defect prediction example, the ratios are:
+For the illustrative frontier of Section 8.7.2, the ratios are:
 
 | Transition | $\Delta k$ | $\Delta \text{MAE}$ | $\rho$ |
 |:---|:---:|:---:|:---:|
@@ -470,16 +470,16 @@ For 5 groups with `max_dims=5`, the enumeration evaluates $\binom{5}{1} + \binom
 
 ### 8.8.4 Interpreting the Results
 
-The Pareto frontier for this model recovers the known ground truth. The frontier typically contains:
+The example was built so that the Pareto frontier would recover the known ground truth. The description that follows is that intended, illustrative outcome and not a recorded one. The frontier would contain:
 
 - **$k = 1$: {Complexity}.** The single most informative group, as expected from the large coefficients on cyclomatic, essential, and design complexity.
 - **$k = 2$: {Complexity, Process}.** The two groups with the largest aggregate coefficients.
 - **$k = 3$: {Complexity, Process, Size}.** Size contributes weakly but measurably through the LOC coefficient.
 - **$k = 5$: All groups.** The random forest can extract marginal signal from Halstead (which is correlated with Size and Complexity) but gains nothing from OO.
 
-The absence of $k = 4$ from the frontier confirms that no 4-group configuration improves enough over the best 3-group configuration to meet the tolerance threshold. The best 4-group subsets are either {Complexity, Process, Size, Halstead} or {Complexity, Process, Size, OO}, both of which reduce MAE by less than 0.01 relative to {Complexity, Process, Size}.
+The absence of $k = 4$ from the frontier would mean that no 4-group configuration improves enough over the best 3-group configuration to meet the tolerance threshold. The best 4-group subsets are either {Complexity, Process, Size, Halstead} or {Complexity, Process, Size, OO}, both of which reduce MAE by less than 0.01 relative to {Complexity, Process, Size}.
 
-This result validates the Pareto approach: without any knowledge of the ground-truth coefficients, the analysis correctly identifies which feature groups matter, in what order, and where the point of diminishing returns lies.
+Such a result would validate the Pareto approach: without any knowledge of the ground-truth coefficients, the analysis would identify which feature groups matter, in what order, and where the point of diminishing returns lies. The recorded run of Chapter 19 does not give it. There the frontier has two points, {Complexity} and {OO, Process}, and the second is a lucky draw on the test set (Sections 19.5 and 19.6).
 
 ---
 

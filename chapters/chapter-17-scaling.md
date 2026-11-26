@@ -110,7 +110,7 @@ At step $t$, it evaluates $n - t$ candidates. Total `optimize_subset` calls for 
 | 100 | 4,087,975 | 394 | 10,376x |
 | 200 | 66,018,450 | 794 | 83,147x |
 
-Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. But empirically, it typically finds configurations within 5--15% of the globally optimal MAE.
+Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. The working expectation, which no recorded run in this volume tests, is that it finds configurations within 5--15% of the globally optimal MAE.
 
 ### 17.3.2 Backward Elimination
 
@@ -148,7 +148,7 @@ def backward_elimination(
     return results
 ```
 
-The total calls are $B(n) = n(n-1)/2 + 1$, the same $O(n^2)$ as forward selection run to completion. However, backward elimination has higher per-call cost because early steps involve large subsets (triggering the expensive random search path in `optimize_subset`).
+The total calls are $B(n) = n(n+1)/2$, the same count as forward selection run to completion, $F(n, n)$. However, backward elimination has higher per-call cost because early steps involve large subsets (triggering the expensive random search path in `optimize_subset`).
 
 **Complementary strengths.** Forward selection excels at identifying the *most important* dimensions; backward elimination excels at identifying the *least important*. Running both and comparing results is a practical diagnostic: agreement suggests clean dimension structure; divergence suggests complex interactions.
 
@@ -588,7 +588,7 @@ Chapter 18 turns to exactly this challenge: composing geometric analyses into *p
 
 High-dimensional parameter spaces challenge every stage of the structural fuzzing pipeline, but the challenges are unequal. Subset enumeration is the critical bottleneck, growing as $O(n^K)$ and becoming intractable for $n > 20$ at $K = 4$. Three families of strategies address this:
 
-1. **Greedy methods** (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ while typically finding configurations within 5--15% of the global optimum.
+1. **Greedy methods** (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ and are expected, without a recorded test in this volume, to find configurations within 5--15% of the global optimum.
 2. **LASSO screening** reduces effective dimensionality from $n$ to $n' \ll n$ at cost independent of $n$, enabling exhaustive enumeration on the reduced set.
 3. **Sampling strategies** (Latin hypercube, quasi-random sequences, importance sampling) improve coverage of high-dimensional perturbation spaces for MRI and robustness analysis.
 

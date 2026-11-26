@@ -86,9 +86,9 @@ Each $\omega_i = |\text{MAE}_{\text{perturbed}} - \text{MAE}_{\text{baseline}}|$
 
 The MRI is a weighted combination of three statistics of the $\omega$ distribution:
 
-$$\text{MRI} = w_0 \cdot \bar{\omega} + w_1 \cdot P_{75}(\omega) + w_2 \cdot P_{95}(\omega)$$
+$$\text{MRI} = w_1 \cdot \bar{\omega} + w_2 \cdot P_{75}(\omega) + w_3 \cdot P_{95}(\omega)$$
 
-with default weights $(w_0, w_1, w_2) = (0.5, 0.3, 0.2)$. The implementation is direct:
+with default weights $(w_1, w_2, w_3) = (0.5, 0.3, 0.2)$. The implementation is direct:
 
 ```python
 omegas_arr = np.array(omegas)
@@ -461,7 +461,7 @@ Running adversarial threshold search with tolerance 0.5 on each of the five dime
 | Process | decrease | 0.12 | legacy modules |
 | Size | decrease | 0.08 | small modules |
 
-Several findings stand out:
+In these illustrative results, several findings stand out:
 
 1. **Complexity has a tipping point at 0.30x** its baseline value in the decrease direction. Reducing the Complexity parameter below 30% of its fitted value causes the model's error on high-complexity modules to exceed tolerance. This is the most dangerous finding: a refactoring initiative that reduces code complexity across the codebase could push the model past this threshold, silently degrading predictions on precisely the modules that refactoring aims to improve.
 
@@ -477,14 +477,14 @@ Several findings stand out:
 
 ### 9.6.4 Synthesis
 
-Combining all three tools, the defect prediction model's robustness profile is:
+Combining all three tools, the defect prediction model's robustness profile, in these illustrative values, is:
 
 - **Global robustness (MRI = 1.44):** Moderately fragile. The model is not catastrophically sensitive, but 5% of perturbations produce substantial degradation.
 - **Fragility concentrates in Complexity and Process.** These two dimensions carry 75% of the predictive load and harbor all identified tipping points.
 - **Complexity has a critical threshold at 0.30x baseline.** This is the model's most dangerous vulnerability: a specific, plausible shift in the data distribution (reduced code complexity due to refactoring) could push the model past this threshold.
 - **OO and Halstead are safe to remove.** They contribute almost nothing and have no adversarial thresholds---removing them simplifies the model without sacrificing accuracy or robustness.
 
-None of these findings are available from accuracy, precision, recall, or F1. They required treating the model's behavior as a geometric object---a point in a multi-dimensional parameter space---and systematically probing the shape of the loss landscape around that point.
+In the illustration, none of these findings are available from accuracy, precision, recall, or F1. They required treating the model's behavior as a geometric object---a point in a multi-dimensional parameter space---and systematically probing the shape of the loss landscape around that point.
 
 ---
 

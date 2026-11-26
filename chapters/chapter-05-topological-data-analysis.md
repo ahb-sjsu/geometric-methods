@@ -149,7 +149,7 @@ The standard visualization of persistent homology is the **persistence diagram**
 
 The distance from a point to the diagonal is $\frac{d - b}{\sqrt{2}}$, proportional to the persistence. Points clustered near the diagonal represent short-lived, noisy features. Points far from the diagonal represent long-lived, significant features. Reading a persistence diagram amounts to identifying the off-diagonal points and interpreting their birth and death scales.
 
-**Example: Two clusters and a loop.** Consider a point cloud consisting of two circular clusters separated by a gap. The $H_0$ persistence diagram will show many points low on the death axis, since every component is born at scale 0 (individual points merging within each cluster), and one point far from the diagonal (the two clusters merging at the inter-cluster distance). The $H_1$ persistence diagram will show two points moderately far from the diagonal (the two circular holes, one per cluster), dying when triangles fill them in.
+**Example: Two clusters and a loop.** Consider a point cloud consisting of two ring-shaped clusters separated by a gap. The $H_0$ persistence diagram will show many points low on the death axis, since every component is born at scale 0 (individual points merging within each cluster), and one point far from the diagonal (the two clusters merging at the inter-cluster distance). The $H_1$ persistence diagram will show two points moderately far from the diagonal (the two circular holes, one per cluster), dying when triangles fill them in.
 
 **Infinite features.** By convention, one $H_0$ feature (the last surviving connected component) has $d = \infty$. It represents the single connected component that all others eventually merge into. Features with infinite death are often excluded from summary statistics, as they carry no discriminative information.
 
@@ -450,11 +450,11 @@ feature_matrix = np.stack([process_coda(ici) for ici in coda_icis])
 # feature_matrix.shape = (n_codas, 16)
 ```
 
-The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). In practice, the most discriminative features tend to be the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of finite $H_0$ bars, which is one less than the number of points in the cloud and so tracks the length of the coda).
+The resulting feature matrix can be passed to any classifier. The first 8 columns encode $H_0$ structure (cluster topology), and the last 8 encode $H_1$ structure (loop topology). The features expected to discriminate most are the $H_1$ max lifetime (feature index 11: the persistence of the most prominent loop, reflecting the strength of the dominant cyclic pattern) and the $H_0$ count (feature index 0: the number of finite $H_0$ bars, which is one less than the number of points in the cloud and so tracks the length of the coda).
 
 ### 5.7.5 Interpretation of Results
 
-When applied to the DSWP dataset (1,501 annotated sperm whale codas), TDA features reveal structure aligned with the known social organization:
+When applied to the DSWP dataset (1,501 annotated sperm whale codas), TDA features are expected to show structure aligned with the known social organization. The three statements below are posited in the sense of Chapter 21: no recorded run supports them yet (Section 20.9.4).
 
 - **$H_0$ features differentiate coda types by interval clustering.** Codas with a single characteristic interval (e.g., "regular" codas with roughly equal spacing) produce a single dominant $H_0$ component. Codas with two characteristic intervals (e.g., "1+1+3" codas with a short-short-long pattern) produce two well-separated clusters, reflected in higher $H_0$ count and longer maximum $H_0$ lifetime.
 

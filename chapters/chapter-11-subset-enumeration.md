@@ -5,7 +5,7 @@
 
 A model with $n$ parameter dimensions admits $2^n - 1$ non-empty subsets of those dimensions. Each subset defines a different structural question: *what happens when the model uses only these inputs?* For $n = 5$, there are 31 subsets---tractable. For $n = 10$, there are 1,023. For $n = 20$, over a million. The exponential growth is a combinatorial fact, and no algorithm can avoid it in general. But the equally important fact---the one that makes the subset enumeration pattern practical---is that most real problems have moderate effective dimensionality. Feature groups, not individual features, are the natural unit of structural analysis, and the number of meaningful groups rarely exceeds ten.
 
-This chapter develops the subset enumeration pattern: the systematic exploration of all dimension combinations up to a specified cardinality. We begin with the combinatorial landscape and the conditions under which brute-force enumeration is feasible. We then examine the `optimize_subset` algorithm in detail, including its log-space parameterization and sentinel-value encoding for inactive dimensions. The `SubsetResult` data structure captures the output of each optimization in a typed, composable form. The `enumerate_subsets` function orchestrates the full sweep. We close with practical heuristics---cardinality limits, early stopping---and a worked example from software defect prediction that reveals which feature groups genuinely drive predictive performance.
+This chapter develops the subset enumeration pattern: the systematic exploration of all dimension combinations up to a specified cardinality. We begin with the combinatorial landscape and the conditions under which brute-force enumeration is feasible. We then examine the `optimize_subset` algorithm in detail, including its log-space parameterization and sentinel-value encoding for inactive dimensions. The `SubsetResult` data structure captures the output of each optimization in a typed, composable form. The `enumerate_subsets` function orchestrates the full sweep. We close with practical heuristics---cardinality limits, early stopping---and a worked example from software defect prediction, with illustrative values, that shows how the enumeration is read to find which feature groups drive predictive performance.
 
 The pattern connects backward to the motivating example of Chapter 1, where subset enumeration first appeared as Step 1 of the geometric validation pipeline, and forward to Chapter 8, where Pareto frontier analysis operates over the space of `SubsetResult` objects to identify non-dominated tradeoffs between model complexity and predictive quality.
 
@@ -445,7 +445,7 @@ The errors are signed differences (predicted minus target), and the MAE is the m
 
 ### 11.6.3 What the Enumeration Reveals
 
-Running `enumerate_subsets` with `max_dims = 5` on the defect prediction example produces 31 `SubsetResult` objects (all subsets of sizes 1 through 5 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:
+Running `enumerate_subsets` with `max_dims = 5` on the defect prediction example produces 31 `SubsetResult` objects (all subsets of sizes 1 through 5 from the five groups). The illustrative values below show the pattern the example was built to produce:
 
 **Single-dimension results ($k = 1$).** The five single-group models reveal the standalone predictive power of each group:
 
@@ -469,13 +469,13 @@ Complexity alone is the best single predictor, consistent with the generator, in
 | {Process, Size} | ~3.4 | N/A |
 | ... | ... | ... |
 
-The {Complexity, Process} pair is substantially better than any singleton, demonstrating a *synergy*: the structural (complexity) and temporal (process) views of the code are complementary. The framework reveals this synergy because it tests all pairs exhaustively; forward selection, starting from Complexity, would find {Complexity, Process} only if Process happened to be the best addition---which it is, but that outcome is not guaranteed in general.
+The {Complexity, Process} pair is, in these illustrative values, substantially better than any singleton, which would indicate a *synergy*: the structural (complexity) and temporal (process) views of the code are complementary. The framework reveals this synergy because it tests all pairs exhaustively; forward selection, starting from Complexity, would find {Complexity, Process} only if Process happened to be the best addition---which it is, but that outcome is not guaranteed in general.
 
 **Three- and four-dimension results ($k = 3, 4$).** Adding Size to {Complexity, Process} reduces MAE to approximately 1.7. Adding Halstead or OO provides marginal further improvement. The pattern is one of diminishing returns: two dimensions capture most of the predictive structure, a third adds a meaningful increment, and the fourth and fifth add little.
 
 ### 11.6.4 Connecting to the Pareto Frontier
 
-The 31 `SubsetResult` objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:
+The 31 `SubsetResult` objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). With the illustrative values above, the frontier contains four points (the recorded run of Chapter 19 gives two):
 
 $$\{(\text{Complexity})\}, \; \{(\text{Complexity, Process})\}, \; \{(\text{Complexity, Process, Size})\}, \; \{(\text{all})\}$$
 
@@ -501,7 +501,7 @@ logit = (
 
 The true predictors are Complexity (coefficients 0.1, 0.15, 0.05), Process (0.12, 0.1, 0.08), and Size (0.03). Halstead is correlated with Size but has no direct effect. OO is pure noise.
 
-The subset enumeration correctly recovers this structure: Complexity and Process are the dominant groups, Size contributes marginally, Halstead's apparent contribution comes from its correlation with Size, and OO adds nothing. This ground-truth validation confirms that the brute-force enumeration pattern, despite its simplicity, reliably identifies the true structural dependencies in the data.
+The illustrative values of Section 11.6.3 are what a recovery of this structure would look like: Complexity and Process are the dominant groups, Size contributes marginally, Halstead's apparent contribution comes from its correlation with Size, and OO adds nothing. The recorded run of Chapter 19 does not recover it. The signal is faint against the noise (Section 19.1.2), the best subset contains OO, and the single groups score within two MAE points of one another, so on these data the ground-truth test is not passed.
 
 ---
 
@@ -569,4 +569,4 @@ The pattern's limitation is equally clear: it does not scale to hundreds of dime
 
 ## 11.10 Looking Ahead
 
-Chapter 12 introduces the *compositional testing pattern*, which addresses the question that subset enumeration leaves open: **in what order should dimensions be added?** Subset enumeration tells us that {Complexity, Process, Size} is a strong 3-dimensional configuration, but it does not tell us whether to start with Complexity and add Process, or start with Process and add Complexity. The compositional test builds dimensions incrementally, measuring the marginal contribution of each addition in context, and produces an ordering that reveals the causal structure of dimension interactions. Where subset enumeration maps the landscape, compositional testing traces a path through it.
+Chapter 12 introduces the *compositional testing pattern*, which addresses the question that subset enumeration leaves open: **in what order should dimensions be added?** Subset enumeration tells us, in the illustration of Section 11.6, that {Complexity, Process, Size} is a strong 3-dimensional configuration, but it does not tell us whether to start with Complexity and add Process, or start with Process and add Complexity. The compositional test builds dimensions incrementally, measuring the marginal contribution of each addition in context, and produces an ordering that reveals the causal structure of dimension interactions. Where subset enumeration maps the landscape, compositional testing traces a path through it.

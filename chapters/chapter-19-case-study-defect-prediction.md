@@ -184,7 +184,7 @@ Every number in Sections 19.4 to 19.9 comes from runs recorded on 16 November 20
 
 ### 19.4.1 The Enumeration Table
 
-The best five of the 30 configurations, with the five single groups and the full model for comparison. Metrics are percentages on the 300 test modules; the MAE is the mean absolute distance from the five targets.
+The best five of the 30 enumerated configurations, with the five single groups and the full model for comparison. Metrics are percentages on the 300 test modules; the MAE is the mean absolute distance from the five targets.
 
 | Configuration | MAE | Accuracy | Precision | Recall | F1 | AUC |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -206,7 +206,7 @@ Two things are wrong with this table before any geometry is applied. Every confi
 
 ### 19.5.1 The Targets Cannot Be Met
 
-The defect rate is 12.1%, so a model that predicts "no defect" for every test module is 88.0% accurate. The random forest predicts a defect when its estimated probability exceeds one half, and Section 19.1.2 showed that no module's defect probability, as far as its features determine it, exceeds 0.16. A classifier that has learned the generator correctly should therefore predict "no defect" almost everywhere. Thirty of the 31 configurations find none of the 36 defective modules: their recall is zero, and so are their precision and F1, since any defects they do predict are wrong. Each of them has an MAE of at least $(70 + 65 + 67)/5 = 40.4$, whatever its accuracy and AUC. The targets of Section 19.2.2 ask for precision of 70%, recall of 65% and AUC of 80%. The generator's own formula, used as an oracle, reaches an AUC of 54.5% on the same test modules. No model can meet these targets on these data, including the true one.
+The defect rate is 12.1%, so a model that predicts "no defect" for every test module is 88.0% accurate. The random forest predicts a defect when its estimated probability exceeds one half, and Section 19.1.2 showed that no module's defect probability, as far as its features determine it, exceeds 0.16. A classifier that has learned the generator correctly should therefore predict "no defect" almost everywhere. Thirty of the 31 configurations (the 30 enumerated ones and the full model) find none of the 36 defective modules: their recall is zero, and so are their precision and F1, since any defects they do predict are wrong. Each of them has an MAE of at least $(70 + 65 + 67)/5 = 40.4$, whatever its accuracy and AUC. The targets of Section 19.2.2 ask for precision of 70%, recall of 65% and AUC of 80%. The generator's own formula, used as an oracle, reaches an AUC of 54.5% on the same test modules. No model can meet these targets on these data, including the true one.
 
 The differences that remain are in accuracy and AUC, and they are small against their noise. With 36 defective and 264 clean modules, the standard error of an AUC near 0.55 is about 0.05 (Hanley and McNeil, 1982). The 31 configurations span AUCs from 43% to 59%, all within two standard errors of chance.
 

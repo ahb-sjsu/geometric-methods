@@ -110,7 +110,7 @@ The parameters fall into four groups:
 
 **Enumeration control.** `max_subset_dims` caps the largest subset size explored during enumeration. For $n$ dimensions, the number of subsets up to size $k$ is $\sum_{i=1}^{k} \binom{n}{i}$. With $n = 9$ and $k = 4$, this is 255 subsets. With $k = 5$, it rises to 381. The default of 4 balances thoroughness against computation time. The `n_grid` and `n_random` parameters control how each subset is optimized: `n_grid` sets the number of grid points for 1D and 2D optimization, while `n_random` sets the number of random samples for 3D and higher subsets. The `inactive_value` (default $10^6$) is the sentinel assigned to deactivated dimensions.
 
-**Robustness parameters.** `n_mri_perturbations` controls the number of random perturbations sampled for the MRI computation---more perturbations yield more stable estimates of tail behavior but cost more evaluations. `mri_scale` sets the log-space perturbation radius, and `mri_weights` controls the relative importance of mean, 75th-percentile, and 95th-percentile deviations in the composite MRI score. `adversarial_tolerance` sets the convergence criterion for binary search during adversarial threshold detection.
+**Robustness parameters.** `n_mri_perturbations` controls the number of random perturbations sampled for the MRI computation---more perturbations yield more stable estimates of tail behavior but cost more evaluations. `mri_scale` sets the log-space perturbation radius, and `mri_weights` controls the relative importance of mean, 75th-percentile, and 95th-percentile deviations in the composite MRI score. `adversarial_tolerance` sets how far a prediction target may move before the log-spaced adversarial threshold search records a tipping point.
 
 **Pipeline control.** `start_dim` and `candidate_dims` configure the compositional test (which dimension to start from, and which to consider adding). `run_baselines` toggles the forward/backward selection baselines. `verbose` controls progress printing.
 
@@ -200,7 +200,7 @@ Understanding the total number of evaluations consumed by a campaign is essentia
 | Adversarial search | up to $n \times 2 \times n_{\text{steps}}$ |
 | Compositional test | $\left(1 + \frac{n(n-1)}{2}\right) \times C(\cdot)$ |
 | Forward selection | up to $K \times n \times C(\cdot)$ |
-| Backward elimination | $n \times C(\cdot)$ |
+| Backward elimination | $\frac{n(n+1)}{2} \times C(\cdot)$ |
 
 Here $C(k)$ is the optimization cost for a $k$-dimensional subset: $n_{\text{grid}}$ for $k = 1$, $n_{\text{grid}}^2$ for $k = 2$, and $n_{\text{random}}$ for $k \geq 3$. $n_{\text{steps}}$ is the number of log-spaced values the adversarial search scans in each direction (default 50), and $N_{\text{pert}}$ is `n_mri_perturbations`.
 
