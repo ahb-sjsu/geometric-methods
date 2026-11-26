@@ -450,11 +450,11 @@ from examples.defect_prediction.model import make_evaluate_fn, GROUP_NAMES
 
 evaluate_fn = make_evaluate_fn(n_samples=1000, seed=42)
 
-# Enumerate all subsets up to size 4
+# Enumerate all subsets up to size 5
 all_results = enumerate_subsets(
     dim_names=GROUP_NAMES,
     evaluate_fn=evaluate_fn,
-    max_dims=4,
+    max_dims=5,
     verbose=True,
 )
 
@@ -466,7 +466,7 @@ for r in frontier:
     print(f"  k={r.n_dims}  {r.dim_names}  MAE={r.mae:.4f}")
 ```
 
-For 5 groups with `max_dims=4`, the enumeration evaluates $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} = 5 + 10 + 10 + 5 = 30$ subsets. Each 1D subset requires 20 evaluations (grid search), each 2D subset requires 400 (grid product), and each 3D or 4D subset requires 5000 (random search). The total evaluation budget is $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 = 100 + 4000 + 50{,}000 + 25{,}000 = 79{,}100$ model evaluations.
+For 5 groups with `max_dims=5`, the enumeration evaluates $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} + \binom{5}{5} = 5 + 10 + 10 + 5 + 1 = 31$ subsets. Each 1D subset requires 20 evaluations (grid search), each 2D subset requires 400 (grid product), and each 3D, 4D or 5D subset requires 5000 (random search). The total evaluation budget is $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 + 1 \times 5000 = 100 + 4000 + 50{,}000 + 25{,}000 + 5000 = 84{,}100$ model evaluations.
 
 ### 8.8.4 Interpreting the Results
 

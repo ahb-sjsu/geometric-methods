@@ -78,17 +78,18 @@ def fig_16_2():
     assert total == 79100
     assert [m * cost for _, m, cost in enum] == [100, 4000, 50000, 25000]
     rows = [(f"size {k}: {m} subsets × {cost:,}", m * cost, 0, f"{m * cost:,}") for k, m, cost in enum]
-    rows += [("MRI perturbations", 300, 1, "300"), ("sensitivity profile, 2n", 2 * n, 1, "10"),
-             ("adversarial search", 100, 1, "roughly 100")]
+    comp = (1 * grid) + (n - 1) * grid ** 2 + ((n - 1) * (n - 2) // 2) * rand  # 1 + n(n-1)/2 optimizations
+    assert comp == 31620 and total + comp + 300 + (n + 1) + 500 == 111526
+    rows += [("compositional test", comp, 1, f"{comp:,}"), ("MRI perturbations", 300, 1, "300"),
+             ("sensitivity profile, n + 1", n + 1, 1, "6"), ("adversarial search", 500, 1, "up to 500")]
     p = reg(CH16, "16.2",
             "The evaluation budget of Section 16.2.3 for five dimensions with the default settings, on a "
             "logarithmic axis. The four rows of subset enumeration are the number of subsets of each size times "
-            "the cost of optimizing one, and they sum to 79,100 calls. The MRI, the sensitivity profile and the "
-            "adversarial search together add about 410. The counts follow from the formulas of the section and "
-            "are not measurements; the compositional test and the baselines are not shown because the section "
-            "gives no count for them.",
+            "the cost of optimizing one, and they sum to 79,100 calls. The compositional test adds 31,620, and the "
+            "MRI, the sensitivity profile and the adversarial search together add at most 806. The counts follow "
+            "from the formulas of the section and are not measurements; the baselines are not shown.",
             "## 16.3 `StructuralFuzzReport`: Structured Output")
-    c = Canvas(720, 340, "With five dimensions, enumeration takes nearly all the evaluations")
+    c = Canvas(720, 370, "With five dimensions, enumeration takes most of the evaluations")
     ax = Axes(c, 230, 60, 400, 30 * len(rows), (1, 1e5), (0, len(rows)), [], [],
               "calls to the evaluation function, logarithmic scale", "", xlog=True)
     for v, lab in ((1, "1"), (10, "10"), (100, "100"), (1e3, "1,000"), (1e4, "10,000"), (1e5, "100,000")):

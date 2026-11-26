@@ -85,7 +85,7 @@ For a generic grid with no internal symmetry, $|\text{Orb}(G)| = 8$. But a grid 
 
 $$|\text{Orb}(G)| = \frac{|D_4|}{|\text{Stab}(G)|} = \frac{8}{|\text{Stab}(G)|}$$
 
-A grid with 4-fold rotational symmetry (e.g., an X-pattern centered on the grid) has $|\text{Stab}(G)| = 4$ and orbit size 2. A grid with full $D_4$ symmetry (e.g., a single centered pixel) has $|\text{Stab}(G)| = 8$ and orbit size 1 --- augmentation produces no new examples.
+A grid with 4-fold rotational symmetry and no mirror symmetry (e.g., a pinwheel centered on the grid) has $|\text{Stab}(G)| = 4$ and orbit size 2. A grid with full $D_4$ symmetry (e.g., a single centered pixel) has $|\text{Stab}(G)| = 8$ and orbit size 1 --- augmentation produces no new examples.
 
 ---
 

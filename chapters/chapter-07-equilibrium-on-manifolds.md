@@ -78,7 +78,7 @@ def ultimatum_game(
     return E
 ```
 
-The resolution is structural. Each possible offer is not a scalar payoff but a point in $\mathbb{R}^9$. Offering \$0 keeps the full \$10 on the consequences dimension ($d_1$), but it pushes fairness ($d_3$) down to 0.1, identity ($d_7$) down to 0.3, and social impact ($d_6$) to $-0.2$. Offering \$5 sacrifices half the monetary value but achieves fairness of 0.9, identity of 0.8, and social impact of 0.4. The Mahalanobis distance from the starting state to the low-offer vertex is *larger* than the distance to the equal-split vertex, because the low offer activates large displacements across multiple non-monetary dimensions. The exploitation boundary penalty ($\beta = 5.0$) adds a further discrete cost when fairness drops sharply while consequences improve---precisely the condition that characterizes exploitative offers.
+The resolution is structural. Each possible offer is not a scalar payoff but a point in $\mathbb{R}^9$. Offering \$0 keeps the full \$10 on the consequences dimension ($d_1$), but it pushes fairness ($d_3$) down to 0.1, identity ($d_7$) down to 0.3, and social impact ($d_6$) to $-0.2$. Offering \$5 sacrifices half the monetary value but achieves fairness of 0.9, identity of 0.8, and social impact of 0.4. The Mahalanobis distance from the starting state to the low-offer vertex is *larger* than the distance to the 20% vertex (0.95 against 0.42), because the low offer activates large displacements across multiple non-monetary dimensions; the equal-split vertex is farther still (1.67), because the metric charges for moral gain as well as moral loss. The exploitation boundary penalty ($\beta = 5.0$) would add a further discrete cost if fairness dropped sharply while consequences improved---precisely the condition that characterizes exploitative offers---but it does not fire here, because the proposer's money never rises (Section 6.6.1).
 
 The Bond Geodesic---the minimum-cost path through this decision complex---leads to a positive offer. With the default covariance of Chapter 6 the least-cost offer is 20% (Section 6.6.1). The zero offer that the Nash analysis predicts costs more than twice as much, because of what it does to fairness, identity, and social impact. The offers observed in experiments are higher, 40--50%. The model gets the direction right without calibration; matching the level requires a covariance fitted to data, which remains open.
 
@@ -571,13 +571,13 @@ This chapter developed the Bond Geodesic Equilibrium as a multi-dimensional gene
 
 2. **BGE reduces to Nash** when all non-monetary dimensions are deactivated (Theorem 7.2). This validates BGE as a proper generalization: classical results are a special case, not a competing framework.
 
-3. **Convergence** is promoted by metric smoothness (Lipschitz contraction of the best-response mapping) and boundary penalty discreteness (attractor regions that partition the strategy space). Mixed BGE existence follows from reduction to finite Nash equilibrium on the augmented game (Theorem 7.2).
+3. **Convergence** is promoted by metric smoothness (Lipschitz contraction of the best-response mapping) and boundary penalty discreteness (attractor regions that partition the strategy space). Mixed BGE existence follows from reduction to finite Nash equilibrium on the augmented game (Theorem 7.1).
 
 4. **Behavioral friction** is the total path cost of the Bond Geodesic---a measure of decision difficulty that integrates cognitive, emotional, moral, and economic costs into a single geometric quantity.
 
 5. **Behavioral biases emerge from geometry.** Loss aversion, the endowment effect, reference dependence, and framing effects are not ad-hoc psychological parameters but consequences of the multi-dimensional metric structure. They require no special assumptions beyond the existence of non-monetary dimensions and a Mahalanobis distance that respects them.
 
-6. **Dimensional loss aversion** provides a unified explanation for why loss aversion varies by context: $\lambda$ is determined by the number and weight of dimensions activated by the loss. Pure cash losses produce $\lambda \approx 1.2$; sentimental goods produce $\lambda \approx 3.0$; the variation is continuous, predictable, and measurable.
+6. **Dimensional loss aversion** provides a unified explanation for why loss aversion varies by context: $\lambda$ is determined by the number and weight of dimensions activated by the loss. Pure cash losses produce $\lambda \approx 1$; sentimental goods produce $\lambda \approx 3.0$; the variation is continuous, predictable, and measurable.
 
 7. **The ultimatum game** (Chapter 1) is resolved naturally: the BGE predicts a positive offer, 20% under the default covariance against the 40--50% observed, because the manifold distance to a zero offer is more than twice the distance to a moderate one once fairness, identity, and social dimensions are accounted for.
 

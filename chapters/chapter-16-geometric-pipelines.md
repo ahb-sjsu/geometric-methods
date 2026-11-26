@@ -56,7 +56,7 @@ Adversarial Search   <-- probes each dimension independently
 Compositional Test   <-- greedy dimension-addition sequence
 ```
 
-The first two stages are tightly coupled: Pareto extraction is a filter over subset results. The middle two stages (sensitivity and MRI) both operate on the best configuration discovered in stage 1 but are independent of each other---they could, in principle, run in parallel. The final two stages are independent of each other but depend on earlier results for their baseline parameters.
+The first two stages are tightly coupled: Pareto extraction is a filter over subset results. The middle two stages (sensitivity and MRI) both operate on the best configuration discovered in stage 1 but are independent of each other---they could, in principle, run in parallel. The final two stages are independent of each other; only the adversarial search depends on earlier results for its baseline parameters.
 
 An optional seventh phase runs forward selection and backward elimination baselines, providing classical feature-selection comparisons against the geometric methods. These baselines serve as a sanity check: if forward selection discovers a configuration that the exhaustive subset enumeration missed, something is wrong with the enumeration parameters.
 
@@ -195,16 +195,16 @@ Understanding the total number of evaluations consumed by a campaign is essentia
 |:------|:--------------------------|
 | Subset enumeration | $\sum_{k=1}^{K} \binom{n}{k} \times C(k)$ |
 | Pareto frontier | 0 (filter only) |
-| Sensitivity profile | $2n$ |
+| Sensitivity profile | $n + 1$ |
 | MRI | $N_{\text{pert}}$ |
-| Adversarial search | $n \times 2 \times \lceil\log_2(R)\rceil$ |
-| Compositional test | $(n-1) \times C(\cdot)$ |
+| Adversarial search | up to $n \times 2 \times n_{\text{steps}}$ |
+| Compositional test | $\left(1 + \frac{n(n-1)}{2}\right) \times C(\cdot)$ |
 | Forward selection | up to $K \times n \times C(\cdot)$ |
 | Backward elimination | $n \times C(\cdot)$ |
 
-Here $C(k)$ is the optimization cost for a $k$-dimensional subset: $n_{\text{grid}}$ for $k = 1$, $n_{\text{grid}}^2$ for $k = 2$, and $n_{\text{random}}$ for $k \geq 3$. $R$ is the search range ratio for adversarial binary search, and $N_{\text{pert}}$ is `n_mri_perturbations`.
+Here $C(k)$ is the optimization cost for a $k$-dimensional subset: $n_{\text{grid}}$ for $k = 1$, $n_{\text{grid}}^2$ for $k = 2$, and $n_{\text{random}}$ for $k \geq 3$. $n_{\text{steps}}$ is the number of log-spaced values the adversarial search scans in each direction (default 50), and $N_{\text{pert}}$ is `n_mri_perturbations`.
 
-For a 5-dimensional problem with defaults ($K = 4$, $n_{\text{grid}} = 20$, $n_{\text{random}} = 5000$), the enumeration stage alone requires approximately $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 = 79{,}100$ evaluations. If each evaluation takes 100ms (reasonable for a small random forest), the enumeration stage takes about 2 hours. The MRI adds 300 evaluations (30 seconds), sensitivity adds 10 evaluations (1 second), and adversarial search adds roughly 100 evaluations (10 seconds). Enumeration dominates.
+For a 5-dimensional problem with defaults ($K = 4$, $n_{\text{grid}} = 20$, $n_{\text{random}} = 5000$), the enumeration stage alone requires approximately $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 = 79{,}100$ evaluations. If each evaluation takes 100ms (reasonable for a small random forest), the enumeration stage takes about 2 hours. The MRI adds 300 evaluations (30 seconds), sensitivity adds 6 evaluations (under a second), and adversarial search adds up to 500 evaluations (50 seconds). Enumeration dominates.
 
 For a 9-dimensional problem, the evaluation count rises sharply: $\binom{9}{3} = 84$ three-dimensional subsets and $\binom{9}{4} = 126$ four-dimensional subsets, each requiring 5000 random evaluations, push the total past one million. Section 16.6 discusses strategies for managing this cost.
 
@@ -212,7 +212,7 @@ For a 9-dimensional problem, the evaluation count rises sharply: $\binom{9}{3} =
 
 ![Figure 16.2](figures/ch16_fig2.svg)
 
-*Figure 16.2. The evaluation budget of Section 16.2.3 for five dimensions with the default settings, on a logarithmic axis. The four rows of subset enumeration are the number of subsets of each size times the cost of optimizing one, and they sum to 79,100 calls. The MRI, the sensitivity profile and the adversarial search together add about 410. The counts follow from the formulas of the section and are not measurements; the compositional test and the baselines are not shown because the section gives no count for them.*
+*Figure 16.2. The evaluation budget of Section 16.2.3 for five dimensions with the default settings, on a logarithmic axis. The four rows of subset enumeration are the number of subsets of each size times the cost of optimizing one, and they sum to 79,100 calls. The compositional test adds 31,620, and the MRI, the sensitivity profile and the adversarial search together add at most 806. The counts follow from the formulas of the section and are not measurements; the baselines are not shown.*
 
 ## 16.3 `StructuralFuzzReport`: Structured Output
 
@@ -533,7 +533,7 @@ The pipeline's cost scales differently in each stage:
 - Subset enumeration scales combinatorially: $O\left(\sum_{k=1}^{K} \binom{n}{k}\right)$ subsets, each requiring $O(C(k))$ evaluations.
 - Sensitivity profiling scales linearly: $O(n)$ ablation evaluations.
 - MRI scales independently of dimensionality: $O(N_{\text{pert}})$ evaluations regardless of $n$.
-- Adversarial search scales linearly: $O(n \log R)$ evaluations.
+- Adversarial search scales linearly: $O(n \cdot n_{\text{steps}})$ evaluations.
 - Compositional testing scales quadratically in the worst case: $O(n^2 \cdot C(\cdot))$ evaluations.
 
 For problems with $n > 10$, subset enumeration up to $k = 4$ becomes expensive. Three mitigation strategies apply:

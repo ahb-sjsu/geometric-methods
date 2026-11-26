@@ -5,7 +5,7 @@
 
 The geometric methods developed in Parts I through III operate beautifully in moderate dimensions. When a model has five parameters grouped into five named dimensions, exhaustive subset enumeration (Chapter 11) evaluates 31 subsets, Pareto frontier extraction completes in microseconds, and the Model Robustness Index (Chapter 9) converges with 300 perturbation samples. The entire structural fuzzing campaign finishes in seconds.
 
-Now consider a model with 50 parameters. Or 200. Or 2,000. The number of subsets of size up to $k = 4$ is $\binom{50}{1} + \binom{50}{2} + \binom{50}{3} + \binom{50}{4} = 292{,}825$. For $n = 200$, the same sum exceeds $67$ million. Exhaustive enumeration, which was the foundation of the geometric analysis pipeline, becomes computationally impossible.
+Now consider a model with 50 parameters. Or 200. Or 2,000. The number of subsets of size up to $k = 4$ is $\binom{50}{1} + \binom{50}{2} + \binom{50}{3} + \binom{50}{4} = 251{,}175$. For $n = 200$, the same sum exceeds $66$ million. Exhaustive enumeration, which was the foundation of the geometric analysis pipeline, becomes computationally impossible.
 
 This chapter addresses the computational challenges that arise when the methods of preceding chapters encounter high-dimensional parameter spaces. We analyze the complexity of each pipeline stage, identify the bottlenecks, and develop three families of strategies for overcoming them: greedy heuristics that sacrifice optimality for tractability, LASSO-based screening that exploits sparsity, and sampling strategies that provide probabilistic coverage guarantees.
 
@@ -33,12 +33,12 @@ Not all pipeline stages suffer equally:
 | Per-subset optimization (1D/2D) | $O(g)$ / $O(g^2)$ | Never | Fixed grid cost |
 | Per-subset optimization (3D+) | $O(r)$ | $n \approx 50$ | Random search coverage degrades |
 | Pareto frontier extraction | $O(m \cdot n)$ | $m > 10^6$ | Dominance checks |
-| Sensitivity profiling | $O(n \cdot g)$ | $n \approx 500$ | Linear, well-behaved |
+| Sensitivity profiling | $O(n)$ | $n \approx 500$ | Linear, well-behaved |
 | MRI computation | $O(p \cdot n)$ | $n \approx 500$ | Perturbation coverage degrades |
 | Adversarial threshold search | $O(n \cdot s)$ | $n \approx 500$ | Linear, well-behaved |
 | Forward/backward selection | $O(n^2)$ | $n \approx 200$ | Quadratic greedy iterations |
 
-Here $g$ is `n_grid` (default 20), $r$ is `n_random` (default 5,000), $m$ the total subset count, $p$ is `n_perturbations` (default 300), and $s$ is binary search steps per dimension. The critical bottleneck is subset enumeration---exponential where everything else is polynomial.
+Here $g$ is `n_grid` (default 20), $r$ is `n_random` (default 5,000), $m$ the total subset count, $p$ is `n_perturbations` (default 300), and $s$ is the number of search steps per dimension. The critical bottleneck is subset enumeration---exponential where everything else is polynomial.
 
 ---
 
@@ -54,12 +54,12 @@ For small $K$ this is $O(n^K)$. Concrete counts:
 |:---:|:---:|:---:|:---:|:---:|
 | 5 | 15 | 25 | 30 | 31 |
 | 10 | 55 | 175 | 385 | 1,023 |
-| 20 | 210 | 1,350 | 5,985 | $\approx 10^6$ |
-| 50 | 1,275 | 20,825 | 292,825 | $\approx 10^{15}$ |
-| 100 | 5,050 | 166,750 | 3,921,225 | $\approx 10^{30}$ |
-| 200 | 20,100 | 1,333,500 | 67,054,150 | $\approx 10^{60}$ |
+| 20 | 210 | 1,350 | 6,195 | $\approx 10^6$ |
+| 50 | 1,275 | 20,875 | 251,175 | $\approx 10^{15}$ |
+| 100 | 5,050 | 166,750 | 4,087,975 | $\approx 10^{30}$ |
+| 200 | 20,100 | 1,333,500 | 66,018,450 | $\approx 10^{60}$ |
 
-The raw subset count understates the true cost because each subset must be *optimized*. The `optimize_subset` function uses grid search ($g$ or $g^2$ evaluations) for 1D/2D subsets and random search ($r$ evaluations) for 3D+. For $n = 50$ and $K = 4$ with $g = 20, r = 5{,}000$, the total exceeds $1.25 \times 10^9$ function evaluations.
+The raw subset count understates the true cost because each subset must be *optimized*. The `optimize_subset` function uses grid search ($g$ or $g^2$ evaluations) for 1D/2D subsets and random search ($r$ evaluations) for 3D+. For $n = 50$ and $K = 4$ with $g = 20, r = 5{,}000$, the total is about $1.25 \times 10^9$ function evaluations.
 
 ---
 
@@ -105,10 +105,10 @@ At step $t$, it evaluates $n - t$ candidates. Total `optimize_subset` calls for 
 
 | $n$ | Exhaustive ($K = 4$) | Forward ($K = 4$) | Speedup |
 |:---:|:---:|:---:|:---:|
-| 20 | 5,985 | 74 | 81x |
-| 50 | 292,825 | 194 | 1,510x |
-| 100 | 3,921,225 | 394 | 9,952x |
-| 200 | 67,054,150 | 794 | 84,453x |
+| 20 | 6,195 | 74 | 84x |
+| 50 | 251,175 | 194 | 1,295x |
+| 100 | 4,087,975 | 394 | 10,376x |
+| 200 | 66,018,450 | 794 | 83,147x |
 
 Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. But empirically, it typically finds configurations within 5--15% of the globally optimal MAE.
 
@@ -179,7 +179,7 @@ The most effective use is as a *screening stage* that reduces the effective dime
 3. Restrict attention to this reduced set of $n' \ll n$ dimensions.
 4. Run `enumerate_subsets` on the reduced set with $n'$ dimensions. Cost: $O(n'^K)$.
 
-If LASSO reduces $n = 200$ to $n' = 12$, exhaustive enumeration with $K = 4$ requires only $\binom{12}{1} + \binom{12}{2} + \binom{12}{3} + \binom{12}{4} = 793$ subsets---a reduction from 67 million to under a thousand. The screening stage costs 100,000 evaluations; the enumeration stage costs a few thousand more. The total cost is a tiny fraction of naive exhaustive enumeration.
+If LASSO reduces $n = 200$ to $n' = 12$, exhaustive enumeration with $K = 4$ requires only $\binom{12}{1} + \binom{12}{2} + \binom{12}{3} + \binom{12}{4} = 793$ subsets---a reduction from 66 million to under a thousand. The screening stage costs 100,000 evaluations; the enumeration stage costs a few thousand more. The total cost is a tiny fraction of naive exhaustive enumeration.
 
 The risk is that LASSO screening may discard a dimension that is individually weak but critical in combination with others. This risk is partially mitigated by using a generous activity threshold ($|\log_{10}(\theta_i)| \geq 0.3$ instead of $0.5$) and by examining the LASSO path across all $\alpha$ values rather than relying on a single regularization strength. Dimensions that appear in the active set for any $\alpha$ value should be retained for the enumeration stage.
 
@@ -241,10 +241,10 @@ The `run_campaign` function in `pipeline.py` executes six stages plus optional b
 |---|---|---|
 | Subset enumeration | $\sum_{k=1}^{K}\binom{n}{k} \cdot c(k)$ | $c(k) = g, g^2, r$ for $k = 1, 2, \geq 3$ |
 | Pareto extraction | $O(m)$, no evaluations | In-memory computation |
-| Sensitivity profiling | $O(n \cdot g)$ | One grid sweep per dimension |
+| Sensitivity profiling | $O(n)$ | One ablation per dimension |
 | MRI computation | $O(p)$ | Independent of $n$ |
-| Adversarial search | $O(n \cdot s)$ | Binary search per dimension |
-| Compositional test | $O(n^2 \cdot g)$ | Greedy build order |
+| Adversarial search | $O(n \cdot s)$ | Log-spaced scan per dimension |
+| Compositional test | $O(n^2) \cdot c_{\text{avg}}$ | Greedy build order |
 | Forward selection | $O(nK) \cdot c_{\text{avg}}$ | |
 | Backward elimination | $O(n^2) \cdot c_{\text{avg}}$ | |
 
@@ -252,14 +252,14 @@ Estimated wall-clock times for $E = 1$ms, $g = 20$, $r = 5{,}000$, $p = 300$, $K
 
 | $n$ | Enumeration | Other stages | Total |
 |:---:|:---:|:---:|:---:|
-| 5 | 0.5s | 0.8s | 1.3s |
-| 10 | 4.5s | 1.7s | 6.2s |
-| 20 | 68s | 5s | 73s |
-| 50 | 24min | 26s | 25min |
-| 100 | 5.4hr | 100s | 5.4hr |
-| 200 | 186hr | 7min | 186hr |
+| 5 | 79s | 32s | 112s |
+| 10 | 28min | 3.1min | 31min |
+| 20 | 8.3hr | 14min | 8.6hr |
+| 50 | 347hr | 1.6hr | 349hr |
+| 100 | 5,671hr | 6.8hr | 5,678hr |
+| 200 | 91,667hr | 27hr | 91,694hr |
 
-Subset enumeration is the bottleneck, becoming intractable between $n = 50$ and $n = 100$.
+Subset enumeration is the bottleneck, becoming intractable between $n = 20$ and $n = 50$.
 
 ---
 
@@ -287,7 +287,7 @@ def parallel_enumerate_subsets(dim_names, evaluate_fn, max_dims=4, n_workers=Non
     return results
 ```
 
-**MRI computation.** Perturbation samples can be precomputed and distributed. **Adversarial search.** Each dimension's binary search is independent.
+**MRI computation.** Perturbation samples can be precomputed and distributed. **Adversarial search.** Each dimension's search is independent.
 
 ### 17.8.2 Sequential Stages with Inner Parallelism
 
@@ -303,7 +303,7 @@ When the evaluation function is GPU-accelerated, perturbation evaluations can be
 
 ### 17.9.1 The Memory Problem
 
-`enumerate_subsets` stores all results in a list. Each `SubsetResult` contains a full parameter vector of shape $(n,)$. For $n = 100$ and $K = 4$, the list holds nearly 4 million results consuming approximately 4 GB. For $n = 200$, memory exceeds 60 GB.
+`enumerate_subsets` stores all results in a list. Each `SubsetResult` contains a full parameter vector of shape $(n,)$. For $n = 100$ and $K = 4$, the list holds about 4.1 million results consuming approximately 4 GB. For $n = 200$, memory exceeds 60 GB.
 
 ### 17.9.2 Streaming Evaluation
 
@@ -338,7 +338,7 @@ For $K = 2$ subsets with $n = 200$, this is a 100x compression.
 
 The choice between exact enumeration and approximate methods is not purely a function of $n$. It depends on three factors:
 
-1. **Evaluation cost $E$.** If each function evaluation takes 1 microsecond (as in a simple closed-form model), exhaustive enumeration with $n = 30$ and $K = 4$ requires 28,405 subsets, each costing at most 5,000 evaluations, for a total wall-clock time under 3 minutes. But if each evaluation takes 1 second (as in a simulation-based model), the same campaign requires 40 hours.
+1. **Evaluation cost $E$.** If each function evaluation takes 1 microsecond (as in a simple closed-form model), exhaustive enumeration with $n = 30$ and $K = 4$ requires 31,930 subsets, each costing at most 5,000 evaluations, for a total wall-clock time under 3 minutes. But if each evaluation takes 1 second (as in a simulation-based model), the same campaign requires about 43,750 hours, roughly five years.
 
 2. **Dimension interaction strength.** If dimensions contribute independently to MAE, forward selection finds the optimal subset with high probability, and exhaustive enumeration provides little additional value. If dimensions interact strongly (synergies, redundancies, suppression effects), exhaustive enumeration is the only way to discover optimal combinations.
 
@@ -379,7 +379,7 @@ report = run_campaign(
 
 ### 17.10.4 A High-Dimensional Campaign
 
-Consider $n = 80$ parameters with 50ms evaluation cost. Naive enumeration with $K = 4$ would require 12.5 years. The recommended approach:
+Consider $n = 80$ parameters with 50ms evaluation cost. Naive enumeration with $K = 4$ would require about 13 years. The recommended approach:
 
 ```python
 # Phase 1: LASSO screening (100,000 evals = 83 min)
@@ -404,7 +404,7 @@ reduced_results = enumerate_subsets(
 # Phase 3: MRI + adversarial testing on top configurations (~10 min)
 ```
 
-Total: 2--3 hours instead of 12.5 years.
+Total: 2--3 hours instead of about 13 years.
 
 ---
 

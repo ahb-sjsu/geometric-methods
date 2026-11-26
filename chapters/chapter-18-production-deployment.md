@@ -496,20 +496,20 @@ A structural fuzzing campaign's computational cost is determined by the number o
 | Phase | Evaluations | Formula |
 |-------|-------------|---------|
 | Subset enumeration | $\sum_{k=1}^{K} \binom{n}{k} \cdot C(k)$ | $C(k)$: optimization cost per subset of size $k$ |
-| Sensitivity profiling | $2n$ | One with, one without per dimension |
+| Sensitivity profiling | $n + 1$ | One baseline, then one ablation per dimension |
 | MRI perturbation | $N_\text{pert}$ | Typically 300 |
-| Adversarial search | $n \cdot \lceil\log_2(R / \epsilon)\rceil$ | Binary search per dimension |
-| Compositional test | $n \cdot C$ | One optimization per step |
+| Adversarial search | up to $2n \cdot n_\text{steps}$ | Log-spaced scan of $n_\text{steps} = 50$ values in each direction per dimension |
+| Compositional test | $\bigl(1 + \tfrac{n(n-1)}{2}\bigr) \cdot C$ | One optimization per remaining candidate at each step |
 
 For the default configuration with $n = 5$ dimensions, $K = 4$, $N_\text{pert} = 300$, and $C(k)$ using the grid/random strategy with 20 grid points and 5000 random samples:
 
 - Subset enumeration: $\binom{5}{1} \cdot 20 + \binom{5}{2} \cdot 20^2 + \binom{5}{3} \cdot 5000 + \binom{5}{4} \cdot 5000 \approx 79,100$ evaluations
-- Sensitivity: $10$ evaluations
+- Sensitivity: $6$ evaluations
 - MRI: $300$ evaluations
-- Adversarial: $\approx 100$ evaluations
-- Compositional: $\approx 25,000$ evaluations
+- Adversarial: $\leq 500$ evaluations
+- Compositional: $\approx 31,600$ evaluations
 
-Total: roughly 104,000 evaluations. If each evaluation takes 10 milliseconds, the campaign completes in about 17 minutes. If each evaluation takes 1 second (typical for a model behind an API), the campaign would take nearly 29 hours---far too long for CI.
+Total: roughly 111,500 evaluations. If each evaluation takes 10 milliseconds, the campaign completes in about 19 minutes. If each evaluation takes 1 second (typical for a model behind an API), the campaign would take about 31 hours---far too long for CI.
 
 ### 18.5.2 Budgeting Strategies
 

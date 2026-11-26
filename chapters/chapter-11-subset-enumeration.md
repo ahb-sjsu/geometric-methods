@@ -151,7 +151,7 @@ if n_active == 1:
             best_errors = errors.copy()
 ```
 
-With `n_grid = 20`, this requires 20 evaluations. The grid is exhaustive within its resolution, guaranteeing that the optimal value (to within a factor of 1.66) is found.
+With `n_grid = 20`, this requires 20 evaluations. The grid is exhaustive within its resolution, guaranteeing that the optimal value (to within a factor of 1.62) is found.
 
 **2D subsets: full grid search.** For two active dimensions, the algorithm evaluates all pairs on the grid:
 
@@ -445,7 +445,7 @@ The errors are signed differences (predicted minus target), and the MAE is the m
 
 ### 11.6.3 What the Enumeration Reveals
 
-Running `enumerate_subsets` with `max_dims = 4` on the defect prediction example produces 30 `SubsetResult` objects (all subsets of sizes 1 through 4 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:
+Running `enumerate_subsets` with `max_dims = 5` on the defect prediction example produces 31 `SubsetResult` objects (all subsets of sizes 1 through 5 from the five groups). The results, sorted by MAE, typically exhibit the following pattern:
 
 **Single-dimension results ($k = 1$).** The five single-group models reveal the standalone predictive power of each group:
 
@@ -475,7 +475,7 @@ The {Complexity, Process} pair is substantially better than any singleton, demon
 
 ### 11.6.4 Connecting to the Pareto Frontier
 
-The 30 `SubsetResult` objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:
+The 31 `SubsetResult` objects, when plotted in the $(k, \text{MAE})$ plane, define a point cloud from which the Pareto frontier is extracted (Chapter 8). The frontier typically contains four points:
 
 $$\{(\text{Complexity})\}, \; \{(\text{Complexity, Process})\}, \; \{(\text{Complexity, Process, Size})\}, \; \{(\text{all})\}$$
 

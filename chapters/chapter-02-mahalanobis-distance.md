@@ -63,7 +63,7 @@ In the `eris-econ` model, the covariance matrix for the 9D ethical-economic spac
 | $\sigma_{0,2}$ | 0.5 | Consequences-Fairness coupling |
 | $\sigma_{1,4}$ | 0.3 | Rights-Trust coupling |
 
-The entry $\sigma_{0,0} = 25.0$ says that monetary consequences naturally vary over a range with standard deviation $\sqrt{25} = 5.0$. In the inverse, this becomes $(\Sigma^{-1})_{0,0} \approx 1/25 = 0.04$ (before accounting for off-diagonal adjustments), so a 1-unit change in consequences contributes very little to the distance. By contrast, $\sigma_{2,2} = 0.25$ means fairness has a standard deviation of $0.5$, and $(\Sigma^{-1})_{2,2} \approx 4.0$: the metric pays close attention to fairness.
+The entry $\sigma_{0,0} = 25.0$ says that monetary consequences naturally vary over a range with standard deviation $\sqrt{25} = 5.0$. In the inverse, this becomes $(\Sigma^{-1})_{0,0} \approx 0.043$ ($1/25 = 0.04$ before accounting for off-diagonal adjustments), so a 1-unit change in consequences contributes very little to the distance. By contrast, $\sigma_{2,2} = 0.25$ means fairness has a standard deviation of $0.5$, and $(\Sigma^{-1})_{2,2} \approx 4.55$ ($1/0.25 = 4.0$ before those adjustments): the metric pays close attention to fairness.
 
 The off-diagonal entry $\sigma_{0,2} = 0.5$ captures the coupling between consequences and fairness. In a game-theoretic context, this reflects the observation that monetary outcomes and perceived fairness are not independent -- a generous offer affects both dimensions simultaneously. The precision matrix captures this coupling as a conditional relationship: once you account for the correlation, only the *residual* variation in each dimension matters for distance.
 
