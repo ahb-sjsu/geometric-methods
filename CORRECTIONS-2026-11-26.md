@@ -69,3 +69,12 @@ They follow the first round committed as 371478c (the tables of Sections 17.2 an
 ## Figures and captions
 
 No figure or caption is made wrong by these corrections. Three were checked because the text beside them changed: Figure 1.2 (its caption already says the values are invented, and it does not print the MRI), Figure 5.2 (already "ring-shaped"), and Figure 16.2 (it says the baselines are not shown, so the corrected backward-elimination count does not enter it). `tools/figs_*.py` contains neither 1.43 nor a backward-elimination count.
+
+## Repaired in the survey of 2026-11-26: mechanical defects
+
+Found by the series checker (`tools/series-build/series_check.py` in erisml-lib). It reports no hard defects in this volume, before or after.
+
+- **Section 15.10, Connecting Back to Geometry.** "parameterically efficient" now reads "parametrically efficient".
+
+The other candidates were checked and left: "Hart" (Hart, Nilsson and Raphael), British spellings, doubled words that are a heading followed by a paragraph starting with the same word, and unbalanced brackets in Chapter 7 that come from the checker reading `\$10` as the start of a formula.
+
