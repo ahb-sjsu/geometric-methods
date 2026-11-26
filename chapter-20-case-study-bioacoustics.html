@@ -165,7 +165,7 @@ print(f&quot;Geodesic deviation: {trajectory.geodesic_deviation:.4f}&quot;)
 # Low δ → diphthong-like smooth transition
 # High δ → complex spectral evolution
 </code></pre>
-<p>In the DSWP data, regular codas (e.g., &ldquo;5R1&rdquo;) tend to produce low geodesic deviation, consistent with spectrally stable clicks. Compound codas (e.g., &ldquo;1+1+3&rdquo;) exhibit higher deviation, reflecting the spectral contrast between the isolated clicks and the triplet.</p>
+<p>The expectation for the DSWP data, not yet measured (Section 20.9.4), is that regular codas (e.g., &ldquo;5R1&rdquo;) produce low geodesic deviation, consistent with spectrally stable clicks, and that compound codas (e.g., &ldquo;1+1+3&rdquo;) exhibit higher deviation, reflecting the spectral contrast between the isolated clicks and the triplet.</p>
 <hr />
 <h2 id="203-persistent-homology-of-click-dynamics">20.3 Persistent Homology of Click Dynamics</h2>
 <p>The second geometric layer operates on the <em>temporal organization</em> of click sequences. Chapter 5 developed persistent homology as a tool for extracting topological features &mdash; connected components, loops, voids &mdash; from point clouds. Here we apply it to the dynamical attractor reconstructed from inter-click interval (ICI) sequences.</p>
@@ -431,7 +431,7 @@ $$\text{Features } z \xrightarrow{\text{GRL}} \xrightarrow{\text{Domain Discrimi
         domain_logits = self.domain_disc(reversed_features)
         return coda_logits, domain_logits
 </code></pre>
-<p>The combination of gradient reversal (recording invariance) with hyperbolic classification (taxonomy-aware similarity) produces a decoder whose features encode coda structure in a geometry that respects the biological hierarchy while being invariant to recording artifacts. The DRI framework (Section 20.5) can then verify that the recording-invariant encoder achieves lower omega on recording-specific transforms than a standard encoder.</p>
+<p>The combination of gradient reversal (recording invariance) with hyperbolic classification (taxonomy-aware similarity) is intended to produce a decoder whose features encode coda structure in a geometry that respects the biological hierarchy while being invariant to recording artifacts. The DRI framework (Section 20.5) can then test whether the recording-invariant encoder achieves lower omega on recording-specific transforms than a standard encoder.</p>
 <hr />
 <h2 id="207-structural-fuzzing-for-model-validation">20.7 Structural Fuzzing for Model Validation</h2>
 <p>The final layer applies the structural fuzzing framework &mdash; the through-line of this book &mdash; to validate the complete geometric analysis pipeline. The pattern follows the integration demonstrated in Chapter 16, adapted from the geometric economics example.</p>
@@ -520,7 +520,7 @@ assert f(np.ones(5))[0] != f(np.array([1.0, 1e6, 1e6, 1e6, 1e6]))[0]
 <p>The Model Robustness Index (Chapter 9) perturbs the decoder&rsquo;s feature weights and measures the distribution of DRI deviations:</p>
 <p>$$\text{MRI} = 0.5 \cdot \bar{d} + 0.3 \cdot d_{75} + 0.2 \cdot d_{95}$$</p>
 <p>where $d$ denotes the DRI deviation from baseline under random perturbation. This nested robustness analysis &mdash; the MRI measures robustness of the DRI, which itself measures robustness of the decoder &mdash; exemplifies the compositional nature of geometric validation. The result is a single number that quantifies the overall stability of the geometric analysis pipeline, not just the decoder in isolation.</p>
-<p>Sensitivity profiling (ablating one feature channel at a time) reveals the contribution of each geometric method:</p>
+<p>Sensitivity profiling (ablating one feature channel at a time) would reveal the contribution of each geometric method (hypothetical values):</p>
 <table>
 <thead>
 <tr>
@@ -557,7 +557,7 @@ assert f(np.ones(5))[0] != f(np.array([1.0, 1e6, 1e6, 1e6, 1e6]))[0]
 </tr>
 </tbody>
 </table>
-<p>These hypothetical values illustrate the pattern: the three geometric channels (SPD, TDA, hyperbolic) each contribute meaningfully, while the traditional features (tempo, ICI histogram) are nearly redundant once the geometric features are present. This is the geometric analogue of the defect prediction finding in Chapter 1, where Complexity and Process dominated while OO and Halstead were nearly redundant.</p>
+<p>These hypothetical values illustrate the pattern: the three geometric channels (SPD, TDA, hyperbolic) each contribute meaningfully, while the traditional features (tempo, ICI histogram) are nearly redundant once the geometric features are present. This is the geometric analogue of the defect prediction illustration in Chapter 1, where Complexity and Process dominated while OO and Halstead were nearly redundant.</p>
 <hr />
 <h2 id="208-complete-workflow">20.8 Complete Workflow</h2>
 <p>We now assemble the individual geometric layers into a single end-to-end pipeline, referencing the specific chapter where each technique was introduced.</p>

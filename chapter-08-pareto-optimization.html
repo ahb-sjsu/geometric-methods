@@ -381,7 +381,7 @@ pareto_results = pareto_frontier(subset_results)
 <ol>
 <li>Select the configuration just before $\rho_i$ drops below a domain-specific threshold.</li>
 </ol>
-<p>For the defect prediction example, the ratios are:</p>
+<p>For the illustrative frontier of Section 8.7.2, the ratios are:</p>
 <table>
 <thead>
 <tr>
@@ -490,15 +490,15 @@ for r in frontier:
 </code></pre>
 <p>For 5 groups with <code>max_dims=5</code>, the enumeration evaluates $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} + \binom{5}{4} + \binom{5}{5} = 5 + 10 + 10 + 5 + 1 = 31$ subsets. Each 1D subset requires 20 evaluations (grid search), each 2D subset requires 400 (grid product), and each 3D, 4D or 5D subset requires 5000 (random search). The total evaluation budget is $5 \times 20 + 10 \times 400 + 10 \times 5000 + 5 \times 5000 + 1 \times 5000 = 100 + 4000 + 50{,}000 + 25{,}000 + 5000 = 84{,}100$ model evaluations.</p>
 <h3 id="884-interpreting-the-results">8.8.4 Interpreting the Results</h3>
-<p>The Pareto frontier for this model recovers the known ground truth. The frontier typically contains:</p>
+<p>The example was built so that the Pareto frontier would recover the known ground truth. The description that follows is that intended, illustrative outcome and not a recorded one. The frontier would contain:</p>
 <ul>
 <li><strong>$k = 1$: {Complexity}.</strong> The single most informative group, as expected from the large coefficients on cyclomatic, essential, and design complexity.</li>
 <li><strong>$k = 2$: {Complexity, Process}.</strong> The two groups with the largest aggregate coefficients.</li>
 <li><strong>$k = 3$: {Complexity, Process, Size}.</strong> Size contributes weakly but measurably through the LOC coefficient.</li>
 <li><strong>$k = 5$: All groups.</strong> The random forest can extract marginal signal from Halstead (which is correlated with Size and Complexity) but gains nothing from OO.</li>
 </ul>
-<p>The absence of $k = 4$ from the frontier confirms that no 4-group configuration improves enough over the best 3-group configuration to meet the tolerance threshold. The best 4-group subsets are either {Complexity, Process, Size, Halstead} or {Complexity, Process, Size, OO}, both of which reduce MAE by less than 0.01 relative to {Complexity, Process, Size}.</p>
-<p>This result validates the Pareto approach: without any knowledge of the ground-truth coefficients, the analysis correctly identifies which feature groups matter, in what order, and where the point of diminishing returns lies.</p>
+<p>The absence of $k = 4$ from the frontier would mean that no 4-group configuration improves enough over the best 3-group configuration to meet the tolerance threshold. The best 4-group subsets are either {Complexity, Process, Size, Halstead} or {Complexity, Process, Size, OO}, both of which reduce MAE by less than 0.01 relative to {Complexity, Process, Size}.</p>
+<p>Such a result would validate the Pareto approach: without any knowledge of the ground-truth coefficients, the analysis would identify which feature groups matter, in what order, and where the point of diminishing returns lies. The recorded run of Chapter 19 does not give it. There the frontier has two points, {Complexity} and {OO, Process}, and the second is a lucky draw on the test set (Sections 19.5 and 19.6).</p>
 <hr />
 <h2 id="89-beyond-two-objectives-multi-objective-extensions">8.9 Beyond Two Objectives: Multi-Objective Extensions</h2>
 <h3 id="891-adding-robustness-as-a-third-objective">8.9.1 Adding Robustness as a Third Objective</h3>

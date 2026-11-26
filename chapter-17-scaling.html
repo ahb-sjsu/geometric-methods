@@ -263,7 +263,7 @@
 </tr>
 </tbody>
 </table>
-<p>Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. But empirically, it typically finds configurations within 5&ndash;15% of the globally optimal MAE.</p>
+<p>Forward selection cannot discover dimensions that are mediocre alone but excellent in combination. The working expectation, which no recorded run in this volume tests, is that it finds configurations within 5&ndash;15% of the globally optimal MAE.</p>
 <h3 id="1732-backward-elimination">17.3.2 Backward Elimination</h3>
 <p>Backward elimination starts with all $n$ dimensions active and greedily removes the least important one at each step. From <code>baselines.py</code>:</p>
 <pre><code class="language-python">def backward_elimination(
@@ -296,7 +296,7 @@
         results.append(best_result)
     return results
 </code></pre>
-<p>The total calls are $B(n) = n(n-1)/2 + 1$, the same $O(n^2)$ as forward selection run to completion. However, backward elimination has higher per-call cost because early steps involve large subsets (triggering the expensive random search path in <code>optimize_subset</code>).</p>
+<p>The total calls are $B(n) = n(n+1)/2$, the same count as forward selection run to completion, $F(n, n)$. However, backward elimination has higher per-call cost because early steps involve large subsets (triggering the expensive random search path in <code>optimize_subset</code>).</p>
 <p><strong>Complementary strengths.</strong> Forward selection excels at identifying the <em>most important</em> dimensions; backward elimination excels at identifying the <em>least important</em>. Running both and comparing results is a practical diagnostic: agreement suggests clean dimension structure; divergence suggests complex interactions.</p>
 <h3 id="1733-bidirectional-and-floating-selection">17.3.3 Bidirectional and Floating Selection</h3>
 <p>More sophisticated variants exist. <strong>Bidirectional selection</strong> alternates forward and backward steps: add the best remaining dimension, then check whether any previously selected dimension has become redundant. <strong>Floating selection</strong> (SFFS/SBFS) allows the subset size to fluctuate, backing up when a backward step improves the objective. These methods escape some local optima that trap pure greedy search while maintaining $O(n^2)$ worst-case complexity.</p>
@@ -812,7 +812,7 @@ reduced_results = enumerate_subsets(
 <h2 id="summary">Summary</h2>
 <p>High-dimensional parameter spaces challenge every stage of the structural fuzzing pipeline, but the challenges are unequal. Subset enumeration is the critical bottleneck, growing as $O(n^K)$ and becoming intractable for $n &gt; 20$ at $K = 4$. Three families of strategies address this:</p>
 <ol>
-<li><strong>Greedy methods</strong> (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ while typically finding configurations within 5&ndash;15% of the global optimum.</li>
+<li><strong>Greedy methods</strong> (forward selection, backward elimination) reduce cost from $O(n^K)$ to $O(n^2)$ and are expected, without a recorded test in this volume, to find configurations within 5&ndash;15% of the global optimum.</li>
 <li><strong>LASSO screening</strong> reduces effective dimensionality from $n$ to $n' \ll n$ at cost independent of $n$, enabling exhaustive enumeration on the reduced set.</li>
 <li><strong>Sampling strategies</strong> (Latin hypercube, quasi-random sequences, importance sampling) improve coverage of high-dimensional perturbation spaces for MRI and robustness analysis.</li>
 </ol>

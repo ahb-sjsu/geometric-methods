@@ -274,8 +274,8 @@
 <li><strong>Process</strong> (3 features): number of revisions, distinct authors, code churn</li>
 </ul>
 <p>The model&rsquo;s configuration is now a point in $\mathbb{R}^5$. Each dimension corresponds to a feature group, and the parameter value for that dimension controls the group&rsquo;s influence on predictions. Setting a dimension to the sentinel value ($10^6$) deactivates the corresponding feature group entirely, allowing the framework to test <em>structural</em> questions: what happens when the model has no access to complexity features? To OO metrics? To process information?</p>
-<p><strong>Step 1: Subset enumeration (Chapter 11).</strong> The framework tests all $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} = 25$ subsets of dimensions up to size 3. Each subset is optimized independently. The results reveal that {Complexity, Process} achieves MAE 2.1, while {Size, Halstead} achieves MAE 2.3. These two configurations are close in scalar terms but occupy entirely different regions of the feature space.</p>
-<p><strong>Step 2: Pareto frontier (Chapter 8).</strong> Plotting all 25 configurations in the (number-of-dimensions, MAE) plane, the Pareto frontier identifies four non-dominated points:</p>
+<p><strong>Step 1: Subset enumeration (Chapter 11).</strong> The framework tests all $\binom{5}{1} + \binom{5}{2} + \binom{5}{3} = 25$ subsets of dimensions up to size 3. Each subset is optimized independently. In this illustration the results show that {Complexity, Process} achieves MAE 2.1, while {Size, Halstead} achieves MAE 2.3. These two configurations are close in scalar terms but occupy entirely different regions of the feature space.</p>
+<p><strong>Step 2: Pareto frontier (Chapter 8).</strong> Plotting all 25 configurations, together with the full five-group model, in the (number-of-dimensions, MAE) plane, the Pareto frontier identifies four non-dominated points (illustrative values):</p>
 <table>
 <thead>
 <tr>
@@ -309,7 +309,7 @@
 </table>
 <p>Adding OO and Halstead to the three-group configuration reduces MAE from 1.7 to 1.5&mdash;a marginal improvement that comes at the cost of doubling the feature count. The Pareto analysis makes this tradeoff explicit without requiring the practitioner to choose a weighting between accuracy and simplicity.</p>
 <p><strong>Step 3: Sensitivity profiling (Chapter 9).</strong> Ablation reveals that removing Complexity increases MAE by 1.9 (the most important dimension), removing Process increases it by 1.2, removing Size increases it by 0.6, while removing OO or Halstead increases it by less than 0.2 each. The scalar metric &ldquo;84% accuracy&rdquo; hid the fact that the model is overwhelmingly dependent on two of its five feature groups.</p>
-<p><strong>Step 4: Model Robustness Index (Chapter 9).</strong> The MRI perturbs the baseline configuration 300 times, measuring the distribution of MAE deviations:</p>
+<p><strong>Step 4: Model Robustness Index (Chapter 9).</strong> The MRI perturbs the baseline configuration 300 times, measuring the distribution of MAE deviations (illustrative values):</p>
 <table>
 <thead>
 <tr>
@@ -332,23 +332,23 @@
 </tr>
 <tr>
 <td style="text-align: center;">MRI (composite)</td>
-<td style="text-align: center;">1.43</td>
+<td style="text-align: center;">1.44</td>
 </tr>
 </tbody>
 </table>
 <p>The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations, the model&rsquo;s error moves by about twice the whole error of the best configuration (1.5). This tail behavior is invisible to mean-based metrics. The MRI&rsquo;s weighted combination of mean, P75, and P95 provides a single robustness score <em>that explicitly accounts for tail risk</em>, unlike standard deviation which treats all deviations symmetrically.</p>
-<p><strong>Step 5: Adversarial threshold search (Chapter 9).</strong> Binary search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity&mdash;it is <em>brittle</em> with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model&rsquo;s real-world performance.</p>
+<p><strong>Step 5: Adversarial threshold search (Chapter 9).</strong> A log-spaced search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity&mdash;it is <em>brittle</em> with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model&rsquo;s real-world performance.</p>
 <p><img alt="Figure 1.2" src="figures/ch01_fig2.svg" /></p>
 <p><em>Figure 1.2. The Pareto frontier of the motivating example, drawn from the invented values of Section 1.5.2: number of feature groups used on the horizontal axis, mean absolute error on the vertical axis. The four joined points are the non-dominated configurations of the table, and {Size, Halstead}, at 2.3, is dominated by {Complexity, Process} at the same size. Most of the gain comes with the second group; going from three groups to five lowers the error only from 1.7 to 1.5. These numbers are illustrations, not measurements (the measured campaign is in Chapter 19).</em></p>
 <h3 id="153-what-geometry-revealed">1.5.3 What Geometry Revealed</h3>
-<p>The standard approach said: &ldquo;84% accuracy.&rdquo; The geometric approach revealed:</p>
+<p>The standard approach said: &ldquo;84% accuracy.&rdquo; In the illustration, the geometric approach revealed:</p>
 <ol>
 <li>The model depends almost entirely on Complexity and Process features; Size contributes modestly; OO and Halstead are nearly redundant.</li>
 <li>The optimal tradeoff between simplicity and accuracy uses 2&ndash;3 feature groups, not all 5.</li>
-<li>The model is fragile: 5% of perturbations nearly double the error.</li>
+<li>The model is fragile: 5% of perturbations nearly triple the error.</li>
 <li>There is a specific tipping point in the Complexity dimension below which the model fails qualitatively, not just quantitatively.</li>
 </ol>
-<p>None of these findings were available from accuracy, precision, recall, or F1. They required treating the evaluation as a geometric object&mdash;a point in a multi-dimensional space&mdash;and applying distance, direction, neighborhood, and boundary analysis to that object.</p>
+<p>In the illustration, none of these findings were available from accuracy, precision, recall, or F1. They required treating the evaluation as a geometric object&mdash;a point in a multi-dimensional space&mdash;and applying distance, direction, neighborhood, and boundary analysis to that object.</p>
 <hr />
 <h2 id="16-what-comes-next">1.6 What Comes Next</h2>
 <p>The remainder of Part I (Chapters 2&ndash;5) builds the mathematical and software foundations: Chapter 2 develops the Mahalanobis distance and weighted metric spaces, Chapter 3 introduces hyperbolic geometry for hierarchical data, Chapter 4 develops SPD manifolds and spectral geometry, and Chapter 5 introduces topological data analysis.</p>

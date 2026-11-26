@@ -169,7 +169,7 @@ Compositional Test   &lt;-- greedy dimension-addition sequence
 <p>The parameters fall into four groups:</p>
 <p><strong>Problem specification.</strong> <code>dim_names</code> provides human-readable names for each dimension, and <code>evaluate_fn</code> is the evaluation callback described above. These two arguments fully specify the problem.</p>
 <p><strong>Enumeration control.</strong> <code>max_subset_dims</code> caps the largest subset size explored during enumeration. For $n$ dimensions, the number of subsets up to size $k$ is $\sum_{i=1}^{k} \binom{n}{i}$. With $n = 9$ and $k = 4$, this is 255 subsets. With $k = 5$, it rises to 381. The default of 4 balances thoroughness against computation time. The <code>n_grid</code> and <code>n_random</code> parameters control how each subset is optimized: <code>n_grid</code> sets the number of grid points for 1D and 2D optimization, while <code>n_random</code> sets the number of random samples for 3D and higher subsets. The <code>inactive_value</code> (default $10^6$) is the sentinel assigned to deactivated dimensions.</p>
-<p><strong>Robustness parameters.</strong> <code>n_mri_perturbations</code> controls the number of random perturbations sampled for the MRI computation&mdash;more perturbations yield more stable estimates of tail behavior but cost more evaluations. <code>mri_scale</code> sets the log-space perturbation radius, and <code>mri_weights</code> controls the relative importance of mean, 75th-percentile, and 95th-percentile deviations in the composite MRI score. <code>adversarial_tolerance</code> sets the convergence criterion for binary search during adversarial threshold detection.</p>
+<p><strong>Robustness parameters.</strong> <code>n_mri_perturbations</code> controls the number of random perturbations sampled for the MRI computation&mdash;more perturbations yield more stable estimates of tail behavior but cost more evaluations. <code>mri_scale</code> sets the log-space perturbation radius, and <code>mri_weights</code> controls the relative importance of mean, 75th-percentile, and 95th-percentile deviations in the composite MRI score. <code>adversarial_tolerance</code> sets how far a prediction target may move before the log-spaced adversarial threshold search records a tipping point.</p>
 <p><strong>Pipeline control.</strong> <code>start_dim</code> and <code>candidate_dims</code> configure the compositional test (which dimension to start from, and which to consider adding). <code>run_baselines</code> toggles the forward/backward selection baselines. <code>verbose</code> controls progress printing.</p>
 <h3 id="1622-stage-execution">16.2.2 Stage Execution</h3>
 <p>The pipeline executes its six stages in a fixed order, with verbose logging at each transition. The implementation in <code>pipeline.py</code> makes the data flow explicit:</p>
@@ -275,7 +275,7 @@ composition_result = compositional_test(
 </tr>
 <tr>
 <td style="text-align: left;">Backward elimination</td>
-<td style="text-align: left;">$n \times C(\cdot)$</td>
+<td style="text-align: left;">$\frac{n(n+1)}{2} \times C(\cdot)$</td>
 </tr>
 </tbody>
 </table>
