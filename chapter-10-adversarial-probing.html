@@ -408,7 +408,7 @@ report = run_campaign(
 <h3 id="1062-the-report-as-a-geometric-object">10.6.2 The Report as a Geometric Object</h3>
 <p>The <code>StructuralFuzzReport</code> returned by <code>run_campaign</code> is itself a geometric object. Its fields encode: a set of <em>points</em> in the (dimensions, MAE) plane (subset results), a <em>frontier</em> in this plane (Pareto-optimal configurations), a <em>vector</em> of importances (sensitivity profile), a <em>scalar</em> with supporting distribution (the MRI and its omega distribution), a set of <em>boundaries</em> in parameter space (adversarial thresholds), and a <em>path</em> through subset space (the compositional building sequence). Taken together, these define the geometric structure of the model&rsquo;s configuration space as explored by the probing campaign.</p>
 <h3 id="1063-portability-of-the-framework">10.6.3 Portability of the Framework</h3>
-<p>The MRI/DRI mathematical structure is domain-agnostic. The specific transforms change, but the measurement protocol, aggregation formula, and diagnostic decomposition remain identical:</p>
+<p>The MRI/DRI mathematical structure is domain-agnostic. The specific transforms change, but the measurement protocol and the diagnostic decomposition remain the same. The aggregation does not: the Bond Index of <em>Geometric Ethics</em> is the mean deviation over a tolerance, $\mathrm{Bd} = D_{op}/\tau$ (Chapter 18 there), while the DRI and the MRI weight the mean and two upper percentiles:</p>
 <table>
 <thead>
 <tr>
@@ -445,7 +445,7 @@ report = run_campaign(
 </tr>
 </tbody>
 </table>
-<p>The common mathematical spine is:</p>
+<p>The common spine of the DRI and the MRI is:</p>
 <p>$$\text{Index} = w_1 \cdot \bar{\omega} + w_2 \cdot P_{75}(\omega) + w_3 \cdot P_{95}(\omega)$$</p>
 <p>with $\omega$ computed as domain-appropriate distance between baseline and perturbed outputs. The framework is a template instantiable for any domain where &ldquo;perturbation,&rdquo; &ldquo;output,&rdquo; and &ldquo;distance&rdquo; are well-defined.</p>
 <hr />
