@@ -1,8 +1,8 @@
 # Appendix B: Software Dependencies and Installation
 
 This appendix provides a guide to setting up the software environment
-required to reproduce the examples in *Structural Fuzzing: Geometric Methods
-for Adversarial Model Validation*. The primary framework, `structural-fuzzing`, is available on
+required to reproduce the examples in *Geometric Methods:
+Computational Modeling*. The primary framework, `structural-fuzzing`, is available on
 PyPI and serves as the backbone for the structural validation techniques
 developed throughout the text.
 

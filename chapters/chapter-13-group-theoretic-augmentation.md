@@ -1,6 +1,6 @@
 # Chapter 13: Group-Theoretic Data Augmentation
 
-*Structural Fuzzing: Geometric Methods for Adversarial Model Validation --- Andrew H. Bond*
+*Geometric Methods: Computational Modeling --- Andrew H. Bond*
 
 ---
 

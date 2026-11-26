@@ -1,6 +1,6 @@
 # Chapter 4: SPD Manifolds and Spectral Geometry
 
-*Structural Fuzzing: Geometric Methods for Adversarial Model Validation* --- Andrew H. Bond
+*Geometric Methods: Computational Modeling* --- Andrew H. Bond
 
 ---
 

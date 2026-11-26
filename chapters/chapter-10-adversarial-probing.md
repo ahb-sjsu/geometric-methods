@@ -366,7 +366,7 @@ The `StructuralFuzzReport` returned by `run_campaign` is itself a geometric obje
 
 ### 10.6.3 Portability of the Framework
 
-The MRI/DRI mathematical structure is domain-agnostic. The specific transforms change, but the measurement protocol, aggregation formula, and diagnostic decomposition remain identical:
+The MRI/DRI mathematical structure is domain-agnostic. The specific transforms change, but the measurement protocol and the diagnostic decomposition remain the same. The aggregation does not: the Bond Index of *Geometric Ethics* is the mean deviation over a tolerance, $\mathrm{Bd} = D_{op}/\tau$ (Chapter 18 there), while the DRI and the MRI weight the mean and two upper percentiles:
 
 | Bond Index (Ethics) | DRI (Bioacoustics) | MRI (Structural Fuzzing) |
 |---------------------|---------------------|--------------------------|
@@ -376,7 +376,7 @@ The MRI/DRI mathematical structure is domain-agnostic. The specific transforms c
 | Adversarial threshold | Adversarial threshold | Adversarial threshold |
 | Compositional chains | Compositional chains | Compositional testing |
 
-The common mathematical spine is:
+The common spine of the DRI and the MRI is:
 
 $$\text{Index} = w_1 \cdot \bar{\omega} + w_2 \cdot P_{75}(\omega) + w_3 \cdot P_{95}(\omega)$$
 

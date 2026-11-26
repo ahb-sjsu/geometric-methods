@@ -1,6 +1,6 @@
 # Appendix C: Selected Proofs and Derivations
 
-*Structural Fuzzing: Geometric Methods for Adversarial Model Validation* --- Andrew H. Bond
+*Geometric Methods: Computational Modeling* --- Andrew H. Bond
 
 ---
 

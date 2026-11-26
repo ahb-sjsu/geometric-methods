@@ -71,8 +71,8 @@ published elsewhere are outside both files. They carry the rights their
 publisher agreement assigns.
 
 CC BY asks you to attribute and to indicate whether you changed anything. Both
-halves of that matter here. Every claim in this series carries a status label,
-such as `[proved]`, `[posited]` or `[open]`, graded against a claim ledger, and
+halves of that matter here. Claims in this series carry status labels,
+such as `[proved]`, `[posited]` or `[open]` or a volume's own tags, graded against a claim ledger where the volume keeps one, and
 an adapted version presented as the original misstates the evidence behind it.
 Attribution that names the author, the volume and this repository, and that
 says whether the text was changed, is enough.

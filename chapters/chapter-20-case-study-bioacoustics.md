@@ -1,6 +1,6 @@
 # Chapter 20: Case Study --- Cetacean Bioacoustics
 
-*Structural Fuzzing: Geometric Methods for Adversarial Model Validation* --- Andrew H. Bond
+*Geometric Methods: Computational Modeling* --- Andrew H. Bond
 
 > *"There is no other species on earth whose social organization and communication system so closely parallels our own as the sperm whale."*
 > --- Hal Whitehead, *Sperm Whales: Social Evolution in the Ocean* (2003)
