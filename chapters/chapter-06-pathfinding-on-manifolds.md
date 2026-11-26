@@ -94,6 +94,10 @@ On the SPD manifold (Chapter 4), the log-Euclidean distance $d_{LE}(S_1, S_2) = 
 
 ---
 
+![Figure 6.1](figures/ch06_fig1.svg)
+
+*Figure 6.1. Mahalanobis length of a unit Euclidean step, against the direction of the step in the plane of Consequences and Fairness, for the diagonal variances 25 and 0.25 of Section 6.1.1 with the coupling left out, as in the text. The length runs from 0.2 along Consequences to 2.0 along Fairness, the square roots of the smallest and largest eigenvalues of the precision matrix. Below 1, at angles under 29.5 degrees from the Consequences axis, the Euclidean distance exceeds the Mahalanobis distance and the Euclidean heuristic overestimates, the failure of Proposition 6.1. The variances are the posited values of the package default.*
+
 ## 6.3 The Economic Decision Complex
 
 The fundamental data structure underlying the Bond Geodesic is a weighted directed graph that we call the *Economic Decision Complex*. It connects the abstract geometric notions of the preceding sections to the concrete implementation in the `eris-econ` codebase.
@@ -539,6 +543,10 @@ For "offer 40%": fairness improves ($0.5 \to 0.74$), identity improves ($0.5 \to
 For "offer 20%": the state hardly moves. Fairness goes from $0.5$ to $0.42$, identity stays at $0.5$, and the money term is $(-2)^2/25 = 0.16$.
 
 The result: the Bond Geodesic terminates at the 20% vertex. The model rejects the zero offer of the Nash analysis, which costs more than twice as much, but its least-cost offer is below the 40--50% that proposers actually make. Two features of the construction produce this. The starting state is placed at neutral fairness and identity ($0.5$), which a 20% offer nearly reproduces, and the metric charges for moral gain as well as moral loss. The `eris-econ` test suite records the same value: with the default covariance the model predicts 20%, the direction is right, and a quantitative match requires a covariance calibrated on experimental data. The six weights are recomputed in `formal/matlab/volume_checks.m`.
+
+![Figure 6.2](figures/ch06_fig2.svg)
+
+*Figure 6.2. The proposer's decision complex for the ultimatum game of Section 6.6.1, projected on two of its nine coordinates, money kept and fairness; identity and social impact also move with the offer and are not shown. One edge leads from the start vertex to each offer, and each label is the edge weight in all nine dimensions, as in the table of the section. The 20% offer nearly reproduces the start's fairness and costs 0.42, the least, so the Bond Geodesic ends there; the zero offer costs 0.95 and the equal split 1.67. The weights are computed from the printed code, whose covariance and scaling functions are set by hand, so this is the model's construction and not a measurement.*
 
 ### 6.6.2 The Prisoner's Dilemma
 

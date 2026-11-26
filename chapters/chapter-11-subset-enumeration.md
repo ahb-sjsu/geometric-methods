@@ -65,6 +65,10 @@ When $n$ is small enough for brute force, there is no reason to accept these lim
 
 ---
 
+![Figure 11.1](figures/ch11_fig1.svg)
+
+*Figure 11.1. The lattice of the 31 non-empty subsets of the five feature groups, one row per subset size k (5, 10, 10, 5 and 1 subsets from bottom to top), with a line from each subset to every subset that adds one group to it. Enumeration with max_dims = 4 evaluates the 30 subsets below the dashed line. The highlighted chain is a single greedy path, which adds one group at a time and so visits 5 of the 31 subsets. Its order (Complexity, Process, Size, OO, Halstead) is the illustrative build order of Section 12.4.1, not a measured result.*
+
 ## 11.2 The `optimize_subset` Algorithm
 
 The core of subset enumeration is the `optimize_subset` function, which takes a set of active dimensions and finds the best parameter values for those dimensions while holding all inactive dimensions at a sentinel value. The algorithm makes three design decisions that merit detailed examination: log-space parameterization, sentinel values for inactive dimensions, and adaptive search strategy.
@@ -95,6 +99,10 @@ for i, dim in enumerate(active_dims):
 ```
 
 The random samples are drawn uniformly in $[\log_{10}(0.01), \log_{10}(100)] = [-2, 2]$ and then exponentiated, producing a distribution that is uniform in log-space. This is equivalent to drawing from a log-uniform distribution over $[0.01, 100]$, which is the maximum-entropy prior for a scale parameter whose order of magnitude is unknown.
+
+![Figure 11.2](figures/ch11_fig2.svg)
+
+*Figure 11.2. Twenty grid points over the search range 0.01 to 100, placed two ways and shown on one logarithmic axis. The log-spaced grid of Section 11.2.1 steps by a constant factor of 1.62 and puts 10 of its 20 points below 1. A uniform grid over the same range steps by 5.26, so its second point is already at 5.27 and only its first lies below 1.*
 
 ### 11.2.2 Sentinel Values for Inactive Dimensions
 

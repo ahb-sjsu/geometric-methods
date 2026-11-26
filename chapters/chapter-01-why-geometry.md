@@ -118,6 +118,10 @@ Two concrete applications motivate the development in later chapters:
 
 **Cetacean coda taxonomies.** Sperm whale communication is organized into coda types---rhythmic patterns of clicks---that form a taxonomy: broad categories subdivide into regional variants, which further subdivide into individual-level signatures. The branching structure of this taxonomy maps naturally onto hyperbolic space, enabling similarity computations that respect the taxonomic hierarchy rather than treating all codas as points in a flat space. This application appears in Chapter 20 as a case study in biological signal analysis.
 
+![Figure 1.1](figures/ch01_fig1.svg)
+
+*Figure 1.1. Growth of a tree against growth of Euclidean volume, on a logarithmic vertical axis; the horizontal axis is the depth d or the radius r. A tree with branching factor 2 has 2 to the power d nodes at depth d. A ball of radius r in dimension k has volume proportional to r to the power k, drawn for k = 2 and k = 3 with the constant set to 1. The tree's count passes both polynomial curves and keeps pulling away, which is why a faithful Euclidean embedding needs more dimensions as the tree deepens.*
+
 ### 1.3.2 Covariance and Spectral Data on SPD Manifolds
 
 A symmetric positive definite (SPD) matrix $\Sigma \in \mathbb{R}^{n \times n}$ satisfies $\Sigma = \Sigma^\top$ and $\mathbf{x}^\top \Sigma \mathbf{x} > 0$ for all $\mathbf{x} \neq 0$. Covariance matrices, diffusion tensors, kernel matrices, and spectral density matrices are all SPD. They are ubiquitous in machine learning and signal processing.
@@ -229,6 +233,10 @@ Adding OO and Halstead to the three-group configuration reduces MAE from 1.7 to 
 The 95th percentile deviation of 3.1 means that in the worst 5% of perturbations, the model's error moves by about twice the whole error of the best configuration (1.5). This tail behavior is invisible to mean-based metrics. The MRI's weighted combination of mean, P75, and P95 provides a single robustness score *that explicitly accounts for tail risk*, unlike standard deviation which treats all deviations symmetrically.
 
 **Step 5: Adversarial threshold search (Chapter 9).** Binary search along each dimension reveals that the Complexity parameter has a tipping point at 0.3x its baseline value: reducing it below this threshold causes recall on high-complexity modules to collapse from 0.71 to 0.29. The model is not just dependent on Complexity---it is *brittle* with respect to it. A small shift in the complexity distribution of incoming code (as might occur during a refactoring initiative) could silently degrade the model's real-world performance.
+
+![Figure 1.2](figures/ch01_fig2.svg)
+
+*Figure 1.2. The Pareto frontier of the motivating example, drawn from the invented values of Section 1.5.2: number of feature groups used on the horizontal axis, mean absolute error on the vertical axis. The four joined points are the non-dominated configurations of the table, and {Size, Halstead}, at 2.3, is dominated by {Complexity, Process} at the same size. Most of the gain comes with the second group; going from three groups to five lowers the error only from 1.7 to 1.5. These numbers are illustrations, not measurements (the measured campaign is in Chapter 19).*
 
 ### 1.5.3 What Geometry Revealed
 

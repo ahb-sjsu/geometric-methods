@@ -130,6 +130,10 @@ The Frobenius distance $d_F(S_2, S_3) = 9900$, which is $99\times$ larger than $
 
 The log-Euclidean distances tell a different story. We have $\log(\lambda)$ values of $\log(0.01) \approx -4.6$, $\log(100) \approx 4.6$, and $\log(10000) \approx 9.2$. So $d_{LE}(S_1, S_2) \approx |{-4.6} - 4.6| = 9.2$ and $d_{LE}(S_2, S_3) \approx |4.6 - 9.2| = 4.6$. The log-Euclidean metric correctly reports that the multiplicative change from $S_2$ to $S_3$ (a factor of 100) is smaller than the change from $S_1$ to $S_2$ (a factor of 10,000). This scale-sensitivity is essential when eigenvalues span many orders of magnitude, as they do in covariance matrices from real-world signals.
 
+![Figure 4.1](figures/ch04_fig1.svg)
+
+*Figure 4.1. The three matrices of Section 4.2, S1 = diag(1, 0.01), S2 = diag(1, 100) and S3 = diag(1, 10000), placed by their second eigenvalue on two rulers. On the linear ruler S1 and S2 fall on the same spot and S3 is far away: the Frobenius distances are 99.99 and 9900. On the logarithmic ruler S2 sits two thirds of the way from S1 to S3: the log-Euclidean distances are 9.2 and 4.6, so the change by a factor of 10,000 is twice as long as the change by a factor of 100.*
+
 ## 4.3 The Frechet Mean on SPD(n)
 
 Given a collection of SPD matrices $S_1, \ldots, S_k$, we often need their "average." The ordinary arithmetic mean $(S_1 + \cdots + S_k)/k$ is SPD (since SPD matrices are closed under addition and positive scalar multiplication), but it is not the correct notion of center on the Riemannian manifold. The arithmetic mean minimizes $\sum_i \|S_i - M\|_F^2$, which uses the flat Euclidean distance, not the manifold distance.
@@ -176,6 +180,10 @@ The implementation normalizes the weights to sum to one, broadcasts them across 
 $$S_1 = \begin{pmatrix} 1 & 0.5 \\ 0.5 & 1 \end{pmatrix}, \quad S_2 = \begin{pmatrix} 4 & 0 \\ 0 & 4 \end{pmatrix}.$$
 
 *The arithmetic mean is $\frac{1}{2}(S_1 + S_2) = \begin{pmatrix} 2.5 & 0.25 \\ 0.25 & 2.5 \end{pmatrix}$, which has eigenvalues $2.75$ and $2.25$. The log-Euclidean Frechet mean $\exp(\frac{1}{2}(\log(S_1) + \log(S_2)))$ yields a different matrix --- one that better interpolates the geometric structure of the two covariances. The difference is most pronounced when the constituent matrices have eigenvalues spanning several orders of magnitude.*
+
+![Figure 4.2](figures/ch04_fig2.svg)
+
+*Figure 4.2. A slice of the 2 by 2 symmetric matrices: those with equal diagonal entries a and off-diagonal entry b, whose eigenvalues are a + b and a − b. The positive definite ones fill the open wedge a > |b|; the zero matrix at the tip and the negative of S1 lie outside, which is why the set is not a vector space. S1 and S2 are the matrices of Example 4.1, and the straight chord carries their arithmetic mean, with eigenvalues 2.75 and 2.25. The curve is the log-Euclidean weighted mean of Section 4.3 as the weight moves from S1 to S2; its midpoint, the log-Euclidean Frechet mean, has eigenvalues 2.45 and 1.41.*
 
 ## 4.4 Frequency-Band Covariance Extraction
 

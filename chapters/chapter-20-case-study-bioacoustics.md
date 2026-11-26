@@ -558,6 +558,10 @@ The overall DRI is 0.195, with 0.188 for the transforms classed as invariant and
 
 Two findings stand out. The decoder is untouched by every transform that changes amplitude or spectrum, which is what a decoder that reads only click times should do. And its largest weakness is `time_shift`, a transform that should change nothing about a coda's meaning and is listed as invariant: a shift of 28% of the transform's range flips the decision. The likely cause is the interval extraction, which detects clicks by an energy threshold and can lose or gain a click at the edge of the window, but that has not been checked. Either way it is the kind of failure Section 10.5 is for. An accuracy of 100% on clean signals says nothing about it.
 
+![Figure 20.1](figures/ch20_fig1.svg)
+
+*Figure 20.1. The robustness measurement of Section 20.9.3 on the template decoder, one row for each of the nine transforms, grouped by the class Section 20.5.1 gives them. Left: mean omega at intensity 1.0. Right: the least intensity that flips the decision, where 1.000 is the top of the searched range and means no flip was found. A decoder should not respond at all to an invariant transform, and time_shift, which is one, has the largest omega and flips the decision at 0.281. The numbers come from an executed notebook that is not committed, so they have no public record yet.*
+
 ### 20.9.4 What Remains to Be Run
 
 The comparison the chapter is built around has not been made. It needs the workflow of Section 20.8 on audio: SPD and topological features computed from recordings, a hyperbolic classifier on the combined features, the same decoder trained with and without gradient reversal on recordings from several deployments, and the DRI and flip thresholds of each, against an interval-only baseline on the same split. Until that run exists, the claims of Sections 20.2 to 20.4 about what each geometric layer contributes are posited in the sense of Chapter 21.

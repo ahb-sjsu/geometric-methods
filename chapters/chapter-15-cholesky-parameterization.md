@@ -74,6 +74,10 @@ Since $\exp(\cdot) : \mathbb{R} \to (0, \infty)$ is a bijection, every real valu
 
 Total: $n(n+1)/2$ unconstrained real parameters that bijectively correspond to the set of $n \times n$ SPD matrices. An optimizer can take gradient steps of any magnitude in any direction without ever leaving the feasible set.
 
+![Figure 15.1](figures/ch15_fig1.svg)
+
+*Figure 15.1. Three ways to hold a 9 by 9 covariance or precision matrix as numbers to optimize. Left: all 81 entries, which no constraint keeps symmetric or positive definite. Middle: the log-diagonal Cholesky factor, 36 unconstrained entries below the diagonal and 9 diagonal entries stored as logarithms, 45 in all, the number of degrees of freedom of a symmetric matrix; any real values give a symmetric positive definite product. Right: the diagonal-only simplification of Section 15.8, 9 numbers.*
+
 ### 15.3.2 Why Log-Space for the Diagonal
 
 The log-space parameterization is not merely a convenience for enforcing positivity. It provides three additional benefits.
@@ -102,6 +106,10 @@ The map $f : \mathbb{R}^{n(n+1)/2} \to \text{SPD}(n)$ is:
 This map is smooth (infinitely differentiable), surjective onto SPD(n), and has a smooth inverse (the Cholesky decomposition followed by taking the log of the diagonal). It is therefore a diffeomorphism between $\mathbb{R}^{n(n+1)/2}$ and SPD(n), which means gradient-based optimization in parameter space $\mathbb{R}^{n(n+1)/2}$ corresponds to smooth navigation of the SPD manifold.
 
 ---
+
+![Figure 15.2](figures/ch15_fig2.svg)
+
+*Figure 15.2. The parameterization map of Section 15.3.3 for a 2 by 2 matrix with its top-left entry fixed at 1, plotted by the off-diagonal entry b (horizontal) and the lower-right entry c (vertical); the matrix is positive definite exactly when c is greater than b squared, the region above the parabola. The map sends the free off-diagonal parameter ℓ and the log-diagonal parameter θ to b = ℓ and c = ℓ squared plus exp(2θ). The curves are the images of the lines θ = −1, −0.5, 0, 0.25 and 0.5 and of the lines ℓ = −1.5 to 1.5 in steps of 0.5. Every one lies above the parabola, which is reached only as θ goes to minus infinity, so a step of any size in the parameters stays inside the cone.*
 
 ## 15.4 Implementation: NumPy
 

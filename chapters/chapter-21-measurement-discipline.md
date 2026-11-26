@@ -58,6 +58,10 @@ This is evidence that is hard to tamper with. It is not proof of the time on the
 
 ---
 
+![Figure 21.1](figures/ch21_fig1.svg)
+
+*Figure 21.1. Schematic of the order of events that makes a statement measured (Section 21.2). The registration is written and sealed in a commit before the run. Amendments are allowed only between the seal and the unblinding of the data. The seal commit must be an ancestor of the first commit that holds the result, which is how priority is shown. Grading by the registered code then has three outcomes, and the registration says in advance which gate leads to which.*
+
 ## 21.3 Frozen-Null Gates
 
 A bar stated as an absolute number invites two errors. It can be set where chance already reaches it, and it can be moved after the result is known. A **frozen-null gate** avoids both. The bar is a margin over one or more *nulls*, which are versions of the instrument that cannot contain the effect, and the nulls, the margin and the date are committed before the run.
@@ -77,6 +81,10 @@ where $\Phi$ is the standard normal distribution function. A margin chosen witho
 **A null can move.** Section 17.11.2 is a warning about nulls that depend on the experiment. The null skewness of a retrieval count is $1/\sqrt{\rho}$, which rises as the query budget $\rho$ falls. A comparison made at two different budgets compares two different nulls. Where a null depends on a design quantity, either hold that quantity fixed or model the null and remove it, and then confirm by measurement that it has been removed.
 
 ---
+
+![Figure 21.2](figures/ch21_fig2.svg)
+
+*Figure 21.2. The probability that a system with no effect passes a frozen-null gate, as a function of the margin measured in standard errors of the difference under no effect, from equation (21.2). The vertical axis is logarithmic. A margin of zero passes half the time. Margins of one, two and three standard errors pass about 16%, 2.3% and 0.13% of the time. A margin stated without the standard error has no place on the horizontal axis, so its false-pass rate is unknown.*
 
 ## 21.4 Admissibility
 

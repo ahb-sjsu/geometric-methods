@@ -757,6 +757,10 @@ def check_frontier_degradation(
 
 The 85% threshold means the frontier's dominated area must remain within 15% of the baseline. This is a *relative* check, not absolute, which makes it robust to differences in scale across models.
 
+![Figure 18.1](figures/ch18_fig1.svg)
+
+*Figure 18.1. The hypervolume indicator of Section 18.6.2 on an invented example. The axes are the number of active dimensions and the MAE, both minimized, with the default reference point (10, 10). A baseline frontier of four points dominates an area of 57.5. In the next version the two middle points are gone and the best MAE is unchanged; the area falls to 45.5, which is 79% of the baseline and below the 85% bar of the check. The frontier points are illustrative values chosen for the drawing, not measurements.*
+
 ### 18.6.3 Integration with Monitoring Infrastructure
 
 For teams that use Prometheus, Datadog, or similar observability platforms, campaign results can be exported as custom metrics:

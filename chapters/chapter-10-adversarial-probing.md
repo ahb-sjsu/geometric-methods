@@ -31,6 +31,10 @@ Three canonical profiles emerge across domains:
 
 **Linear profile** ($\delta(\alpha) \approx k\alpha$). Proportional degradation with no hidden tipping points---the most benign failure mode.
 
+![Figure 10.1](figures/ch10_fig1.svg)
+
+*Figure 10.1. The three canonical shapes of the intensity-response curve of Section 10.1.2: displacement of the model's output (vertical) against the intensity of the transform, from 0 to 1 (horizontal). All three start at zero displacement, as the intensity-zero identity requires. These are schematic shapes, not measurements: the threshold is placed at 0.6 and the linear profile has slope 1.*
+
 ### 10.1.3 Invariance and Sensitivity as Structural Signatures
 
 Transforms divide into *invariant* (semantics-preserving) and *stress* (semantics-destroying), a domain-dependent classification:
@@ -129,6 +133,10 @@ def find_adversarial_threshold(self, decoder, signal, sr, transform,
 A threshold of 0.95 means near-total robustness; 0.05 means the faintest perturbation flips the answer. The search plays the role of Chapter 9's parameter-space threshold search, with one difference: Chapter 9 scans a log-spaced grid, while here binary search on a monotone predicate finds the transition in $O(\log(1/\epsilon))$ evaluations regardless of domain.
 
 ---
+
+![Figure 10.2](figures/ch10_fig2.svg)
+
+*Figure 10.2. The binary search of Section 10.2.3 beside the ten-point sweep of Section 10.2.2, for a decoder whose output flips at an intensity of 0.37, a value chosen for the figure; the horizontal axis is the intensity. The sweep (top row) spends ten evaluations and places the threshold between two points 0.111 apart. Each row below is the interval the search still holds, with a dot at the midpoint it tests next. Seven halvings after the first check at intensity 1 bring the interval to a width of 0.0078, inside the tolerance of 0.01, and the search returns its upper end, 0.375.*
 
 ## 10.3 StructureProbe: The Probe Response Matrix
 

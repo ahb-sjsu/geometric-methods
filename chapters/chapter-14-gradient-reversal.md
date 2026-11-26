@@ -79,6 +79,10 @@ $$\frac{\partial \text{GRL}}{\partial \mathbf{z}} = -\lambda \mathbf{I} \quad \t
 
 where $\lambda > 0$ is a scaling factor that controls the strength of the adversarial signal.
 
+![Figure 14.1](figures/ch14_fig1.svg)
+
+*Figure 14.1. The domain-adversarial network of Section 14.2.1 with both passes drawn (a schematic of the structure, not a result). Solid arrows are the forward pass: the encoder's output z goes to the task head directly and to the domain head through the gradient reversal layer (GRL), which passes it unchanged. Dashed arrows are the backward pass: the task-loss gradient returns to the encoder as it is, and the domain-loss gradient is multiplied by −λ at the GRL before it reaches the encoder. The domain head therefore learns to predict the nuisance variable s while the encoder is pushed to make that prediction harder.*
+
 ### 14.2.2 The Combined Loss
 
 The full training objective is:
@@ -785,6 +789,10 @@ Means over three seeds. Chance is 20% for the condition and 16.7% for the coda t
 **P2 holds,** but for a reason that limits what follows. The model without reversal loses 10.4 points between the correlated and the shifted test, just over the bar. On the shifted test, however, every setting is at chance: 16.7% to 17.6%. At the click strength fixed before the run, no model learned the rhythm in 25 epochs. What each model knows about the coda type, it knows through the recording condition.
 
 **P3 fails.** Full reversal fooled the domain head, whose training accuracy fell from 95.9% to 37.7% on average and to 17.6% on one seed, below chance. But the probe, fitted on the same encoder's output afterwards, recovers the recording condition 99.9% of the time, exactly as it does without reversal. The information was not removed; it was moved to where this domain head could not read it. Shifted accuracy did not rise.
+
+![Figure 14.2](figures/ch14_fig2.svg)
+
+*Figure 14.2. The recorded run of Section 14.9 on the shortcut data, means over three seeds, accuracy in per cent: the domain head during training, a probe fitted afterwards to recover the recording condition from the frozen latent vectors, and the task on the shifted test set. Full reversal brings the domain head from 95.9% down to 37.7%, but the probe still recovers the condition 99.9% of the time and shifted accuracy stays at chance. Prediction P3, registered before the run, required the probe to fall by at least 15 points and shifted accuracy to rise by at least 5; the probe fell by 0.0 and shifted accuracy changed by −0.5, so P3 failed. The setting 0.5 was run without a prediction.*
 
 ### 14.9.3 What the Experiment Shows
 

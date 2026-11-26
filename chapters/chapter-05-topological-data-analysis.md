@@ -96,6 +96,10 @@ This is justified by the stability of persistent homology: if the subsampled clo
 
 ---
 
+![Figure 5.1](figures/ch05_fig1.svg)
+
+*Figure 5.1. Takens' delay embedding of the sine wave of Section 5.6, 5000 samples over five periods. Left: the signal against the sample index, with one pair of samples a delay τ = 250 apart. Right: each pair (x(t), x(t + τ)) plotted as a point, the embedding with d = 2. With the delay of the text, 50 samples, the points trace a thin ellipse, and with 250 samples, a quarter period, a circle: both are closed loops, which persistent homology reports as a long-lived H1 feature.*
+
 ## 5.3 Persistent Homology
 
 We now have a point cloud in $\mathbb{R}^d$. We want to extract its topological features — but a finite set of discrete points has no interesting topology in itself. Every point is an isolated connected component; there are no loops or voids. The key idea of persistent homology is to *thicken* the points and observe how topology changes as the thickening grows.
@@ -152,6 +156,10 @@ The distance from a point to the diagonal is $\frac{d - b}{\sqrt{2}}$, proportio
 **Stability.** The stability theorem guarantees that if we perturb the input point cloud by at most $\delta$ in the Hausdorff distance, the persistence diagram changes by at most $\delta$ in the bottleneck distance. This means that persistence diagrams are robust descriptors: small noise produces small changes, and the large-persistence features are the most stable.
 
 ---
+
+![Figure 5.2](figures/ch05_fig2.svg)
+
+*Figure 5.2. The example of Section 5.4, two ring-shaped clusters separated by a gap, computed from the definitions of Section 5.3 for the 22 points on the left (an illustrative cloud, not data). Right: the persistence diagram, with birth scale on the horizontal axis, death scale on the vertical axis and the diagonal death = birth. Every component is born at scale 0: twenty die below 0.70 as points join their ring, one lives until 1.52, where the two rings join, and the last never dies and is not drawn. The two loops are born at 0.74 and 0.59 and die at 1.77 and 1.39, far above the diagonal.*
 
 ## 5.5 Feature Extraction from Persistence
 

@@ -95,6 +95,10 @@ The interaction matrix $\Phi \in \mathbb{R}^{n \times n}$ collects all pairwise 
 
 ---
 
+![Figure 12.1](figures/ch12_fig1.svg)
+
+*Figure 12.1. The pairwise interaction as a gap, for the two-dimension cases of Section 12.1.3. In each panel the bars are increases in error: from removing dimension i, from removing dimension j, the sum of those two (what single removals predict for removing both), and what removing both does; the interaction is the last bar minus the third. Two copies of one signal cost nothing to remove singly and 1 to remove together, an interaction of +1, so ablation calls both unimportant. Two halves of an exclusive-or cost 1 each to remove and 1 together, an interaction of −1.*
+
 ## 12.2 The Interaction Matrix
 
 ### 12.2.1 Construction
@@ -358,6 +362,10 @@ The gains exhibit strong diminishing returns: the first dimension added (Process
 **Diminishing-returns elbow.** The point where marginal gains transition from substantial to negligible---the "elbow" of the MAE curve---is a natural place to draw a complexity boundary. In the example above, the elbow occurs at step 2 (adding Size), after which further dimensions contribute less than 0.15 MAE each. A practitioner might reasonably conclude that three dimensions (Complexity, Process, Size) capture the essential behavior and the remaining two add complexity without proportionate benefit. This connects directly to the Pareto analysis of Chapter 8: the elbow in the compositional sequence often corresponds to a Pareto-optimal point on the (dimensionality, MAE) frontier.
 
 **Interaction signatures.** The marginal gains also encode interaction information, though less directly than the interaction matrix. If the gain from adding dimension $j$ to the set $\{d_1, \ldots, d_k\}$ is much larger than the gain from $j$ alone, then $j$ completes something already in the set. If it is much smaller, the set already carries most of $j$'s information. Section 12.4.2 makes this exact.
+
+![Figure 12.2](figures/ch12_fig2.svg)
+
+*Figure 12.2. The composition path of Section 12.4.1 (illustrative values, not a recorded run): the error MAE after re-optimization (vertical) along the greedy build order, one dimension added per step (horizontal). Each segment is labelled with its marginal gain: 1.72, 0.37, 0.14 and 0.07. The descent is steep, then shallow, then nearly flat. The circled point is the elbow at three dimensions, after which each further dimension gains less than 0.15.*
 
 ### 12.4.2 Synergy versus Redundancy
 

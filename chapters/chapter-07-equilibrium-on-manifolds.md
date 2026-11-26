@@ -447,6 +447,14 @@ The model has no parameter named loss aversion, but the value of $\lambda$ is no
 
 With no non-monetary displacement a loss is slightly *less* costly than a gain, because the gain's small social term is the only one present. The geometry supplies the mechanism: a loss that moves more dimensions is farther away. The size of the effect comes from the displacement coefficients, and the empirical value is reproduced by choosing them. The table is computed in `formal/matlab/volume_checks.m`. Measuring those displacements, for example from how people rate losses and gains on each dimension, would turn this from a construction into a test.
 
+![Figure 7.1](figures/ch07_fig1.svg)
+
+*Figure 7.1. The displacements that the code of Section 7.7.1 assigns to a gain and to a loss of magnitude 1, each divided by the standard deviation of its dimension under the default covariance, 5 for money and 0.5 for the others. The gain moves two dimensions and the loss moves five. The Mahalanobis distance from the reference is 0.514 for the loss against 0.231 for the gain, a ratio of 2.22. The displacement coefficients and the covariance are set by hand, so the ratio is a property of that construction, not a measured value.*
+
+![Figure 7.2](figures/ch07_fig2.svg)
+
+*Figure 7.2. The loss aversion ratio λ of Section 7.7.1 against a common scale factor applied to the four non-monetary loss coefficients, under the default covariance. The curve is computed from the printed code and the five marked points are the values of the table. At scale 0 the loss moves money only and λ is 0.88; at scale 1, the coefficients as printed, λ is 2.22, inside the band 2.0 to 2.5 that the chapter cites from Kahneman and Tversky. The ratio falls in the band by the choice of the coefficients, which are set by hand; it is not a measurement.*
+
 ### 7.7.2 The Endowment Effect
 
 The endowment effect is the finding that people demand more to give up an object they own (willingness-to-accept, WTA) than they would pay to acquire the same object (willingness-to-pay, WTP). The ratio WTA/WTP typically ranges from 1.5 to 3.0 in experimental settings.

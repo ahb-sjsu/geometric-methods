@@ -471,6 +471,10 @@ Several findings stand out:
 
 4. **The targets that flip are dimension-specific.** Complexity perturbation affects high-complexity modules; Process perturbation affects high-churn and legacy modules. The adversarial search has revealed the *coupling structure* between parameters and prediction targets---information that global metrics like the MRI cannot provide.
 
+![Figure 9.2](figures/ch09_fig2.svg)
+
+*Figure 9.2. The tipping points of Section 9.6.3 (illustrative values, not a recorded run). The horizontal axis is one parameter as a multiple of its fitted value, on a logarithmic scale over the range of the threshold search, 1/1000 to 1000. Each band covers the multiples at which every target stays within the tolerance of 0.5, and a marked end is the first value at which a target breaks, labelled with that target. OO and Halstead show no tipping point anywhere in the range; a direction with no row in the table of Section 9.6.3 is drawn as reaching the edge.*
+
 ### 9.6.4 Synthesis
 
 Combining all three tools, the defect prediction model's robustness profile is:
@@ -499,6 +503,10 @@ $$\mathbb{E}[\omega] = \frac{\sigma^2}{2} \text{tr}(\mathbf{H}), \qquad \mathbb{
 In this regime, the mean term of the MRI is proportional to $\text{tr}(\mathbf{H})$, the sum of the eigenvalues of the Hessian, and the spread that drives its percentile terms grows with $\text{tr}(\mathbf{H}^2)$, the sum of their squares. Large eigenvalues (sharp directions in the loss landscape) therefore contribute disproportionately to the MRI, which is exactly the behavior we want: the MRI should be elevated when the landscape has even one sharp direction, because that direction represents a vulnerability.
 
 But the approximation breaks down when the loss surface is non-quadratic---when it has asymmetric curvature, flat plateaus that transition into cliffs, or multiple local minima in the perturbation neighborhood. In these cases, the MRI's empirical sampling approach captures behavior that the Hessian analysis misses. The Hessian is a local linear approximation; the MRI is a global (within the perturbation radius) nonlinear probe. Both are useful, but the MRI is more general.
+
+![Figure 9.1](figures/ch09_fig1.svg)
+
+*Figure 9.1. A sharp and a broad minimum with the same minimum value, in one parameter: the rise in loss (vertical) against the perturbation of the parameter (horizontal), from the quadratic form of Section 9.7.1 with curvatures 8 and 0.5, values chosen for the figure. Under a Gaussian perturbation of standard deviation 0.5 the mean rise is half the variance times the curvature: 1 for the sharp minimum and 0.0625 for the broad one, sixteen times less. An evaluation at the minimum alone gives the two the same score.*
 
 ### 9.7.2 Directional Robustness
 

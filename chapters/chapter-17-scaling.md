@@ -63,6 +63,10 @@ The raw subset count understates the true cost because each subset must be *opti
 
 ---
 
+![Figure 17.1](figures/ch17_fig1.svg)
+
+*Figure 17.1. The number of subsets of at most K dimensions out of n, the sum S(n, K) of Section 17.2, computed from that formula and drawn on logarithmic axes. The marked points are at the values of n the section tabulates. Each curve approaches a straight line of slope K, which is growth as n to the power K: going from 20 to 200 dimensions multiplies the count by about 100 for K = 2 and by about 10,000 for K = 4. Each of those subsets still has to be optimized.*
+
 ## 17.3 Greedy Alternatives
 
 ### 17.3.1 Forward Selection
@@ -538,6 +542,10 @@ The two ratio statistics change sign with the protocol. Dividing by a null remov
 **Hubs are made by the queries.** Which points become hubs? The campaign described each point by eight features: seven of local geometry (density, three neighbour radii, the slope of radius with rank, local intrinsic dimension, anisotropy) and one of query exposure, the amount of query mass near the point. A partition of the points built from all eight carried at most 1.20 times the information about retrieval counts that a partition built from query exposure alone carried, at twelve cells and on held-out points (`results/R13_STAGE1_RESULT.md`). Local geometry adds little once query exposure is known. Consistent with this, real queries against the corpus gave an attractiveness skew of 6.36 where queries drawn from the corpus's own distribution gave 2.51 in a matched cell.
 
 The lower tail depends on the budget as well. The share of points never returned at $k = 10$ was 26.5% at $\rho = 3.34$, 55.2% at $\rho = 1.25$ and 75.9% at $\rho = 0.50$. At the highest budget, half of the never-returned points were ones that no query had come near. A count of anti-hubs taken at one budget is partly a count of unasked questions.
+
+![Figure 17.2](figures/ch17_fig2.svg)
+
+*Figure 17.2. Slope of three hubness statistics per tenfold increase in corpus size, at k = 10, under two protocols that differ only in whether the query budget or the number of queries is held constant (table of Section 17.11.2). The two statistics formed by dividing by a null change sign with the protocol. The attractiveness skew, which models the sampling and inverts it, gives nearly the same slope twice. The values are measurements from the openvector-bench campaign, not peer reviewed. The comparison between protocols stands, but the slopes are not a property of the corpus: queries and corpus came from different files, and the claim that hubness rises with corpus size was withdrawn.*
 
 ### 17.11.3 Rules for Practice
 

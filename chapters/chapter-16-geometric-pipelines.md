@@ -75,6 +75,10 @@ The evaluation function is the pipeline's most important abstraction boundary. E
 
 ---
 
+![Figure 16.1](figures/ch16_fig1.svg)
+
+*Figure 16.1. Schematic of the data flow in run_campaign, as the listing of Section 16.2.2 has it. The six stages run in a fixed order. Five of them call the evaluation function, and the Pareto stage only filters the results of stage 1. The parameter vector of the best subset found in stage 1 is the point that stages 3, 4 and 5 probe, so a poor result in stage 1 sends all three to the wrong point.*
+
 ## 16.2 The `run_campaign` API
 
 ### 16.2.1 Function Signature and Parameters
@@ -205,6 +209,10 @@ For a 5-dimensional problem with defaults ($K = 4$, $n_{\text{grid}} = 20$, $n_{
 For a 9-dimensional problem, the evaluation count rises sharply: $\binom{9}{3} = 84$ three-dimensional subsets and $\binom{9}{4} = 126$ four-dimensional subsets, each requiring 5000 random evaluations, push the total past one million. Section 16.6 discusses strategies for managing this cost.
 
 ---
+
+![Figure 16.2](figures/ch16_fig2.svg)
+
+*Figure 16.2. The evaluation budget of Section 16.2.3 for five dimensions with the default settings, on a logarithmic axis. The four rows of subset enumeration are the number of subsets of each size times the cost of optimizing one, and they sum to 79,100 calls. The MRI, the sensitivity profile and the adversarial search together add about 410. The counts follow from the formulas of the section and are not measurements; the compositional test and the baselines are not shown because the section gives no count for them.*
 
 ## 16.3 `StructuralFuzzReport`: Structured Output
 

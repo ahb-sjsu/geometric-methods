@@ -517,6 +517,10 @@ $$\mathcal{L}_{\text{hier}} \;=\; \sum_{(r, r') \in \text{parent-child}} \max\bi
 
 ---
 
+![Figure 3.1](figures/ch03_fig1.svg)
+
+*Figure 3.1. Geodesic distance from the origin on the Poincaré ball with c = 1, the depth score of Section 3.5.2, against the Euclidean norm of the point. The curve is 2 artanh of the norm; near the origin it follows the dashed line, twice the norm, and toward the rim it diverges. The marked points carry the conformal factors quoted in the chapter: 20.51 at the projection radius 0.95, about 100 at 0.99 and about 1000 at 0.999. Equal steps in depth take ever smaller Euclidean steps near the rim, which gives room for deep, specific nodes and is also where float precision runs out.*
+
 ## 3.6 Einstein Midpoint for Aggregation
 
 A recurring operation in hyperbolic neural networks is *weighted averaging* — computing the centroid of a set of points on the ball. The Euclidean weighted mean $\bar{x} = \sum_i w_i x_i / \sum_i w_i$ does not generalize directly because $\mathbb{B}^d_c$ is not a vector space.
@@ -621,6 +625,10 @@ def aggregate_rules(encoder: HyperbolicRuleEncoder,
 The attention weights typically come from a cross-attention mechanism that scores how relevant each candidate rule is to the current input. The Einstein midpoint then produces a single point on the ball that respects the hyperbolic geometry — it is not simply the Euclidean average of the embeddings, which would systematically underestimate the "depth" of the aggregate rule.
 
 ---
+
+![Figure 3.2](figures/ch03_fig2.svg)
+
+*Figure 3.2. The two-point test of Section 3.6.1 in the unit ball, x1 = (0.9, 0) and x2 at the origin. The upper ruler is the position on the radius in Euclidean coordinates and the lower ruler is hyperbolic distance from x2, which runs from 0 to 2.94. The Einstein midpoint, at radius 0.627, lands at half that distance, 1.47 from each point. The shortcut that weights Poincaré points by 1/(1 − ‖x‖²) returns 0.756, which is 1.98 from x2 and 0.97 from x1, and the Euclidean mean, 0.45, is only 0.97 from x2.*
 
 ## 3.7 Numerical Considerations and Best Practices
 

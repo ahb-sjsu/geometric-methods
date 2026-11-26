@@ -332,6 +332,10 @@ def unique_orbit(grid: np.ndarray) -> list[np.ndarray]:
 
 In practice, grids with large stabilizers are rare in ARC --- most task grids are asymmetric, yielding the full orbit of 8. But when they do occur, the duplicate augmentations can subtly bias training. If a symmetric grid has orbit size 2 while asymmetric grids have orbit size 8, the symmetric grid is overrepresented by a factor of 4 in the augmented training set. For large-scale training this may not matter; for the few-shot regime of ARC (typically 2--4 training pairs per task), it can shift the inferred rule toward the symmetric example.
 
+![Figure 13.1](figures/ch13_fig1.svg)
+
+*Figure 13.1. The orbit-stabilizer count on four example 4 by 4 grids, each shown under the eight transforms that all_dihedral returns, in its order; a transform that reproduces a grid already shown in the row is dimmed. A grid with no symmetry gives eight distinct grids, one with a single mirror axis four, one unchanged by quarter turns two, and a fully symmetric one a single grid. In every row the number of distinct grids times the number of transforms that leave the grid unchanged is 8. The dimmed copies are the duplicate augmentations of Section 13.6.1.*
+
 ### 13.6.2 Burnside's Lemma and Counting Distinct Patterns
 
 A related question arises in ARC task analysis: *how many truly distinct grid patterns exist*, up to $D_4$ equivalence? Burnside's lemma (also known as the Cauchy-Frobenius lemma) answers this:

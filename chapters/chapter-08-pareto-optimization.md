@@ -59,6 +59,10 @@ To see why, observe that minimizing $\Phi(\mathbf{x}) = \sum w_i f_i(\mathbf{x})
 
 In the structural fuzzing context, non-convex frontiers arise naturally. Consider the two objectives "number of feature groups" (dimensionality $k$) and "prediction error" (MAE). A configuration using two carefully chosen feature groups may outperform all three-group configurations---creating a non-convex pocket at $k = 3$. No weighted combination of $k$ and MAE can discover this pocket. Only direct enumeration and dominance-based filtering can find it.
 
+![Figure 8.1](figures/ch08_fig1.svg)
+
+*Figure 8.1. Why a weighted sum cannot reach every point of a Pareto frontier, on nine illustrative points with both objectives to be minimized. Minimizing a weighted sum slides a straight line toward the origin until it first touches a point; for equal weights (dashed) the line rests on two points, where the sum is 4, and passes below the point between them, where the sum is 4.6. That point lies in a non-convex pocket: it is not dominated, yet in each of 999 weightings tried, from 0.001 to 0.999 on the first objective, another point has the smaller weighted sum.*
+
 ### 8.2.3 The Preference Inversion Problem
 
 A subtler failure mode of scalarization is *preference inversion*: the optimal configuration under weights $\mathbf{w}_1$ may be ranked lower than a suboptimal configuration under slightly different weights $\mathbf{w}_2$, with no way to determine which weights are "correct" without external domain knowledge. In practice, this means that two teams analyzing the same data with slightly different weight choices can reach opposite conclusions about which configuration is best---and both are "right" within their respective scalarizations.
@@ -367,6 +371,10 @@ For the defect prediction example, the ratios are:
 With a threshold of $\rho \geq 0.3$, the practitioner selects $k = 3$ (three feature groups). Each additional group beyond three buys less than 0.3 MAE improvement per group added---below the threshold of practical significance. The decision is data-driven, explicit, and reproducible.
 
 ---
+
+![Figure 8.2](figures/ch08_fig2.svg)
+
+*Figure 8.2. The selection rule of Section 8.7.3 on the frontier of Section 8.7.2 (illustrative values, not a recorded run), with the number of feature groups k on the horizontal axis and the error MAE on the vertical. Each segment is labelled with its marginal return, the error removed per group added: 1.70, 0.40, then 0.10. With a threshold of 0.3 the rule stops at k = 3, the last point reached by a step that returns at least the threshold. No point stands at k = 4, because no four-group configuration is on this frontier.*
 
 ## 8.8 The Defect Prediction Example
 

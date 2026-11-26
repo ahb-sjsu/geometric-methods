@@ -104,6 +104,10 @@ sigma_inv = np.linalg.inv(sigma)
 **Cultural heterogeneity.** A powerful consequence of encoding the metric in $\Sigma$ is that different populations -- different cultures, different market segments, different user cohorts -- can be modeled with different covariance structures. A culture that prioritizes fairness over economic efficiency would have a smaller $\sigma_{2,2}$ (making fairness deviations more costly) and a larger $\sigma_{0,0}$ (making monetary differences less significant). The *same* underlying model, the *same* distance function, but different $\Sigma$ matrices. This is metric learning applied to behavioral science, and it is one of the most compelling aspects of the geometric approach.
 
 
+![Figure 2.1](figures/ch02_fig1.svg)
+
+*Figure 2.1. Variance and precision for the nine dimensions of the illustrative covariance matrix of Section 2.2, on a logarithmic axis. The variance is the diagonal entry of the matrix and the precision is the diagonal entry of its inverse, computed from the printed code with its couplings. Inversion mirrors each dimension about 1: Consequences has the widest variance, 25, and the lowest precision, 0.043, and Fairness has the narrowest variance, 0.25, and the highest precision, 4.55. The matrix is an illustration and is not the package default.*
+
 ## 2.3 The Inverse Covariance as an Attention Mechanism
 
 The precision matrix $\Sigma^{-1}$ has a natural interpretation as an *attention* mechanism. Each diagonal entry $(\Sigma^{-1})_{ii}$ determines how much the distance metric "pays attention" to dimension $i$. Large values mean high attention; small values mean the dimension is effectively ignored.
@@ -167,6 +171,10 @@ for _ in range(n_random):
 
 This principle extends beyond grid search. Gradient-based optimizers also benefit from log-space parameterization, because the gradient of $\log(\sigma)$ with respect to a loss function has more uniform magnitude across the parameter range than the gradient of $\sigma$ itself. To see why, consider the chain rule: if $\sigma = 10^\theta$, then $\partial \mathcal{L}/\partial \theta = (\partial \mathcal{L}/\partial \sigma) \cdot \sigma \cdot \ln(10)$. The multiplicative factor of $\sigma$ compensates for the fact that $\partial \mathcal{L}/\partial \sigma$ tends to be inversely proportional to $\sigma$ for scale-sensitive losses. The result is that gradient steps in $\theta$-space produce proportional changes in $\sigma$ regardless of the current scale. We exploit this property in the Cholesky factorization discussed next.
 
+
+![Figure 2.2](figures/ch02_fig2.svg)
+
+*Figure 2.2. Two grids of 20 points on the range 0.01 to 100, drawn on a logarithmic axis. The uniform grid has equal differences between neighbours and places 1 of its 20 points at or below 1. The log-spaced grid of Section 2.4 has equal ratios, each value 1.62 times the one before, and places 10 of its 20 points below 1. The shaded band is the part of the range from 0.01 to 1, two of the four decades.*
 
 ## 2.5 Cholesky Factorization for Positive-Definiteness
 

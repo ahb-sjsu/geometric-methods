@@ -35,6 +35,10 @@ The scalar $\operatorname{tr}(Q\Delta)$ replaces the reconstruction error $\oper
 
 ---
 
+![Figure 22.1](figures/ch22_fig1.svg)
+
+*Figure 22.1. Two read metrics on the same plane, each shown by the set of displacements whose loss is at most 1. Left: the whitening consumer, whose read metric is the inverse covariance, so the set is the Mahalanobis ellipse of Chapter 2, closed in every direction. Right: a consumer that reads one linear combination of the coordinates. Its read metric has rank 1, the set is a strip that never closes, and a displacement along the strip, the kernel, costs nothing. Drawn for a covariance with variances 2 and 0.5 on axes turned by 30 degrees, and a read direction at 30 degrees; these are illustrative values.*
+
 ## 22.2 Computing the Metric When the Consumer Can Only Be Queried
 
 When the consumer is available as code with automatic differentiation, $P(x)$ costs one Jacobian. When it is a black box, central differences recover the Jacobian column by column:
@@ -133,6 +137,10 @@ At every rate the weighted allocation has the larger reconstruction error and th
 **Status.** The result is exploratory in the sense of Chapter 21. The predictions were fixed before the run and the script precedes its output in the version history, but there is one synthetic consumer, one seed, and no registration outside the script. The standard errors of the measured losses are below 0.002. The consumer was built with a kernel that is the same at every point, which is the favorable case for an averaged metric. The measured cases on real consumers, with their failures, are in Volume 14.
 
 ---
+
+![Figure 22.2](figures/ch22_fig2.svg)
+
+*Figure 22.2. The recorded run of Section 22.4: two allocations of the same description rate, one by reverse water-filling with the identity weight and one with the read metric estimated from 200 probe points. Left: reconstruction error, tr Δ. Right: the consumer loss measured on 200,000 simulated vectors. At 1, 2 and 4 nats the weighted allocation has the larger reconstruction error and the smaller consumer loss, by ratios of 0.476, 0.334 and 0.196. The result is exploratory: one synthetic consumer and one seed, with a kernel that is the same at every point.*
 
 ## 22.5 When One Averaged Matrix Is the Wrong Object
 

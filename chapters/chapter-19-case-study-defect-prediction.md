@@ -210,6 +210,10 @@ The defect rate is 12.1%, so a model that predicts "no defect" for every test mo
 
 The differences that remain are in accuracy and AUC, and they are small against their noise. With 36 defective and 264 clean modules, the standard error of an AUC near 0.55 is about 0.05 (Hanley and McNeil, 1982). The 31 configurations span AUCs from 43% to 59%, all within two standard errors of chance.
 
+![Figure 19.1](figures/ch19_fig1.svg)
+
+*Figure 19.1. AUC on the 300 test modules for the six configurations whose AUC the table of Section 19.4.1 prints, in percent. The shaded band is two standard errors either side of chance, with the standard error of about 5 points given in Section 19.5.1. The bar under the rows is the range of all 31 configurations, 43 to 59. The generator's own formula, used as an oracle, reaches 54.5, and the target the evaluation function scores against is 80. Measured on one recorded run; exploratory, since no prediction was registered before it.*
+
 ### 19.5.2 The Winner Is a Draw
 
 {OO, Process} wins because it made exactly one positive prediction and that prediction was right: precision 100%, recall one in 36. That single module lowers its MAE by eight points and puts it first. It was chosen on the same 300 modules that score it, so its rank is a property of those modules.
@@ -223,6 +227,10 @@ That can be tested directly by drawing the data again. Over 20 seeds of the same
 **Sensitivity.** The profile ablates each group from the best configuration. Removing Process raises the MAE to 48.84 (+9.44) and removing OO raises it to 48.27 (+8.87); Size, Complexity and Halstead are already off, so removing them changes nothing. The profile ranks OO as the second most important group. That is true of this test set and false of the generator.
 
 **Composition and the baselines.** Starting from Size, the compositional test adds Complexity (47.23), Halstead (47.45), Process (48.13) and OO (48.27). Forward selection starts from Complexity (47.34) and adds Size (47.23), Halstead (47.45) and Process (48.13). Backward elimination starts from all five (48.27) and removes Halstead (47.47), OO (48.24), Process (47.23) and Size (47.34). None of the three greedy paths ever reaches {OO, Process}. The exhaustive optimum is an isolated point whose neighbours score like everything else, which is the signature of a lucky draw and not of structure in the data. When exhaustive and greedy searches disagree this sharply, the disagreement is itself a diagnostic.
+
+![Figure 19.2](figures/ch19_fig2.svg)
+
+*Figure 19.2. MAE of every configuration the three greedy searches of Section 19.6 visit, against the number of active feature groups. Where two paths pass through the same configuration their markers are drawn side by side. All of them lie between 47.2 and 49.3, above the floor of 40.4 that any configuration with zero recall must have. The exhaustive optimum, {OO, Process} at 39.40, is below that floor because of one correct positive prediction, and no greedy path reaches it. Measured on one recorded run; exploratory.*
 
 ## 19.7 The Model Robustness Index
 
